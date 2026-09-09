@@ -12,6 +12,7 @@
     "dev:client": "vite",
     "dev:server": "tsx watch src/server/index.ts",
     "build": "vite build",
+    "vendor:specs": "node scripts/vendor-specs.mjs",
     "start": "NODE_ENV=production tsx src/server/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

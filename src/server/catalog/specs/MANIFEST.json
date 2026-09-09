@@ -1,0 +1,63 @@
+{
+  "repository": "https://github.com/0xShug0/audio.cpp.git",
+  "commit": "05f9c5d6e26b6a06d7d29f0c8142a1c8951d9598",
+  "vendoredAt": "2026-09-09T10:08:23.964Z",
+  "files": [
+    {
+      "name": "ace_step.json",
+      "sha256": "e71d84adebb00d607e4d6f97a0c6043e20721c1913f5716e1274e54079a146a9"
+    },
+    {
+      "name": "minimax_music3.json",
+      "sha256": "233f0b1e1f9601003739200b3451919925c65ecf2524f4160fa26346bb7c2fe5"
+    },
+    {
+      "name": "heartmula.json",
+      "sha256": "3a76e5a7be361f9b73c91e0a4052fcb2f6cf8a0e4033b9962a0ce7ea31a691a5"
+    },
+    {
+      "name": "stable_audio.json",
+      "sha256": "a9c270c5ad984643a346eb754062e60e8556baa9b2a0ae748f12e8afcb9be582"
+    },
+    {
+      "name": "midashenglm_gen.json",
+      "sha256": "48684d9006d7398922fc3b98e662a1eeef01ad69bd37734f908a636617c17c36"
+    },
+    {
+      "name": "htdemucs.json",
+      "sha256": "b53e8b6eb399c30d8631850f61868bbd5efe7f03c00574ea85ca5a77079e5205"
+    },
+    {
+      "name": "bs_roformer.json",
+      "sha256": "ddbb087f3df70bc1ee14d811435a69da8e9d7e195e07d4ed5436cf42ef3d7508"
+    },
+    {
+      "name": "mel_band_roformer.json",
+      "sha256": "bb168fd5c8e7a8b9a61bdbfc1fc77d2f9f3105bf59e96a0312ae4a0d5548c4f4"
+    },
+    {
+      "name": "rvc.json",
+      "sha256": "f60ff8e6c7ed4e8f7c38c9b5c9c16e5cf010bb8c3574bba1f91aa99334399e9d"
+    },
+    {
+      "name": "seed_vc.json",
+      "sha256": "c16632ac1626a705bacbb35011d483da1b35d4d0c2532006944fc0b73370174a"
+    },
+    {
+      "name": "meanvc2.json",
+      "sha256": "e4fe246f57d3db22d6574a0c97f593cef10523173d1f62a5762c1ac847e93e00"
+    },
+    {
+      "name": "audiosr.json",
+      "sha256": "cca03ae649c8e43fe306bb53f8bf0164cb9c7b63c356ad592d6a6b4326906abf"
+    },
+    {
+      "name": "controlfoley.json",
+      "sha256": "f874e80a413657f449d9138617093b845e86c9d50903773115f1ea2dd4744047"
+    },
+    {
+      "name": "muscriptor.json",
+      "sha256": "eaf507e8b6af24da022c5583b2e77cee2082e824005fafa8c23f79e01445cda9"
+    }
+  ]
+}
