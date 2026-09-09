@@ -60,3 +60,49 @@ export interface InstallProgress {
   startedAt: string;
   updatedAt: string;
 }
+
+/** One installable package as the catalog screen sees it: spec, live size, and any install in flight. */
+export interface CatalogPackage {
+  id: string;
+  label: string;
+  precision: string;
+  /** The precision the model authors suggest. Exactly one per family, and it leads the card. */
+  recommended: boolean;
+  /** Download size in bytes. Absent until the backend has finished scanning. */
+  bytes?: number;
+  /**
+   * Not optional on purpose. With no live data this is false and the screen
+   * says the state is unknown, rather than claiming the package is absent.
+   */
+  installed: boolean;
+  /** Present only while Miso has a record of installing this package. */
+  install?: InstallProgress;
+}
+
+/** A model family and its precisions, one card on the catalog screen. */
+export interface CatalogFamily {
+  family: string;
+  displayName: string;
+  summary: string;
+  tasks: string[];
+  languages: string[];
+  packages: CatalogPackage[];
+}
+
+/**
+ * Everything the catalog screen needs in one response.
+ *
+ * `live` says how much to trust the sizes and installed flags. Families are
+ * listed either way, because the vendored specs are what exists and a backend
+ * that cannot answer should not empty the screen.
+ */
+export interface Catalog {
+  families: CatalogFamily[];
+  live: 'ready' | 'scanning' | 'unavailable';
+  unavailableReason?: 'management_disabled' | 'unreachable' | 'error';
+  unavailableMessage?: string;
+  /** The vendored spec commit, echoed so the UI never guesses which specs it is showing. */
+  specVersion: string;
+  /** The backend these sizes and installs describe. */
+  backendUrl: string;
+}
