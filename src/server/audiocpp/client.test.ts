@@ -104,6 +104,24 @@ describe('fetchInstallStatus', () => {
       expect(result.value.totalBytes).toBeUndefined();
     }
   });
+
+  it('reports a failed install as known, finished, and failed, and keeps the real error message', async () => {
+    // Recorded live against a gated Hugging Face package (pocket_tts_english_safetensors),
+    // which the server refuses without a valid HF token. state is "failed" directly, not
+    // "complete" with a non-zero exit_code, and exit_code and progress_percent both stay -1.
+    respondWith(load('install-status-failed.json'));
+    const result = await fetchInstallStatus('http://backend', 'pocket_tts_english_safetensors');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.known).toBe(true);
+      expect(result.value.finished).toBe(true);
+      expect(result.value.failed).toBe(true);
+      expect(result.value.phase).toBe('failed');
+      expect(result.value.message).toBe(
+        'kyutai/pocket-tts/languages/english/embeddings/alba.safetensors requires accepted Hugging Face access and a valid HF token',
+      );
+    }
+  });
 });
 
 describe('startInstall', () => {

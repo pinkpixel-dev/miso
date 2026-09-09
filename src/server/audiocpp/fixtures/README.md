@@ -10,7 +10,7 @@ Re-record them when the image is updated, using the commands in Task 1 of
 |---|---|---|---|
 | `/v1/ui/models/package-sizes` | GET | none | `package-sizes-scanning.json`, `package-sizes-complete.json` |
 | `/v1/ui/models/install` | POST | `{"id":"<package_id>"}` | `install-started.json` |
-| `/v1/ui/models/install-status` | GET | `?id=<package_id>` | `install-status-running.json`, `install-status-complete.json`, `install-status-unknown.json` |
+| `/v1/ui/models/install-status` | GET | `?id=<package_id>` | `install-status-running.json`, `install-status-complete.json`, `install-status-unknown.json`, `install-status-failed.json` |
 | `/v1/ui/models/install/stop` | POST | `{"id":"<package_id>"}` | not recorded, see notes |
 | `/v1/ui/models/delete` | POST | `{"id":"<package_id>"}` | not recorded, see notes |
 | `/v1/ui/models/clean-partial` | POST | `{"id":"<package_id>"}` | not recorded, see notes |
@@ -21,11 +21,21 @@ Re-record them when the image is updated, using the commands in Task 1 of
   `{"error":{"message":"UI model installation is disabled","type":"forbidden"}}`.
 - Install progress reports real byte counts, not just a phase string. Every
   install-status response carries `downloaded_bytes`, `total_bytes`, and
-  `progress_percent` (an integer 0-100, or -1 for a job that never started)
+  `progress_percent` (an integer 0-100, or -1 while idle or on failure)
   alongside `state`, `message`, `exit_code`, `started_at_ms`, and
-  `finished_at_ms`. `state` is one of `idle`, `queued`, `running`, `complete`
-  (both success and failure land here; check `exit_code` and `message` to
-  tell them apart).
+  `finished_at_ms`.
+- **Correction to an earlier note (Task 5 review):** `state` is not limited to
+  `idle`, `queued`, `running`, `complete`. A real failure was captured
+  installing the gated package `pocket_tts_english_safetensors` (HF access
+  refused): the server reports `state:"failed"` directly, not
+  `state:"complete"` with a non-zero `exit_code`. `exit_code` stayed `-1`
+  (never set) and `progress_percent` stayed `-1` too, the same value used for
+  a job the server has no record of. The two states are still distinguishable:
+  an unrecorded job has `state:"idle"` and `started_at_ms:0`; a real failure
+  has `state:"failed"` and a non-zero `started_at_ms`/`finished_at_ms`. See
+  `install-status-failed.json`. A `state:"complete"` job with a non-zero
+  `exit_code` may still exist for other failure modes and is still treated as
+  failed, but `state:"failed"` is the confirmed real path.
 - The plan's guessed request body key `package` is wrong. The install route
   requires `id` and returns `{"error":{"message":"missing required json key: id","type":"server_error"}}`
   when you send `package` instead.

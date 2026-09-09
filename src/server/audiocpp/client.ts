@@ -150,6 +150,10 @@ async function call<T>(
       headers: { accept: 'application/json', ...init.headers },
     });
 
+    // 403 is the confirmed live response for a server started without --ui-management.
+    // 404 is treated the same defensively (a route that does not exist reads the same
+    // to a caller as one that refuses), but that case is unconfirmed against a real
+    // server.
     if (response.status === 403 || response.status === 404) {
       return {
         ok: false,
@@ -209,21 +213,26 @@ function readPackageSizes(body: unknown): PackageSizeReport {
 
 /**
  * Normalizes the install / install-status payload. Field names come from the
- * Task 1 fixtures: `state` is "idle" | "queued" | "running" | "complete",
- * `exit_code` is -1 until the job finishes and 0 on success, and a job the
- * server never started answers with `progress_percent:-1`, which is the only
- * reliable signal that this job is not known (state is "idle" for both a fresh
- * queue slot and a job the server has no record of).
+ * Task 1 fixtures, corrected after a real recorded failure (Task 5 review):
+ * `state` is "idle" | "queued" | "running" | "complete" | "failed", `exit_code`
+ * is -1 until the job finishes and 0 on success, and `progress_percent` is -1
+ * both for a job the server never started AND for a real failure (a gated
+ * package refused by Hugging Face never got a percent at all), so it cannot
+ * tell those two apart on its own. `state:"idle"` is the reliable signal for
+ * "no record of this job"; a real failure reports `state:"failed"` directly,
+ * not `state:"complete"` with a non-zero exit_code as first assumed. Both are
+ * treated as failed here, since a "complete" job with a non-zero exit_code may
+ * still exist for other failure modes even though only "failed" is confirmed.
  */
 function readInstallStatus(body: unknown): InstallReport {
   const row = (body ?? {}) as Record<string, unknown>;
   const state = str(row.state);
-  const known = num(row.progress_percent) !== -1;
+  const known = state !== 'idle';
 
   return {
     known,
-    finished: state === 'complete',
-    failed: state === 'complete' && row.exit_code !== 0,
+    finished: state === 'complete' || state === 'failed',
+    failed: state === 'failed' || (state === 'complete' && row.exit_code !== 0),
     phase: state,
     downloadedBytes: known ? num(row.downloaded_bytes) : undefined,
     totalBytes: known ? num(row.total_bytes) : undefined,

@@ -1,0 +1,1 @@
+{"id":"pocket_tts_english_safetensors","state":"failed","message":"kyutai/pocket-tts/languages/english/embeddings/alba.safetensors requires accepted Hugging Face access and a valid HF token","exit_code":-1,"downloaded_bytes":125,"total_bytes":0,"progress_percent":-1,"started_at_ms":1788949476351,"finished_at_ms":1788949480713}
