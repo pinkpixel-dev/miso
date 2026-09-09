@@ -3,17 +3,16 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react
 /**
  * The handful of primitives Miso needs so far.
  *
- * These are hand written rather than pulled from shadcn/ui, because at this
- * point we need a button, an input, and a panel, and the shadcn CLI would bring
- * a dependency tree plus an interactive setup for three components. When we
- * reach dialogs, selects, and popovers in phase 2, adding shadcn will earn its
- * keep and these can be replaced.
+ * These are hand written rather than pulled from shadcn/ui. Phase 2 added the
+ * dialog and the disclosure the same way shadcn does, by keeping the component
+ * source here on top of the Radix primitives, because the shadcn CLI wants the
+ * path aliases phase 1 removed. See Dialog.tsx and Disclosure.tsx.
  *
  * Every interactive element here has default, hover, focus-visible, active, and
  * disabled states. That is not polish, it is the baseline.
  */
 
-function cx(...parts: (string | false | undefined)[]): string {
+export function cx(...parts: (string | false | undefined)[]): string {
   return parts.filter(Boolean).join(' ');
 }
 
