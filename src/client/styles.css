@@ -1,0 +1,88 @@
+@import 'tailwindcss';
+
+@import '@fontsource-variable/space-grotesk';
+@import '@fontsource-variable/public-sans';
+@import '@fontsource-variable/jetbrains-mono';
+
+/*
+ * Miso is a dark-only application. It is a studio tool that people use for long
+ * stretches, often at night, and a light theme is not worth maintaining until
+ * somebody asks for it.
+ *
+ * Surfaces are warm charcoal rather than black, so stacked panels stay
+ * distinguishable without borders doing all the work. The accent is a single
+ * amber, used sparingly for the active state and destructive confirmation.
+ */
+@theme {
+  --font-display: 'Space Grotesk Variable', ui-sans-serif, sans-serif;
+  --font-sans: 'Public Sans Variable', ui-sans-serif, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  /* Surfaces, darkest to lightest. */
+  --color-base: oklch(0.17 0.005 285);
+  --color-surface: oklch(0.21 0.006 285);
+  --color-raised: oklch(0.25 0.007 285);
+  --color-line: oklch(0.32 0.008 285);
+  --color-line-strong: oklch(0.42 0.009 285);
+
+  /* Text. */
+  --color-ink: oklch(0.97 0.002 285);
+  --color-ink-muted: oklch(0.75 0.006 285);
+  --color-ink-faint: oklch(0.6 0.007 285);
+
+  /* Meaning. */
+  --color-accent: oklch(0.78 0.15 75);
+  --color-accent-ink: oklch(0.2 0.04 75);
+  --color-good: oklch(0.75 0.14 155);
+  --color-bad: oklch(0.68 0.17 25);
+  --color-warn: oklch(0.8 0.13 90);
+}
+
+@layer base {
+  html {
+    background-color: var(--color-base);
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-base);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  /*
+   * Focus is never removed, only restyled. Every interactive element gets a
+   * visible ring on keyboard focus, which matters because this app is meant to
+   * be fully drivable from the keyboard.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-accent-ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

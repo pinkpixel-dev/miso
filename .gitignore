@@ -1,0 +1,22 @@
+# Models are large local downloads, never committed
+models/
+
+# Miso runtime data
+data/
+*.sqlite
+*.sqlite-journal
+
+# Node
+node_modules/
+dist/
+.env
+.env.local
+
+# OS
+.DS_Store
+samples/
+
+# Other
+models/
+samples/
+DOCS/
