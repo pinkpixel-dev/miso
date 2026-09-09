@@ -8,9 +8,9 @@ Miso runs on [audio.cpp](https://github.com/0xShug0/audio.cpp), a C++ inference 
 audio models. Miso is the studio around it: projects that persist, a history of every take,
 and a record of exactly how each clip was made so you can change one thing and try again.
 
-> **Early days.** Phase 1 of the [roadmap](DOCS/ROADMAP.md) is done, which means the app
-> runs and connects to a server. Generation arrives in phase 4 and remix in phase 5. It is
-> not usable for making music yet.
+> **Early days.** Phases 1 and 2 of the [roadmap](DOCS/ROADMAP.md) are done, so the app runs,
+> connects to a server, and installs models. Generation arrives in phase 4 and remix in
+> phase 5. It is not usable for making music yet.
 
 ## Why it exists
 
@@ -85,16 +85,23 @@ That puts the whole app on <http://127.0.0.1:5171>.
 
 ### 3. Get some models
 
-Model downloading through the Miso interface arrives in phase 2. Until then, use the
-server's own API:
+Open the Models screen. It lists every music model audio.cpp can run, what each one does,
+its download size, and whether it is already installed. Pick a model and press Install. The
+download runs in the Miso service, so progress keeps moving after you close the tab.
 
-```bash
-curl -X POST http://127.0.0.1:8080/v1/ui/models/install \
-  -H 'Content-Type: application/json' \
-  -d '{"id":"ace_step_turbo_q8_0"}'
+Each family leads with the precision its authors recommend. The rest are behind the
+variants expander on the card.
 
-curl "http://127.0.0.1:8080/v1/ui/models/install-status?id=ace_step_turbo_q8_0"
-```
+Installing needs the server started with `--ui-management`. Without it the Models screen
+still describes every model, but the buttons are disabled and Miso shows you the command to
+restart with.
+
+Downloads come from Hugging Face and are often slower than your connection. A 250 MB
+package taking several minutes is normal and is nothing to do with Miso or audio.cpp.
+
+The models directory you bind into the container must be writable by uid 1000, which is the
+user audio.cpp runs as. If Docker created it for you as root, installs fail with
+`could not create package staging directory`.
 
 ## Running the server somewhere else
 
@@ -128,6 +135,7 @@ which can run to hundreds of megabytes, out of the browser.
 
 ## Project docs
 
+- [DOCS/OVERVIEW.md](DOCS/OVERVIEW.md) is the technical reference for how Miso works today
 - [DOCS/PLAN.md](DOCS/PLAN.md) covers the design and why each decision was made
 - [DOCS/ROADMAP.md](DOCS/ROADMAP.md) is the build order and checklist
 - [DOCS/ERRORS.md](DOCS/ERRORS.md) records problems already solved, worth reading before
