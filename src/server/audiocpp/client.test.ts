@@ -1,0 +1,152 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  cleanPartial,
+  deletePackage,
+  fetchInstallStatus,
+  fetchPackageSizes,
+  startInstall,
+  stopInstall,
+} from './client.ts';
+
+const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+const load = (name: string): unknown => JSON.parse(readFileSync(join(fixtures, name), 'utf8'));
+
+function respondWith(body: unknown, status = 200): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })),
+  );
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('fetchPackageSizes', () => {
+  it('reports a scan in progress', async () => {
+    respondWith(load('package-sizes-scanning.json'));
+    const result = await fetchPackageSizes('http://backend');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.scanning).toBe(true);
+      expect(result.value.packages.every((p) => p.bytes === undefined)).toBe(true);
+    }
+  });
+
+  it('reports sizes and installed state once the scan completes', async () => {
+    respondWith(load('package-sizes-complete.json'));
+    const result = await fetchPackageSizes('http://backend');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.scanning).toBe(false);
+      expect(result.value.packages.length).toBe(202);
+      expect(result.value.packages.every((p) => typeof p.id === 'string')).toBe(true);
+      const acestepTurbo = result.value.packages.find((p) => p.id === 'ace_step_turbo_q8_0');
+      expect(acestepTurbo).toEqual({ id: 'ace_step_turbo_q8_0', bytes: 6185460032, installed: true });
+    }
+  });
+
+  it('reports management disabled rather than throwing', async () => {
+    respondWith(load('management-forbidden.json'), 403);
+    const result = await fetchPackageSizes('http://backend');
+    expect(result).toEqual({ ok: false, reason: 'management_disabled', message: expect.any(String) });
+  });
+
+  it('reports an unreachable server rather than throwing', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('fetch failed');
+      }),
+    );
+    const result = await fetchPackageSizes('http://backend');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('unreachable');
+  });
+});
+
+describe('fetchInstallStatus', () => {
+  it('reports a running install with real byte progress', async () => {
+    respondWith(load('install-status-running.json'));
+    const result = await fetchInstallStatus('http://backend', 'stable_audio_3_small_music_q8_0');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.known).toBe(true);
+      expect(result.value.finished).toBe(false);
+      expect(result.value.failed).toBe(false);
+      expect(result.value.phase).toBe('running');
+      expect(result.value.downloadedBytes).toBe(40950081);
+      expect(result.value.totalBytes).toBe(1683570752);
+    }
+  });
+
+  it('reports a finished, successful install', async () => {
+    respondWith(load('install-status-complete.json'));
+    const result = await fetchInstallStatus('http://backend', 'stable_audio_3_small_music_q8_0');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.finished).toBe(true);
+      expect(result.value.failed).toBe(false);
+      expect(result.value.downloadedBytes).toBe(1683570752);
+    }
+  });
+
+  it('reports a job the server does not know about, with no misleading byte counts', async () => {
+    respondWith(load('install-status-unknown.json'));
+    const result = await fetchInstallStatus('http://backend', 'definitely_not_a_package');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.known).toBe(false);
+      expect(result.value.downloadedBytes).toBeUndefined();
+      expect(result.value.totalBytes).toBeUndefined();
+    }
+  });
+});
+
+describe('startInstall', () => {
+  it('posts the id key, not package, and succeeds', async () => {
+    const spy = vi.fn(async () => new Response(JSON.stringify(load('install-started.json')), { status: 200 }));
+    vi.stubGlobal('fetch', spy);
+
+    const result = await startInstall('http://backend', 'htdemucs_q8_0');
+
+    expect(result.ok).toBe(true);
+    const [url, init] = spy.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain('/v1/ui/models/install');
+    expect(String(init.body)).toBe(JSON.stringify({ id: 'htdemucs_q8_0' }));
+  });
+});
+
+describe('fetchInstallStatus request shape', () => {
+  it('queries by id, not package', async () => {
+    const spy = vi.fn(async () => new Response(JSON.stringify(load('install-status-running.json')), { status: 200 }));
+    vi.stubGlobal('fetch', spy);
+
+    await fetchInstallStatus('http://backend', 'stable_audio_3_small_music_q8_0');
+
+    const [url] = spy.mock.calls[0] as unknown as [string];
+    expect(url).toBe('http://backend/v1/ui/models/install-status?id=stable_audio_3_small_music_q8_0');
+  });
+});
+
+describe('stopInstall, deletePackage, cleanPartial', () => {
+  it('all post the id key to their respective routes', async () => {
+    const spy = vi.fn(async () => new Response(JSON.stringify(load('install-status-complete.json')), { status: 200 }));
+    vi.stubGlobal('fetch', spy);
+
+    await stopInstall('http://backend', 'p1');
+    await deletePackage('http://backend', 'p2');
+    await cleanPartial('http://backend', 'p3');
+
+    const calls = spy.mock.calls as unknown as [string, RequestInit][];
+    expect(calls[0]?.[0]).toContain('/v1/ui/models/install/stop');
+    expect(String(calls[0]?.[1].body)).toBe(JSON.stringify({ id: 'p1' }));
+    expect(calls[1]?.[0]).toContain('/v1/ui/models/delete');
+    expect(String(calls[1]?.[1].body)).toBe(JSON.stringify({ id: 'p2' }));
+    expect(calls[2]?.[0]).toContain('/v1/ui/models/clean-partial');
+    expect(String(calls[2]?.[1].body)).toBe(JSON.stringify({ id: 'p3' }));
+  });
+});

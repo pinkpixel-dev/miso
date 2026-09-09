@@ -101,3 +101,157 @@ export async function checkHealth(baseUrl: string): Promise<BackendStatus> {
     };
   }
 }
+
+/**
+ * The model management surface, which needs the server started with
+ * --ui-management. Without it these routes refuse, and that refusal is a state
+ * Miso renders rather than an error it throws.
+ *
+ * These are quick metadata calls (start a job, poll its status, stop it, delete
+ * a package), not the download itself, which runs on the server in the
+ * background. They still share the server process with that download, so they
+ * get more headroom than the health check but nowhere near a generation
+ * budget: 10 seconds is enough for a JSON round trip even while the server is
+ * busy streaming gigabytes to disk.
+ */
+const MANAGEMENT_TIMEOUT_MS = 10_000;
+
+export type ManagementResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: 'management_disabled' | 'unreachable' | 'error'; message: string };
+
+export interface PackageSizeReport {
+  scanning: boolean;
+  packages: { id: string; bytes: number | undefined; installed: boolean }[];
+}
+
+export interface InstallReport {
+  /** False when the server has no record of this job, which is the restart case. */
+  known: boolean;
+  finished: boolean;
+  failed: boolean;
+  phase: string | undefined;
+  downloadedBytes: number | undefined;
+  totalBytes: number | undefined;
+  message: string | undefined;
+}
+
+/** Makes a management request and turns every expected failure into a ManagementResult. */
+async function call<T>(
+  baseUrl: string,
+  path: string,
+  init: RequestInit,
+  read: (body: unknown) => T,
+): Promise<ManagementResult<T>> {
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      ...init,
+      signal: AbortSignal.timeout(MANAGEMENT_TIMEOUT_MS),
+      headers: { accept: 'application/json', ...init.headers },
+    });
+
+    if (response.status === 403 || response.status === 404) {
+      return {
+        ok: false,
+        reason: 'management_disabled',
+        message: 'This server was started without --ui-management, so it cannot manage models.',
+      };
+    }
+
+    if (!response.ok) {
+      return { ok: false, reason: 'error', message: `The server answered with HTTP ${response.status}.` };
+    }
+
+    return { ok: true, value: read(await response.json()) };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return { ok: false, reason: 'unreachable', message: `No response within ${MANAGEMENT_TIMEOUT_MS} ms.` };
+    }
+    if (error instanceof TypeError) {
+      return { ok: false, reason: 'unreachable', message: `Could not reach ${baseUrl}.` };
+    }
+    return { ok: false, reason: 'error', message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function json(body: unknown): RequestInit {
+  return { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } };
+}
+
+function num(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function str(value: unknown): string | undefined {
+  return typeof value === 'string' && value !== '' ? value : undefined;
+}
+
+/**
+ * Normalizes the package-sizes payload. Field names come from the Task 1 fixtures:
+ * top-level `state` ("running" while the scan is in flight, "complete" once done)
+ * and `data`, an array of entries carrying `id`, `size_bytes` (null while scanning),
+ * and `installed`.
+ */
+function readPackageSizes(body: unknown): PackageSizeReport {
+  const root = (body ?? {}) as Record<string, unknown>;
+  const entries = Array.isArray(root.data) ? root.data : [];
+
+  return {
+    scanning: root.state === 'running',
+    packages: entries.flatMap((entry) => {
+      const row = (entry ?? {}) as Record<string, unknown>;
+      const id = str(row.id);
+      if (!id) return [];
+      return [{ id, bytes: num(row.size_bytes), installed: row.installed === true }];
+    }),
+  };
+}
+
+/**
+ * Normalizes the install / install-status payload. Field names come from the
+ * Task 1 fixtures: `state` is "idle" | "queued" | "running" | "complete",
+ * `exit_code` is -1 until the job finishes and 0 on success, and a job the
+ * server never started answers with `progress_percent:-1`, which is the only
+ * reliable signal that this job is not known (state is "idle" for both a fresh
+ * queue slot and a job the server has no record of).
+ */
+function readInstallStatus(body: unknown): InstallReport {
+  const row = (body ?? {}) as Record<string, unknown>;
+  const state = str(row.state);
+  const known = num(row.progress_percent) !== -1;
+
+  return {
+    known,
+    finished: state === 'complete',
+    failed: state === 'complete' && row.exit_code !== 0,
+    phase: state,
+    downloadedBytes: known ? num(row.downloaded_bytes) : undefined,
+    totalBytes: known ? num(row.total_bytes) : undefined,
+    message: str(row.message),
+  };
+}
+
+export function fetchPackageSizes(baseUrl: string): Promise<ManagementResult<PackageSizeReport>> {
+  return call(baseUrl, '/v1/ui/models/package-sizes', { method: 'GET' }, readPackageSizes);
+}
+
+export function startInstall(baseUrl: string, packageId: string): Promise<ManagementResult<void>> {
+  return call(baseUrl, '/v1/ui/models/install', json({ id: packageId }), () => undefined);
+}
+
+export function fetchInstallStatus(baseUrl: string, packageId: string): Promise<ManagementResult<InstallReport>> {
+  const query = `?id=${encodeURIComponent(packageId)}`;
+  return call(baseUrl, `/v1/ui/models/install-status${query}`, { method: 'GET' }, readInstallStatus);
+}
+
+export function stopInstall(baseUrl: string, packageId: string): Promise<ManagementResult<void>> {
+  return call(baseUrl, '/v1/ui/models/install/stop', json({ id: packageId }), () => undefined);
+}
+
+export function deletePackage(baseUrl: string, packageId: string): Promise<ManagementResult<void>> {
+  return call(baseUrl, '/v1/ui/models/delete', json({ id: packageId }), () => undefined);
+}
+
+export function cleanPartial(baseUrl: string, packageId: string): Promise<ManagementResult<void>> {
+  return call(baseUrl, '/v1/ui/models/clean-partial', json({ id: packageId }), () => undefined);
+}
