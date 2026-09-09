@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { ApiError } from '../../shared/types.ts';
 import { checkHealth } from '../audiocpp/client.ts';
 import { readSettings, writeSettings } from '../db/settings.ts';
+import { catalogRoutes } from './catalog.ts';
 
 export const api = new Hono();
 
@@ -39,3 +40,5 @@ api.get('/backend/status', async (c) => {
   const url = override?.trim() ? override.trim().replace(/\/+$/, '') : readSettings().backendUrl;
   return c.json(await checkHealth(url));
 });
+
+api.route('/', catalogRoutes);

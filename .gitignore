@@ -3,6 +3,7 @@ models/
 
 # Miso runtime data
 data/
+.tmp/
 *.sqlite
 *.sqlite-journal
 

@@ -1,4 +1,4 @@
-import type { ApiError, BackendStatus, Settings } from '../../shared/types.ts';
+import type { ApiError, BackendStatus, Catalog, Settings } from '../../shared/types.ts';
 
 /**
  * Every call the client makes goes through here, and every one targets the Miso
@@ -34,4 +34,18 @@ export const api = {
   /** Omit `url` to check the saved backend, pass one to test before saving. */
   getBackendStatus: (url?: string) =>
     request<BackendStatus>(`/backend/status${url ? `?url=${encodeURIComponent(url)}` : ''}`),
+
+  getCatalog: () => request<Catalog>('/catalog'),
+
+  installPackage: (id: string) =>
+    request<Catalog>(`/catalog/packages/${encodeURIComponent(id)}/install`, { method: 'POST' }),
+
+  stopInstall: (id: string) =>
+    request<Catalog>(`/catalog/packages/${encodeURIComponent(id)}/install/stop`, { method: 'POST' }),
+
+  cleanPartial: (id: string) =>
+    request<Catalog>(`/catalog/packages/${encodeURIComponent(id)}/clean`, { method: 'POST' }),
+
+  removePackage: (id: string) =>
+    request<Catalog>(`/catalog/packages/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
