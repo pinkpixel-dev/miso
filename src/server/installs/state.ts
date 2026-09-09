@@ -22,11 +22,14 @@ export function nextInstallProgress(
 
   const status = report.value;
 
-  if (status.finished) return { state: 'complete', phase: status.phase, downloadedBytes: status.downloadedBytes };
-
+  // Failure is checked first. audio.cpp reports a failed install as a finished
+  // one, so testing `finished` first would record the failure as a completed
+  // install and throw the server's reason away.
   if (status.failed) {
     return { state: 'failed', error: status.message ?? 'The server reported a failed install without saying why.' };
   }
+
+  if (status.finished) return { state: 'complete', phase: status.phase, downloadedBytes: status.downloadedBytes };
 
   if (!status.known) {
     return {

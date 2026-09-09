@@ -4,6 +4,7 @@ import { BackendBanner } from './BackendBanner.tsx';
 
 const NAV = [
   { to: '/', label: 'Library', end: true },
+  { to: '/models', label: 'Models', end: false },
   { to: '/settings', label: 'Settings', end: false },
 ];
 

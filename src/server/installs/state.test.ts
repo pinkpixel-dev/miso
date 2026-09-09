@@ -58,7 +58,11 @@ describe('nextInstallProgress', () => {
     expect(nextInstallProgress({ ok: false, reason: 'unreachable' })).toEqual({});
   });
 
-  it('prefers finished over failed when a report claims both', () => {
-    expect(nextInstallProgress(report({ finished: true, failed: true })).state).toBe('complete');
+  it('treats a report claiming both finished and failed as a failure', () => {
+    // audio.cpp marks a failed install finished as well. Reading that as a
+    // completed install is what silently hid install errors.
+    const next = nextInstallProgress(report({ finished: true, failed: true, message: 'no staging directory' }));
+    expect(next.state).toBe('failed');
+    expect(next.error).toBe('no staging directory');
   });
 });
