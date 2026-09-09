@@ -42,3 +42,21 @@ export interface ApiError {
   error: string;
   detail?: string;
 }
+
+/** Where an install Miso started has got to. */
+export type InstallState = 'running' | 'complete' | 'failed' | 'cancelled' | 'interrupted';
+
+/**
+ * `interrupted` means the job stopped reporting without finishing, which is
+ * what a restarted audio.cpp looks like. Miso offers to resume rather than
+ * resuming on its own, because this is a multi-gigabyte download.
+ */
+export interface InstallProgress {
+  state: InstallState;
+  phase?: string;
+  downloadedBytes?: number;
+  totalBytes?: number;
+  error?: string;
+  startedAt: string;
+  updatedAt: string;
+}
