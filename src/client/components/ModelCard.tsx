@@ -101,7 +101,9 @@ function PackageRow({
             {pkg.install?.state === 'interrupted' ? 'Resume' : 'Install'}
           </Button>
         )}
-        {pkg.install?.state === 'interrupted' || pkg.install?.state === 'failed' ? (
+        {pkg.install?.state === 'interrupted' ||
+        pkg.install?.state === 'failed' ||
+        pkg.install?.state === 'cancelled' ? (
           <Button variant="ghost" onClick={onClean} disabled={disabled}>
             Clean up
           </Button>

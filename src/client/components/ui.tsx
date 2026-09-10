@@ -64,7 +64,7 @@ export function Field({ label, hint, error, id, className, ...rest }: FieldProps
         aria-describedby={describedBy}
         aria-invalid={error ? true : undefined}
         className={cx(
-          'w-full rounded-md border bg-base px-3 py-2 text-sm text-ink transition-colors duration-150',
+          'w-full rounded-md border bg-canvas px-3 py-2 text-sm text-ink transition-colors duration-150',
           'placeholder:text-ink-faint hover:border-line-strong',
           error ? 'border-bad' : 'border-line',
           'disabled:cursor-not-allowed disabled:opacity-45',
@@ -97,7 +97,7 @@ export function Panel({
   return (
     <section className="rounded-lg border border-line bg-surface">
       <header className="border-b border-line px-5 py-4">
-        <h2 className="text-base">{title}</h2>
+        <h2 className="text-base text-ink">{title}</h2>
         {description ? <p className="mt-1 text-sm text-ink-muted">{description}</p> : null}
       </header>
       <div className="px-5 py-5">{children}</div>
@@ -128,7 +128,7 @@ export function Pill({ tone, children }: { tone: 'good' | 'bad' | 'warn' | 'neut
 
 export function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-md border border-line bg-base px-3.5 py-3 font-mono text-xs leading-relaxed text-ink-muted">
+    <pre className="overflow-x-auto rounded-md border border-line bg-canvas px-3.5 py-3 font-mono text-xs leading-relaxed text-ink-muted">
       <code>{children}</code>
     </pre>
   );

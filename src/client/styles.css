@@ -18,8 +18,14 @@
   --font-sans: 'Public Sans Variable', ui-sans-serif, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
 
-  /* Surfaces, darkest to lightest. */
-  --color-base: oklch(0.17 0.005 285);
+  /*
+   * Surfaces, darkest to lightest. The page colour is canvas, not base,
+   * because a --color-base token makes Tailwind generate a text-base colour
+   * utility that collides with its own text-base font size. The colour won,
+   * so any heading using text-base for its size was painted in the page
+   * background and became invisible.
+   */
+  --color-canvas: oklch(0.17 0.005 285);
   --color-surface: oklch(0.21 0.006 285);
   --color-raised: oklch(0.25 0.007 285);
   --color-line: oklch(0.32 0.008 285);
@@ -40,13 +46,13 @@
 
 @layer base {
   html {
-    background-color: var(--color-base);
+    background-color: var(--color-canvas);
     color-scheme: dark;
   }
 
   body {
     margin: 0;
-    background-color: var(--color-base);
+    background-color: var(--color-canvas);
     color: var(--color-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;

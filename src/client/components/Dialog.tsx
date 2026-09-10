@@ -60,7 +60,7 @@ export function ConfirmDialog({
               onClick={onConfirm}
               className={
                 destructive
-                  ? 'bg-bad text-[var(--color-base)] hover:bg-bad/90 active:bg-bad/80'
+                  ? 'bg-bad text-canvas hover:bg-bad/90 active:bg-bad/80'
                   : undefined
               }
             >

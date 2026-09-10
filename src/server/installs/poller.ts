@@ -1,5 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import { fetchInstallStatus } from '../audiocpp/client.ts';
+import { clearLiveStatusCache } from '../audiocpp/packageStatus.ts';
 import { activeInstalls, updateInstall } from '../db/installs.ts';
 import { nextInstallProgress } from './state.ts';
 
@@ -34,11 +35,20 @@ export async function pollActiveInstalls(handle: Database): Promise<number> {
   );
 
   let changed = 0;
+  let settled = false;
   for (const { row, patch } of results) {
     if (Object.keys(patch).length === 0) continue;
     updateInstall(handle, row.packageId, row.backendUrl, patch);
     changed += 1;
+    if (patch.state !== undefined && patch.state !== 'running') settled = true;
   }
+
+  // An install that has just stopped running is the one moment the cached
+  // directory scan is certainly wrong, and the client stops asking as soon as
+  // nothing is running. Without this the card sits on Install until somebody
+  // reloads the page. Only terminal states clear it, because clearing on every
+  // tick would rescan the models directory every three seconds mid-download.
+  if (settled) clearLiveStatusCache();
 
   return changed;
 }
