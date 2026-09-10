@@ -127,3 +127,33 @@ export interface Project {
   assetCount: number;
   bytes: number;
 }
+
+export type AssetFormat = 'wav' | 'flac' | 'mp3' | 'm4a';
+export type AssetKind = 'source' | 'generated' | 'stem';
+
+/**
+ * One piece of audio. `peaks` is null until the browser that imported it, or a
+ * later viewer, computes and uploads them. An asset without peaks is complete
+ * and playable, it just has no waveform drawn yet.
+ */
+export interface Asset {
+  id: string;
+  projectId: string;
+  kind: AssetKind;
+  label: string;
+  filename: string;
+  format: AssetFormat;
+  bytes: number;
+  checksum: string;
+  durationSeconds?: number;
+  sampleRate?: number;
+  channels?: number;
+  peaks?: number[][];
+  createdAt: string;
+}
+
+/** A project together with its assets, newest first. */
+export interface ProjectDetail {
+  project: Project;
+  assets: Asset[];
+}
