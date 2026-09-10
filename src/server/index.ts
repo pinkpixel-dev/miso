@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { relative } from 'node:path';
 import { clientDistDir, host, isProduction, port, projectRoot } from './config.ts';
 import { db } from './db/index.ts';
+import { sweepTempFiles } from './library/storage.ts';
 import { api } from './routes/api.ts';
 
 const app = new Hono();
@@ -30,6 +31,11 @@ if (isProduction) {
 }
 
 db();
+
+// Any .tmp- file is an upload whose process is gone, so it can never finish.
+void sweepTempFiles().then((removed) => {
+  if (removed > 0) console.log(`[miso] swept ${removed} abandoned upload(s)`);
+});
 
 serve({ fetch: app.fetch, hostname: host, port }, (info) => {
   const where = `http://${host}:${info.port}`;
