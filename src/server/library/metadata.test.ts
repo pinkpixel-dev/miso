@@ -34,4 +34,11 @@ describe('readAudioFacts', () => {
     const result = await readAudioFacts(join(fixtures, 'absent.wav'));
     expect(result.ok).toBe(false);
   });
+
+  it('rejects an MP4 video with an AAC audio track, not just files that fail to parse', async () => {
+    const result = await readAudioFacts(join(fixtures, 'video.mp4'));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.detected).toMatch(/\S/);
+  });
 });

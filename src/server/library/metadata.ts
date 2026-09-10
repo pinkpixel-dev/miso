@@ -34,9 +34,16 @@ export type AudioFactsResult = { ok: true; value: AudioFacts } | { ok: false; de
  * - WAV reports container "WAVE".
  * - FLAC reports container "FLAC".
  * - MP3 reports container "MPEG".
- * - M4A reports container "M4A/isom/iso2", not a bare "M4A" or "MPEG-4". The
- *   entries below cover the exact string plus the shorter forms other M4A
- *   variants are documented to use, since only one M4A encoder was tested here.
+ * - M4A reports container "M4A/isom/iso2", not a bare "M4A" or "MPEG-4".
+ *
+ * Only entries that have actually been observed, or that are distinctive
+ * enough to prefix-match safely, are kept here. Generic ISO base media brand
+ * codes such as "isom" and "mp42" are deliberately absent: an ordinary MP4
+ * video with an AAC audio track also reports a container beginning with
+ * "isom", and matching on that would silently accept a video file as m4a.
+ * "MPEG-4" is likewise absent from the prefix set for a related reason: the
+ * string "MPEG-4" itself starts with "MPEG", so keeping "MPEG" loose would
+ * misclassify an MP4 container as mp3.
  */
 const CONTAINERS: Record<string, AssetFormat> = {
   WAVE: 'wav',
@@ -44,23 +51,33 @@ const CONTAINERS: Record<string, AssetFormat> = {
   FLAC: 'flac',
   MPEG: 'mp3',
   'M4A/isom/iso2': 'm4a',
-  'MPEG-4': 'm4a',
   M4A: 'm4a',
-  mp42: 'm4a',
-  isom: 'm4a',
 };
+
+/**
+ * Keys distinctive enough to prefix-match without risking a false accept.
+ * MPEG is deliberately excluded: "MPEG-4" starts with "MPEG", so a loose
+ * MPEG prefix would classify an MP4 container as mp3. MPEG is exact-match
+ * only, via the CONTAINERS lookup above.
+ */
+const PREFIX_KEYS: readonly string[] = ['WAVE', 'RIFF', 'FLAC', 'M4A'];
 
 function toFormat(container: string | undefined, codec: string | undefined): AssetFormat | undefined {
   if (container && CONTAINERS[container]) return CONTAINERS[container];
 
-  // Some containers arrive with a trailing space or a version suffix, and the
-  // MPEG-4 family reports several brand codes. Fall back to a prefix match
-  // before giving up, then to the codec name.
+  // Some containers arrive with a trailing space or a version suffix. Fall
+  // back to a prefix match against only the distinctive keys, never the
+  // generic ones, and never MPEG (see PREFIX_KEYS above).
   const normalised = container?.trim().toUpperCase() ?? '';
-  for (const [key, format] of Object.entries(CONTAINERS)) {
-    if (normalised.startsWith(key.toUpperCase())) return format;
+  for (const key of PREFIX_KEYS) {
+    if (normalised.startsWith(key)) return CONTAINERS[key];
   }
-  if (codec && codec.toUpperCase().includes('AAC')) return 'm4a';
+
+  // The codec fallback only fires once the container has already shown
+  // itself to be part of the M4A family. Checking the codec alone would
+  // readmit a video file whose container was rejected above but whose audio
+  // track happens to be AAC.
+  if (normalised.startsWith('M4A') && codec && codec.toUpperCase().includes('AAC')) return 'm4a';
 
   return undefined;
 }
