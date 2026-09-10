@@ -1,4 +1,4 @@
-import type { ApiError, BackendStatus, Catalog, Settings } from '../../shared/types.ts';
+import type { ApiError, BackendStatus, Catalog, CleanPartialsResult, Settings } from '../../shared/types.ts';
 
 /**
  * Every call the client makes goes through here, and every one targets the Miso
@@ -43,8 +43,8 @@ export const api = {
   stopInstall: (id: string) =>
     request<Catalog>(`/catalog/packages/${encodeURIComponent(id)}/install/stop`, { method: 'POST' }),
 
-  cleanPartial: (id: string) =>
-    request<Catalog>(`/catalog/packages/${encodeURIComponent(id)}/clean`, { method: 'POST' }),
+  /** Sweeps abandoned downloads for every package at once, not one model. */
+  cleanPartials: () => request<CleanPartialsResult>('/catalog/partials/clean', { method: 'POST' }),
 
   removePackage: (id: string) =>
     request<Catalog>(`/catalog/packages/${encodeURIComponent(id)}`, { method: 'DELETE' }),

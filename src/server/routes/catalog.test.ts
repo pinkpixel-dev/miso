@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Catalog } from '../../shared/types.ts';
+import type { Catalog, CleanPartialsResult } from '../../shared/types.ts';
 import * as client from '../audiocpp/client.ts';
 import { clearLiveStatusCache } from '../audiocpp/packageStatus.ts';
 import { catalogRoutes } from './catalog.ts';
@@ -75,3 +75,66 @@ async function firstPackageId(): Promise<string> {
   if (!id) throw new Error('No vendored package to test with');
   return id;
 }
+
+describe('POST /api/catalog/partials/clean', () => {
+  function sizesReady() {
+    vi.spyOn(client, 'fetchPackageSizes').mockResolvedValue({
+      ok: true,
+      value: { scanning: false, packages: [] },
+    });
+  }
+
+  it('sweeps every vendored package, not just one', async () => {
+    sizesReady();
+    const clean = vi.spyOn(client, 'cleanPartial').mockResolvedValue({ ok: true, value: 0 });
+
+    const response = await app().request('/api/catalog/partials/clean', { method: 'POST' });
+
+    expect(response.status).toBe(200);
+    const ids = clean.mock.calls.map((call) => call[1]);
+    expect(ids.length).toBeGreaterThan(1);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('totals the directories the server removed', async () => {
+    sizesReady();
+    let first = true;
+    vi.spyOn(client, 'cleanPartial').mockImplementation(async () => {
+      if (first) {
+        first = false;
+        return { ok: true, value: 2 };
+      }
+      return { ok: true, value: 0 };
+    });
+
+    const body = (await (await app().request('/api/catalog/partials/clean', { method: 'POST' })).json()) as
+      CleanPartialsResult;
+
+    expect(body.removed).toBe(2);
+    expect(body.catalog.families.length).toBeGreaterThan(0);
+  });
+
+  it('reports an unknown count rather than zero when no server said how many', async () => {
+    sizesReady();
+    vi.spyOn(client, 'cleanPartial').mockResolvedValue({ ok: true, value: undefined });
+
+    const body = (await (await app().request('/api/catalog/partials/clean', { method: 'POST' })).json()) as
+      CleanPartialsResult;
+
+    expect(body.removed).toBeUndefined();
+  });
+
+  it('refuses when the server cannot manage models', async () => {
+    sizesReady();
+    vi.spyOn(client, 'cleanPartial').mockResolvedValue({
+      ok: false,
+      reason: 'management_disabled',
+      message: 'This server was started without --ui-management, so it cannot manage models.',
+    });
+
+    const response = await app().request('/api/catalog/partials/clean', { method: 'POST' });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('ui-management') });
+  });
+});

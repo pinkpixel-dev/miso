@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ConfirmDialog } from '../components/Dialog.tsx';
 import { ModelCard } from '../components/ModelCard.tsx';
 import { Button, CodeBlock, Panel } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
@@ -17,7 +19,24 @@ const ENABLE_MANAGEMENT_COMMAND = `docker run -d --name miso-audiocpp --runtime=
  * the sizes, the installed state, and the buttons go away.
  */
 export function Models() {
-  const { catalog, error, loading, reload, act } = useCatalog();
+  const { catalog, error, loading, reload, act, cleanPartials } = useCatalog();
+  const [confirmingClean, setConfirmingClean] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanResult, setCleanResult] = useState<string | undefined>();
+
+  async function runClean() {
+    setCleaning(true);
+    const { ok, removed } = await cleanPartials();
+    setCleaning(false);
+    setConfirmingClean(false);
+    if (!ok) return setCleanResult(undefined);
+    if (removed === 0) return setCleanResult('Nothing to clean up. No partial downloads were left behind.');
+    setCleanResult(
+      removed === undefined
+        ? 'Partial downloads cleaned up.'
+        : `Cleaned up ${removed} partial ${removed === 1 ? 'download' : 'downloads'}.`,
+    );
+  }
 
   if (loading) return <p className="text-sm text-ink-muted">Loading the catalog.</p>;
 
@@ -42,10 +61,21 @@ export function Models() {
             <span className="font-mono text-xs">{catalog.backendUrl}</span>.
           </p>
         </div>
-        <Button variant="ghost" onClick={() => void reload()}>
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" onClick={() => setConfirmingClean(true)} disabled={unavailable}>
+            Clean up partial downloads
+          </Button>
+          <Button variant="ghost" onClick={() => void reload()}>
+            Refresh
+          </Button>
+        </div>
       </header>
+
+      {cleanResult ? (
+        <p role="status" className="rounded-md border border-line px-4 py-3 text-sm text-ink-muted">
+          {cleanResult}
+        </p>
+      ) : null}
 
       {error ? (
         <p role="alert" className="rounded-md border border-bad/40 px-4 py-3 text-sm text-bad">
@@ -84,10 +114,32 @@ export function Models() {
             onInstall={(id) => void act(() => api.installPackage(id))}
             onStop={(id) => void act(() => api.stopInstall(id))}
             onRemove={(id) => void act(() => api.removePackage(id))}
-            onClean={(id) => void act(() => api.cleanPartial(id))}
           />
         ))}
       </div>
+
+      <ConfirmDialog
+        open={confirmingClean}
+        title="Clean up partial downloads?"
+        body={
+          <>
+            <p>
+              A download that was cancelled, failed, or stopped when the server did leaves a partly downloaded
+              folder behind. audio.cpp cannot resume one, so a later install starts again from the beginning and
+              the old folder just takes up space.
+            </p>
+            <p className="mt-2">
+              Miso cannot tell how much there is until it asks, so this checks every model. Installed models are
+              not touched.
+            </p>
+          </>
+        }
+        confirmLabel="Clean up"
+        destructive
+        busy={cleaning}
+        onConfirm={() => void runClean()}
+        onCancel={() => setConfirmingClean(false)}
+      />
 
       <p className="text-xs text-ink-faint">
         Model descriptions come from audio.cpp at commit{' '}
