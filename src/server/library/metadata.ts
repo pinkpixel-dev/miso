@@ -62,7 +62,7 @@ const CONTAINERS: Record<string, AssetFormat> = {
  */
 const PREFIX_KEYS: readonly string[] = ['WAVE', 'RIFF', 'FLAC', 'M4A'];
 
-function toFormat(container: string | undefined, codec: string | undefined): AssetFormat | undefined {
+function toFormat(container: string | undefined): AssetFormat | undefined {
   if (container && CONTAINERS[container]) return CONTAINERS[container];
 
   // Some containers arrive with a trailing space or a version suffix. Fall
@@ -72,12 +72,6 @@ function toFormat(container: string | undefined, codec: string | undefined): Ass
   for (const key of PREFIX_KEYS) {
     if (normalised.startsWith(key)) return CONTAINERS[key];
   }
-
-  // The codec fallback only fires once the container has already shown
-  // itself to be part of the M4A family. Checking the codec alone would
-  // readmit a video file whose container was rejected above but whose audio
-  // track happens to be AAC.
-  if (normalised.startsWith('M4A') && codec && codec.toUpperCase().includes('AAC')) return 'm4a';
 
   return undefined;
 }
@@ -91,7 +85,7 @@ export async function readAudioFacts(path: string): Promise<AudioFactsResult> {
   }
 
   const { container, codec, duration, sampleRate, numberOfChannels } = parsed.format;
-  const format = toFormat(container, codec);
+  const format = toFormat(container);
 
   if (!format || !isAcceptedFormat(format)) {
     return { ok: false, detected: container ?? codec ?? 'unknown format' };
