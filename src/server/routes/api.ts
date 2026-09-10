@@ -3,6 +3,7 @@ import type { ApiError } from '../../shared/types.ts';
 import { checkHealth } from '../audiocpp/client.ts';
 import { readSettings, writeSettings } from '../db/settings.ts';
 import { catalogRoutes } from './catalog.ts';
+import { projectRoutes } from './projects.ts';
 
 export const api = new Hono();
 
@@ -42,3 +43,4 @@ api.get('/backend/status', async (c) => {
 });
 
 api.route('/', catalogRoutes);
+api.route('/', projectRoutes);
