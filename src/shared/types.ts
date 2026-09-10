@@ -117,3 +117,13 @@ export interface Catalog {
   /** The backend these sizes and installs describe. */
   backendUrl: string;
 }
+
+/** A project as the client sees it, with its rollup counts already summed. */
+export interface Project {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  assetCount: number;
+  bytes: number;
+}
