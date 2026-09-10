@@ -17,6 +17,10 @@ dist/
 .DS_Store
 samples/
 
+# Agents
+AGENTS.md
+CLAUDE.md
+
 # Other
 models/
 samples/

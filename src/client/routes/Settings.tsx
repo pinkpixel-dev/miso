@@ -140,7 +140,7 @@ function StatusReport({ status }: { status: BackendStatus }) {
   ];
 
   return (
-    <div className="rounded-md border border-line bg-base px-4 py-3">
+    <div className="rounded-md border border-line bg-canvas px-4 py-3">
       <div className="flex items-center gap-2">
         <Pill tone="good">connected</Pill>
         <span className="text-sm font-medium text-ink">Server is responding</span>

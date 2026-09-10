@@ -20,7 +20,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-10 border-b border-line bg-base/85 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-line bg-canvas/85 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3 sm:px-6">
           <span className="font-display text-lg font-semibold tracking-tight">miso</span>
 

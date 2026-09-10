@@ -41,14 +41,12 @@ function PackageRow({
   onInstall,
   onStop,
   onRemove,
-  onClean,
 }: {
   pkg: CatalogPackage;
   disabled: boolean;
   onInstall: () => void;
   onStop: () => void;
   onRemove: () => void;
-  onClean: () => void;
 }) {
   const running = pkg.install?.state === 'running';
   const line = installLine(pkg);
@@ -98,14 +96,9 @@ function PackageRow({
           </Button>
         ) : (
           <Button variant="primary" onClick={onInstall} disabled={disabled}>
-            {pkg.install?.state === 'interrupted' ? 'Resume' : 'Install'}
+            Install
           </Button>
         )}
-        {pkg.install?.state === 'interrupted' || pkg.install?.state === 'failed' ? (
-          <Button variant="ghost" onClick={onClean} disabled={disabled}>
-            Clean up
-          </Button>
-        ) : null}
       </div>
     </div>
   );
@@ -117,14 +110,12 @@ export function ModelCard({
   onInstall,
   onStop,
   onRemove,
-  onClean,
 }: {
   family: CatalogFamily;
   disabled: boolean;
   onInstall: (id: string) => void;
   onStop: (id: string) => void;
   onRemove: (id: string) => void;
-  onClean: (id: string) => void;
 }) {
   const [pendingRemoval, setPendingRemoval] = useState<CatalogPackage | undefined>();
   const [lead, ...rest] = family.packages;
@@ -135,7 +126,6 @@ export function ModelCard({
     disabled,
     onInstall: () => onInstall(pkg.id),
     onStop: () => onStop(pkg.id),
-    onClean: () => onClean(pkg.id),
     onRemove: () => setPendingRemoval(pkg),
   });
 

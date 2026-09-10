@@ -261,6 +261,19 @@ export function deletePackage(baseUrl: string, packageId: string): Promise<Manag
   return call(baseUrl, '/v1/ui/models/delete', json({ id: packageId }), () => undefined);
 }
 
-export function cleanPartial(baseUrl: string, packageId: string): Promise<ManagementResult<void>> {
-  return call(baseUrl, '/v1/ui/models/clean-partial', json({ id: packageId }), () => undefined);
+/**
+ * Removes the staging directories a stopped download left behind.
+ *
+ * The count only exists inside the server's human message ("Cleaned 2 partial
+ * download directories for <id>"), confirmed against a live server: the JSON
+ * carries `cleaned:true` whether it removed two directories or none. Reading a
+ * number out of prose is fragile, so a message that does not match reports an
+ * unknown count rather than a wrong one.
+ */
+export function cleanPartial(baseUrl: string, packageId: string): Promise<ManagementResult<number | undefined>> {
+  return call(baseUrl, '/v1/ui/models/clean-partial', json({ id: packageId }), (body) => {
+    const message = str((body as Record<string, unknown> | null)?.message);
+    const found = message?.match(/cleaned\s+(\d+)\s+partial/i);
+    return found ? Number(found[1]) : undefined;
+  });
 }

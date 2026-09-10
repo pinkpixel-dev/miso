@@ -48,8 +48,9 @@ export type InstallState = 'running' | 'complete' | 'failed' | 'cancelled' | 'in
 
 /**
  * `interrupted` means the job stopped reporting without finishing, which is
- * what a restarted audio.cpp looks like. Miso offers to resume rather than
- * resuming on its own, because this is a multi-gigabyte download.
+ * what a restarted audio.cpp looks like. audio.cpp cannot resume a download,
+ * so Miso says so and leaves starting over to the person, because this is a
+ * multi-gigabyte download.
  */
 export interface InstallProgress {
   state: InstallState;
@@ -96,6 +97,16 @@ export interface CatalogFamily {
  * listed either way, because the vendored specs are what exists and a backend
  * that cannot answer should not empty the screen.
  */
+/**
+ * The answer to a partial-download sweep. `removed` is undefined when the
+ * server did not say how many directories it took, which is a wording change
+ * away rather than a failure, so the UI reports it as done without a number.
+ */
+export interface CleanPartialsResult {
+  removed: number | undefined;
+  catalog: Catalog;
+}
+
 export interface Catalog {
   families: CatalogFamily[];
   live: 'ready' | 'scanning' | 'unavailable';

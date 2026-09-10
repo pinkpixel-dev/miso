@@ -168,3 +168,25 @@ describe('stopInstall, deletePackage, cleanPartial', () => {
     expect(String(calls[2]?.[1].body)).toBe(JSON.stringify({ id: 'p3' }));
   });
 });
+
+describe('cleanPartial', () => {
+  // The real server carries the count only in its message, confirmed live:
+  // {"id":"...","cleaned":true,"message":"Cleaned 0 partial download directories for ..."}
+  it('reads the directory count out of the server message', async () => {
+    respondWith({ id: 'p1', cleaned: true, message: 'Cleaned 3 partial download directories for p1' });
+    const result = await cleanPartial('http://backend', 'p1');
+    expect(result).toEqual({ ok: true, value: 3 });
+  });
+
+  it('reads a sweep that removed nothing as zero, not as unknown', async () => {
+    respondWith({ id: 'p1', cleaned: true, message: 'Cleaned 0 partial download directories for p1' });
+    const result = await cleanPartial('http://backend', 'p1');
+    expect(result).toEqual({ ok: true, value: 0 });
+  });
+
+  it('reports an unknown count rather than guessing when the wording changes', async () => {
+    respondWith({ id: 'p1', cleaned: true, message: 'Removed the leftovers' });
+    const result = await cleanPartial('http://backend', 'p1');
+    expect(result).toEqual({ ok: true, value: undefined });
+  });
+});

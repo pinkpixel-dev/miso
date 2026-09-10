@@ -1,11 +1,13 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as client from '../audiocpp/client.ts';
+import * as packageStatus from '../audiocpp/packageStatus.ts';
 import { listInstalls, recordInstallStarted } from '../db/installs.ts';
 import { migrate } from '../db/migrate.ts';
 import { pollActiveInstalls } from './poller.ts';
 
 vi.mock('../audiocpp/client.ts', { spy: true });
+vi.mock('../audiocpp/packageStatus.ts', { spy: true });
 
 let handle: Database.Database;
 
@@ -90,6 +92,26 @@ describe('pollActiveInstalls', () => {
     const spy = vi.spyOn(client, 'fetchInstallStatus');
     expect(await pollActiveInstalls(handle)).toBe(0);
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('drops the cached directory scan once an install settles', async () => {
+    recordInstallStarted(handle, 'pkg', 'http://backend');
+    const cleared = vi.spyOn(packageStatus, 'clearLiveStatusCache');
+    vi.spyOn(client, 'fetchInstallStatus').mockResolvedValue({ ok: true, value: running({ finished: true }) });
+
+    await pollActiveInstalls(handle);
+
+    expect(cleared).toHaveBeenCalled();
+  });
+
+  it('keeps the cached directory scan while an install is still running', async () => {
+    recordInstallStarted(handle, 'pkg', 'http://backend');
+    const cleared = vi.spyOn(packageStatus, 'clearLiveStatusCache');
+    vi.spyOn(client, 'fetchInstallStatus').mockResolvedValue({ ok: true, value: running() });
+
+    await pollActiveInstalls(handle);
+
+    expect(cleared).not.toHaveBeenCalled();
   });
 
   it('keeps polling the other installs when one status call throws', async () => {

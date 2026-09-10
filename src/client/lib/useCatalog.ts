@@ -55,5 +55,22 @@ export function useCatalog() {
     }
   }, []);
 
-  return { catalog, error, loading, reload: load, act };
+  /**
+   * Sweeps abandoned downloads. Returns how many directories went, or undefined
+   * when the server did not say. Throws nothing: a failure lands in `error`
+   * like every other action, and the caller sees `false`.
+   */
+  const cleanPartials = useCallback(async (): Promise<{ ok: boolean; removed: number | undefined }> => {
+    try {
+      const result = await api.cleanPartials();
+      setCatalog(result.catalog);
+      setError(undefined);
+      return { ok: true, removed: result.removed };
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      return { ok: false, removed: undefined };
+    }
+  }, []);
+
+  return { catalog, error, loading, reload: load, act, cleanPartials };
 }
