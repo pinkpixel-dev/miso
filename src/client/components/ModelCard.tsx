@@ -96,7 +96,7 @@ function PackageRow({
           </Button>
         ) : (
           <Button variant="primary" onClick={onInstall} disabled={disabled}>
-            {pkg.install?.state === 'interrupted' ? 'Resume' : 'Install'}
+            Install
           </Button>
         )}
       </div>

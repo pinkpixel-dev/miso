@@ -34,7 +34,7 @@ export function nextInstallProgress(
   if (!status.known) {
     return {
       state: 'interrupted',
-      error: 'The download stopped. The server restarts lose queued installs, so it can be resumed.',
+      error: 'The download stopped and cannot be resumed. Installing again starts from the beginning.',
     };
   }
 

@@ -48,8 +48,9 @@ export type InstallState = 'running' | 'complete' | 'failed' | 'cancelled' | 'in
 
 /**
  * `interrupted` means the job stopped reporting without finishing, which is
- * what a restarted audio.cpp looks like. Miso offers to resume rather than
- * resuming on its own, because this is a multi-gigabyte download.
+ * what a restarted audio.cpp looks like. audio.cpp cannot resume a download,
+ * so Miso says so and leaves starting over to the person, because this is a
+ * multi-gigabyte download.
  */
 export interface InstallProgress {
   state: InstallState;

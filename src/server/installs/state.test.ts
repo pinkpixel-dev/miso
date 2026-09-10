@@ -47,7 +47,7 @@ describe('nextInstallProgress', () => {
   it('marks a job the server has forgotten as interrupted', () => {
     const next = nextInstallProgress(report({ known: false }));
     expect(next.state).toBe('interrupted');
-    expect(next.error).toMatch(/restart/i);
+    expect(next.error).toMatch(/cannot be resumed/i);
   });
 
   it('marks an install interrupted when management is switched off underneath it', () => {
