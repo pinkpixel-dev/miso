@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { BackendStatus, Settings as SettingsData } from '../../shared/types.ts';
 import { api } from '../lib/api.ts';
+import { StorageUsage } from '../components/StorageUsage.tsx';
 import { Button, CodeBlock, Field, Panel, Pill } from '../components/ui.tsx';
 
 const RUN_COMMAND = `docker run -d --name miso-audiocpp --runtime=nvidia \\
@@ -116,6 +117,8 @@ export function SettingsRoute() {
           </div>
         </div>
       </Panel>
+
+      <StorageUsage />
     </div>
   );
 }

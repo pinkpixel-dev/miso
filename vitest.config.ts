@@ -1,9 +1,11 @@
 import { defineConfig } from 'vitest/config';
 
-// Route tests open the real database through db(). Point them at a scratch
-// directory so a test run never touches the working data/ directory.
+// Route tests open the real database through db() and write real asset files.
+// The setup file points each worker at its own scratch directory, so a run
+// never touches the working data/ directory and two test files never share one
+// database.
 export default defineConfig({
   test: {
-    env: { MISO_DATA_DIR: '.tmp/vitest' },
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

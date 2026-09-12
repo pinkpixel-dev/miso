@@ -157,3 +157,13 @@ export interface ProjectDetail {
   project: Project;
   assets: Asset[];
 }
+
+/**
+ * What Miso is holding. Figures are summed from the recorded byte counts, not
+ * measured by walking the directory: the count was taken during the upload
+ * stream, so it is the same number, and a sum is cheap where a walk is not.
+ */
+export interface StorageUsage {
+  totalBytes: number;
+  projects: Project[];
+}

@@ -1,4 +1,14 @@
-import type { ApiError, BackendStatus, Catalog, CleanPartialsResult, Settings } from '../../shared/types.ts';
+import type {
+  ApiError,
+  Asset,
+  BackendStatus,
+  Catalog,
+  CleanPartialsResult,
+  Project,
+  ProjectDetail,
+  Settings,
+  StorageUsage,
+} from '../../shared/types.ts';
 
 /**
  * Every call the client makes goes through here, and every one targets the Miso
@@ -48,4 +58,52 @@ export const api = {
 
   removePackage: (id: string) =>
     request<Catalog>(`/catalog/packages/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  getProjects: () => request<Project[]>('/projects'),
+
+  createProject: (name: string) =>
+    request<Project>('/projects', { method: 'POST', body: JSON.stringify({ name }) }),
+
+  getProject: (id: string) => request<ProjectDetail>(`/projects/${encodeURIComponent(id)}`),
+
+  renameProject: (id: string, name: string) =>
+    request<Project>(`/projects/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    }),
+
+  deleteProject: (id: string) =>
+    request<Project[]>(`/projects/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  setAssetPeaks: (projectId: string, assetId: string, peaks: number[][]) =>
+    request<Asset>(
+      `/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/peaks`,
+      { method: 'PUT', body: JSON.stringify({ peaks }) },
+    ),
+
+  renameAsset: (projectId: string, assetId: string, label: string) =>
+    request<Asset>(
+      `/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}`,
+      { method: 'PATCH', body: JSON.stringify({ label }) },
+    ),
+
+  deleteAsset: (projectId: string, assetId: string) =>
+    request<Asset[]>(
+      `/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}`,
+      { method: 'DELETE' },
+    ),
+
+  getStorage: () => request<StorageUsage>('/storage'),
 };
+
+/**
+ * Addresses rather than calls. An <audio> element and a download link need a
+ * URL, not a promise.
+ */
+export function audioUrl(projectId: string, assetId: string): string {
+  return `/api/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/audio`;
+}
+
+export function downloadUrl(projectId: string, assetId: string): string {
+  return `/api/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/download`;
+}

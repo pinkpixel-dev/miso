@@ -8,9 +8,10 @@ Miso runs on [audio.cpp](https://github.com/0xShug0/audio.cpp), a C++ inference 
 audio models. Miso is the studio around it: projects that persist, a history of every take,
 and a record of exactly how each clip was made so you can change one thing and try again.
 
-> **Early days.** Phases 1 and 2 of the [roadmap](DOCS/ROADMAP.md) are done, so the app runs,
-> connects to a server, and installs models. Generation arrives in phase 4 and remix in
-> phase 5. It is not usable for making music yet.
+> **Early days.** Phases 1 through 3 of the [roadmap](DOCS/ROADMAP.md) are done, so the app
+> runs, connects to a server, installs models, and holds your projects and audio. Generation
+> arrives in phase 4 and remix in phase 5, so Miso cannot make music yet. What it can do
+> today is keep it.
 
 ## Why it exists
 
@@ -83,7 +84,31 @@ npm start
 
 That puts the whole app on <http://127.0.0.1:5171>.
 
-### 3. Get some models
+### 3. Make a project and import a song
+
+The Library screen is the front door. Give a project a name, press Create project, and Miso
+opens it.
+
+Inside a project, drag an audio file onto the drop zone, or press Choose an audio file if
+you are on a phone. Miso accepts wav, flac, mp3, and m4a up to 200 MB. The upload shows a
+progress bar, then your browser works out the waveform and sends it up, which is why the
+waveform appears a moment after the upload finishes.
+
+Pick a track to load it into the player. Click anywhere along the waveform to seek, and
+playback continues from there. Each track can be renamed, exported, or deleted, and Export
+gives you back exactly the bytes you imported under the name you imported them with.
+
+A few things worth knowing:
+
+- Format is decided by reading the file, not its extension. A text file renamed to `.wav` is
+  rejected, and the message says what Miso actually found.
+- A track with no waveform still plays normally. Press Draw waveform on the player and the
+  browser you are on will work it out and save it for every other device.
+- None of this needs audio.cpp. Projects, imports, playback, and export all work with the
+  server stopped. Only the Models screen needs it.
+- Settings has a Storage section showing what each project is using.
+
+### 4. Get some models
 
 Open the Models screen. It lists every music model audio.cpp can run, what each one does,
 its download size, and whether it is already installed. Pick a model and press Install. The
