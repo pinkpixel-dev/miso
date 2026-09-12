@@ -21,9 +21,10 @@ recorded beside it.
   an estimate from how long past runs on the same model took.
 - **Cancel.** Available on a job that has not started. A running generation cannot be
   interrupted, and the queue says so rather than offering a button that does nothing.
-- **Model residency.** Miso loads a package when a job needs it, keeps it loaded for the next
-  job that can use it, and frees it when the queue moves to a different model. Settings for
-  the card can be reclaimed through the new unload route.
+- **Model residency.** Miso frees every other model on the backend before loading the one a
+  job needs, keeps it loaded for the next job that can use it, and reads what is actually
+  resident from the backend each time rather than trusting its own memory of it. The card can
+  be reclaimed through the new unload route.
 - **Takes.** A generated track is saved as an asset that knows which job made it, alongside
   imported audio in the same track list.
 
@@ -31,6 +32,8 @@ recorded beside it.
 
 - The queue runs jobs grouped by model, so six jobs across two models cost two weight loads
   rather than six.
+- A generation that runs out of GPU memory says what to do about it, rather than only
+  repeating the backend's wording about a failed buffer allocation.
 - A busy backend no longer fails a job. It goes back in the queue, and the wait doubles from
   five seconds to two minutes before the job gives up.
 - Jobs left running when the service stops are marked failed at the next start, with the

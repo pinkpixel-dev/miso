@@ -21,6 +21,12 @@ import type { TaskDefinition } from '../tasks/registry.ts';
  * /v1/models/unload-all is not an endpoint. Unloading everything means listing
  * what is registered and unloading each loaded one, which is what unloadAll
  * does below.
+ *
+ * What is resident is read from the backend before every load, never remembered
+ * in this process. A remembered answer is wrong after a restart, wrong when the
+ * package changes, and wrong when anything else loaded a model, and each of
+ * those ends the same way: two copies of a 13 GB model on a 16 GB card and an
+ * allocation failure partway into a generation.
  */
 
 /**
@@ -66,6 +72,16 @@ export async function ensureLoaded(
 
   const existing = registered.value.find((model) => model.id === id);
   if (existing?.loaded) return { ok: true };
+
+  // Everything else goes first. One model at a time is the only arrangement
+  // that fits on a single consumer card, and the backend keeps a model resident
+  // until it is told otherwise, so whatever is loaded now would still be there
+  // underneath this one.
+  for (const model of registered.value) {
+    if (!model.loaded || model.id === id) continue;
+    const freed = await unloadModel(baseUrl, model.id);
+    if (!freed.ok) return failed(freed);
+  }
 
   // Asked before loading, because the loader's own answer to a missing package
   // is a sentence about safetensors sources and a missing model file, which

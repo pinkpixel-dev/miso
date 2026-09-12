@@ -15,7 +15,7 @@ import {
 import { readSettings } from '../db/settings.ts';
 import { assetPath } from '../library/storage.ts';
 import { findTask, validateParams, type TaskDefinition } from '../tasks/registry.ts';
-import { ensureLoaded, unload } from './residency.ts';
+import { ensureLoaded } from './residency.ts';
 import { storeResult } from './results.ts';
 import type { Job } from '../../shared/types.ts';
 
@@ -38,8 +38,13 @@ const MAX_BACKOFF_MS = 2 * 60 * 1000;
 
 let draining = false;
 
-/** The package whose weights are in GPU memory, as far as this process knows. */
-let resident: string | undefined;
+/**
+ * The package the last job used, which is only a hint for ordering the queue.
+ *
+ * What is actually loaded is read from the backend before every load. This
+ * variable being stale costs one wasted preference and nothing else.
+ */
+let lastModelId: string | undefined;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -110,6 +115,19 @@ async function stageInputs(
 }
 
 /**
+ * Adds what to do about it to a failure that only says what happened.
+ *
+ * "backend buffer allocation failed" means the card ran out of room partway
+ * through, which on a 16 GB card is normally a second model still resident or a
+ * package too large for what is free. The server's own wording says none of
+ * that.
+ */
+function describeRunFailure(message: string): string {
+  if (!/allocation failed|out of memory|cudaMalloc/i.test(message)) return message;
+  return `${message} The card ran out of room. Free it with Unload models, or pick a smaller package.`;
+}
+
+/**
  * Runs one job to a terminal state, or puts it back in the queue.
  *
  * Returns how long to wait before looking at the queue again. Zero means carry
@@ -150,7 +168,8 @@ async function runOne(job: Job): Promise<number> {
     setJobState(db(), job.id, 'failed', loaded.message);
     return 0;
   }
-  resident = job.modelId;
+
+  lastModelId = job.modelId;
 
   setJobState(db(), job.id, 'running');
 
@@ -171,7 +190,7 @@ async function runOne(job: Job): Promise<number> {
       return backoffFor(job.attempts);
     }
 
-    setJobState(db(), job.id, 'failed', result.message);
+    setJobState(db(), job.id, 'failed', describeRunFailure(result.message));
     return 0;
   }
 
@@ -193,10 +212,11 @@ async function runOne(job: Job): Promise<number> {
 /**
  * Works through the queue until it is empty.
  *
- * Weights are freed only when the next job needs different ones. Leaving a
- * model resident after the last job is deliberate: the next prompt on the same
- * model then starts immediately, and Settings has an unload for when the card
- * is wanted back.
+ * Jobs are ordered to keep the same model for as long as there is work for it,
+ * and the load step frees whatever else is resident first. Leaving the last
+ * model loaded at the end is deliberate: the next prompt on it starts
+ * immediately, and POST /api/backend/unload frees the card when it is wanted
+ * back.
  */
 async function drain(): Promise<void> {
   if (draining) return;
@@ -204,13 +224,8 @@ async function drain(): Promise<void> {
 
   try {
     for (;;) {
-      const job = nextQueuedJob(db(), resident);
+      const job = nextQueuedJob(db(), lastModelId);
       if (!job) break;
-
-      if (resident !== undefined && resident !== job.modelId) {
-        await unload(readSettings().backendUrl, resident);
-        resident = undefined;
-      }
 
       const wait = await runOne(job);
       if (wait > 0) await sleep(wait);
