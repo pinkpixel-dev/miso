@@ -97,11 +97,44 @@ function Row({ job, onCancel }: { job: Job; onCancel: (jobId: string) => void })
   );
 }
 
-export function JobList({ jobs, onCancel }: { jobs: Job[]; onCancel: (jobId: string) => void }) {
+/**
+ * Says what clearing did.
+ *
+ * An empty queue after a clear should not read as work that went missing. The
+ * rows are still there and every take can still say what made it, so the note
+ * says that plainly rather than leaving people to guess.
+ */
+function ClearedNote({ count }: { count: number }) {
+  return (
+    <p className="mt-3 border-t border-line pt-3 text-sm text-ink-faint">
+      {count === 1 ? '1 finished job is' : `${count} finished jobs are`} cleared from this list.
+      Nothing was deleted, so each take can still show the prompt and lyrics that made it.
+    </p>
+  );
+}
+
+export function JobList({
+  jobs,
+  hiddenCount = 0,
+  onCancel,
+  onClear,
+}: {
+  jobs: Job[];
+  /** Finished jobs the queue is holding back. Their rows still exist. */
+  hiddenCount?: number;
+  onCancel: (jobId: string) => void;
+  /** Absent where there is nothing that could be cleared. */
+  onClear?: () => void;
+}) {
   if (jobs.length === 0) {
     return (
       <Panel title="Queue">
-        <p className="text-sm text-ink-muted">Nothing generated yet. Write a prompt above.</p>
+        <p className="text-sm text-ink-muted">
+          {hiddenCount > 0
+            ? 'Nothing running.'
+            : 'Nothing generated yet. Write a prompt on the left.'}
+        </p>
+        {hiddenCount > 0 ? <ClearedNote count={hiddenCount} /> : null}
       </Panel>
     );
   }
@@ -115,6 +148,14 @@ export function JobList({ jobs, onCancel }: { jobs: Job[]; onCancel: (jobId: str
 
   return (
     <Panel title="Queue">
+      {finished.length > 0 && onClear ? (
+        <div className="mb-2 flex justify-end">
+          <Button variant="ghost" onClick={onClear}>
+            Clear finished
+          </Button>
+        </div>
+      ) : null}
+
       <ul className="flex flex-col divide-y divide-line">
         {[...live, ...shown].map((job) => (
           <Row key={job.id} job={job} onCancel={onCancel} />
@@ -134,6 +175,8 @@ export function JobList({ jobs, onCancel }: { jobs: Job[]; onCancel: (jobId: str
           </Disclosure>
         </div>
       ) : null}
+
+      {hiddenCount > 0 ? <ClearedNote count={hiddenCount} /> : null}
     </Panel>
   );
 }

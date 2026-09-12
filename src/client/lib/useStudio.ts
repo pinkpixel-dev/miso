@@ -35,6 +35,10 @@ export interface StudioValue {
     originalPrompt?: string;
   }) => Promise<boolean>;
   cancelJob: (jobId: string) => void;
+  /** Hides finished jobs. The rows stay, so a take can still show what made it. */
+  dismissJobs: () => void;
+  /** How many finished jobs the queue is holding back. */
+  dismissedCount: number;
   importFile: (file: File) => void;
   renameAsset: (assetId: string, label: string) => void;
   removeAsset: (assetId: string) => void;

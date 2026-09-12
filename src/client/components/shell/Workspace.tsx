@@ -3,6 +3,7 @@ import type { Asset } from '../../../shared/types.ts';
 import { usePlayer } from '../../lib/usePlayer.ts';
 import { useStudio } from '../../lib/useStudio.ts';
 import { ConfirmDialog } from '../Dialog.tsx';
+import { Disclosure } from '../Disclosure.tsx';
 import { ImportDropZone } from '../ImportDropZone.tsx';
 import { JobList } from '../JobList.tsx';
 import { TakeRow } from './TakeRow.tsx';
@@ -19,13 +20,35 @@ import { TakeRow } from './TakeRow.tsx';
  * project gets big enough to be annoying and not before.
  */
 
+/**
+ * How many takes stay on screen before the rest fold away.
+ *
+ * The column is capped rather than scrolled, matching the queue directly below
+ * it. Two independent scroll regions stacked in one 360px column is a way to
+ * lose things: you scroll one, the other stays put, and neither shows you where
+ * its end is. Folding keeps the whole column one length.
+ */
+const RECENT_TAKES = 8;
+
 function countLabel(count: number): string {
   return count === 1 ? '1 take' : `${count} takes`;
 }
 
 export function Workspace() {
-  const { project, projectId, assets, jobs, loading, importing, importFile, renameAsset, removeAsset, cancelJob } =
-    useStudio();
+  const {
+    project,
+    projectId,
+    assets,
+    jobs,
+    loading,
+    importing,
+    importFile,
+    renameAsset,
+    removeAsset,
+    cancelJob,
+    dismissJobs,
+    dismissedCount,
+  } = useStudio();
   const { clear } = usePlayer();
   const [pendingRemoval, setPendingRemoval] = useState<Asset | undefined>();
 
@@ -55,22 +78,48 @@ export function Workspace() {
                 Nothing here yet. Generate something, or drop a file in below.
               </p>
             ) : (
-              <ul className="flex flex-col gap-1">
-                {assets.map((asset) => (
-                  <TakeRow
-                    key={asset.id}
-                    asset={asset}
-                    onRename={(label) => renameAsset(asset.id, label)}
-                    onRemove={() => setPendingRemoval(asset)}
-                  />
-                ))}
-              </ul>
+              <>
+                <ul className="flex flex-col gap-1">
+                  {assets.slice(0, RECENT_TAKES).map((asset) => (
+                    <TakeRow
+                      key={asset.id}
+                      asset={asset}
+                      onRename={(label) => renameAsset(asset.id, label)}
+                      onRemove={() => setPendingRemoval(asset)}
+                    />
+                  ))}
+                </ul>
+
+                {assets.length > RECENT_TAKES ? (
+                  <Disclosure
+                    summary={`${assets.length - RECENT_TAKES} earlier ${
+                      assets.length - RECENT_TAKES === 1 ? 'take' : 'takes'
+                    }`}
+                  >
+                    <ul className="flex flex-col gap-1">
+                      {assets.slice(RECENT_TAKES).map((asset) => (
+                        <TakeRow
+                          key={asset.id}
+                          asset={asset}
+                          onRename={(label) => renameAsset(asset.id, label)}
+                          onRemove={() => setPendingRemoval(asset)}
+                        />
+                      ))}
+                    </ul>
+                  </Disclosure>
+                ) : null}
+              </>
             )}
 
             <ImportDropZone onFile={importFile} importing={importing} />
           </div>
 
-          <JobList jobs={jobs} onCancel={cancelJob} />
+          <JobList
+            jobs={jobs}
+            hiddenCount={dismissedCount}
+            onCancel={cancelJob}
+            onClear={dismissJobs}
+          />
         </>
       )}
 

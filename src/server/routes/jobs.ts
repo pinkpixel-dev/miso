@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { ApiError, Job, StudioTask } from '../../shared/types.ts';
 import { findPackage } from '../catalog/registry.ts';
 import { db } from '../db/index.ts';
-import { createJob, listJobs, readJob, setJobState } from '../db/jobs.ts';
+import { createJob, dismissFinishedJobs, listJobs, readJob, setJobState } from '../db/jobs.ts';
 import { readProject } from '../db/projects.ts';
 import { readSettings } from '../db/settings.ts';
 import { unloadAll } from '../jobs/residency.ts';
@@ -157,6 +157,24 @@ jobRoutes.delete('/projects/:id/jobs/:jobId', (c) => {
 
   const cancelled = setJobState(db(), jobId, 'cancelled');
   return c.json<Job>(cancelled ?? job);
+});
+
+/**
+ * Clears the queue.
+ *
+ * Finished work is hidden rather than deleted, so this answers with the whole
+ * list including what it just hid. The client filters on the timestamp, which
+ * keeps one shape of job row everywhere and leaves the take detail panel able
+ * to read a cleared job's prompt.
+ */
+jobRoutes.post('/projects/:id/jobs/dismiss', (c) => {
+  const projectId = c.req.param('id');
+  if (!readProject(db(), projectId)) {
+    return c.json<ApiError>({ error: `No project with the id ${projectId}` }, 404);
+  }
+
+  dismissFinishedJobs(db(), projectId);
+  return c.json<Job[]>(listJobs(db(), projectId));
 });
 
 /** Frees the GPU without stopping the service, for when the card is wanted elsewhere. */

@@ -136,6 +136,13 @@ export const api = {
       method: 'DELETE',
     }),
 
+  /**
+   * Clears the queue by hiding finished jobs. Answers with the whole list,
+   * hidden rows included, because nothing was deleted.
+   */
+  dismissJobs: (projectId: string) =>
+    request<Job[]>(`/projects/${encodeURIComponent(projectId)}/jobs/dismiss`, { method: 'POST' }),
+
   /** Asks the configured language model for a lyric sheet and a title. */
   writeLyrics: (body: { description: string; studio?: StudioState }) =>
     request<LyricsDraft>('/lyrics/write', { method: 'POST', body: JSON.stringify(body) }),

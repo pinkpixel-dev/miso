@@ -45,7 +45,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   // A finished job has written a new take, so the track list is stale the
   // moment the queue reports one.
-  const { jobs, tasks, error: jobError, submit, cancel } = useJobs(projectId, reload);
+  const {
+    jobs,
+    dismissedCount,
+    tasks,
+    error: jobError,
+    submit,
+    cancel,
+    dismiss,
+  } = useJobs(projectId, reload);
   const { catalog, loading: catalogLoading } = useCatalog();
 
   const value = useMemo<StudioValue>(
@@ -62,6 +70,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       importing,
       submit,
       cancelJob: cancel,
+      dismissJobs: dismiss,
+      dismissedCount,
       importFile,
       renameAsset,
       removeAsset,
@@ -81,6 +91,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       importing,
       submit,
       cancel,
+      dismiss,
+      dismissedCount,
       importFile,
       renameAsset,
       removeAsset,

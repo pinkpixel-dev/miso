@@ -125,7 +125,37 @@ export function useJobs(projectId: string | undefined, onComplete?: () => void) 
     [projectId],
   );
 
-  return { jobs, tasks, error, submit, cancel, reload: load };
+  /**
+   * Clears the queue.
+   *
+   * The service hides finished rows and answers with the whole list, so what
+   * comes back still holds everything. Filtering happens below rather than in
+   * the request, which keeps one shape of job in the client and leaves the
+   * hidden ones readable by anything that wants a take's provenance.
+   */
+  const dismiss = useCallback(async () => {
+    if (projectId === undefined) return;
+    try {
+      setJobs(await api.dismissJobs(projectId));
+      setError(undefined);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  }, [projectId]);
+
+  const visible = jobs.filter((job) => job.dismissedAt === undefined);
+
+  return {
+    jobs: visible,
+    /** Finished jobs being held back, so the queue can say so rather than lie. */
+    dismissedCount: jobs.length - visible.length,
+    tasks,
+    error,
+    submit,
+    cancel,
+    dismiss,
+    reload: load,
+  };
 }
 
 /**
