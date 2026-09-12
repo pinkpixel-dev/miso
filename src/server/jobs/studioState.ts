@@ -23,6 +23,13 @@ const MAX_LEGACY_CHIPS = 24;
 const MAX_FREE_TEXT = 400;
 const MAX_PROMPT = 4_000;
 
+/**
+ * Every vocal mode a row can hold, which is one more than the builder offers.
+ *
+ * `duet` is no longer a choice on the form, but rows written while it was one
+ * are read back through here, so refusing it now would make those jobs fail to
+ * parse on the read path and lose the record of how their take was made.
+ */
 const VOCAL_MODES: VocalMode[] = ['female', 'male', 'duet', 'instrumental'];
 
 export type StudioResult<T> = { ok: true; value: T } | { ok: false; error: string };

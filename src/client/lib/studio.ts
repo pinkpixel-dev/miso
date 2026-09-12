@@ -47,10 +47,18 @@ export const KEYS = [
   'B flat minor',
 ];
 
+/**
+ * The vocal modes the builder offers.
+ *
+ * Duet is deliberately absent. The models Miso runs do not separate two voices
+ * well enough to be worth offering, and a toggle that asks for something the
+ * model cannot do reads as a broken feature rather than an honest limit. It
+ * stays in VocalMode and in the phrases below because jobs written before this
+ * still hold it, and those rows have to keep opening.
+ */
 export const VOCAL_MODES: { value: VocalMode; label: string }[] = [
   { value: 'female', label: 'Female' },
   { value: 'male', label: 'Male' },
-  { value: 'duet', label: 'Duet' },
   { value: 'instrumental', label: 'Instrumental' },
 ];
 
@@ -58,6 +66,7 @@ export const VOCAL_MODES: { value: VocalMode; label: string }[] = [
 const VOCAL_PHRASES: Record<VocalMode, string> = {
   female: 'female vocals',
   male: 'male vocals',
+  // Only reachable from a job written while the builder still offered duet.
   duet: 'male and female duet vocals',
   instrumental: 'instrumental, no vocals',
 };

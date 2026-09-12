@@ -38,7 +38,10 @@ describe('compilePrompt', () => {
     );
   });
 
-  it('names both voices for a duet', () => {
+  it('still compiles a duet stored by an older job', () => {
+    // The builder no longer offers duet, because the models cannot hold two
+    // voices apart. Rows written while it did are still in the database and
+    // still have to compile to the prompt that produced their take.
     expect(compilePrompt(state({ style: 'folk', vocalMode: 'duet' }))).toBe(
       'folk, male and female duet vocals',
     );

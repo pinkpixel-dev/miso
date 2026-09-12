@@ -274,6 +274,14 @@ export interface StudioState {
   vocalStyle: string;
 }
 
+/**
+ * Who is singing.
+ *
+ * `duet` is a legacy value. The builder stopped offering it once it was clear
+ * the models could not hold two voices apart, and nothing writes it any more,
+ * but stored jobs still carry it so everything that reads a job still accepts
+ * it. See VOCAL_MODES in src/client/lib/studio.ts.
+ */
 export type VocalMode = 'female' | 'male' | 'duet' | 'instrumental';
 
 /** One queued or finished piece of work. */
