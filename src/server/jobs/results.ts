@@ -4,8 +4,9 @@ import { rename, writeFile } from 'node:fs/promises';
 import type { Database } from 'better-sqlite3';
 import type { Asset } from '../../shared/types.ts';
 import type { TaskResult } from '../audiocpp/client.ts';
-import { insertAsset } from '../db/assets.ts';
+import { insertAsset, setAssetPeaks } from '../db/assets.ts';
 import { readAudioFacts } from '../library/metadata.ts';
+import { peaksFromWav } from '../library/wavPeaks.ts';
 import { assetPath, ensureProjectDir, removeTemp, tempPath } from '../library/storage.ts';
 
 /**
@@ -56,7 +57,7 @@ async function writeOne(
     throw error;
   }
 
-  return insertAsset(handle, {
+  const asset = insertAsset(handle, {
     id,
     projectId,
     kind,
@@ -70,6 +71,22 @@ async function writeOne(
     channels: facts.value.channels,
     jobId,
   });
+
+  // The waveform is read here because the samples are already in memory. An
+  // imported file goes to the browser for this, which has a real decoder, but a
+  // generated take is a PCM WAV and sending it back out to be decoded would
+  // cost every device that opens the project a 34 MB download to draw a picture
+  // of audio the service was holding a moment ago.
+  //
+  // After the row, not before: peaks are worth less than the take, so a reader
+  // that cannot make sense of the samples leaves a complete asset with no
+  // waveform and Draw waveform still works.
+  if (facts.value.format !== 'wav') return asset;
+
+  const peaks = peaksFromWav(bytes);
+  if (!peaks) return asset;
+
+  return setAssetPeaks(handle, id, peaks) ?? asset;
 }
 
 /**

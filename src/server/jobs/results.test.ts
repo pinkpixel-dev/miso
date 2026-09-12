@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../db/migrate.ts';
 import { createJob } from '../db/jobs.ts';
 import { createProject } from '../db/projects.ts';
+import { validatePeaks } from '../library/peaks.ts';
 import { assetPath, projectDir } from '../library/storage.ts';
 import { storeResult } from './results.ts';
 
@@ -95,5 +96,35 @@ describe('storeResult', () => {
         { audio: '', sampleRate: undefined, channels: undefined, namedOutputs: [] },
       ),
     ).rejects.toThrow(/empty/i);
+  });
+
+  it('saves the take with its waveform already drawn', async () => {
+    // The samples are in memory here, so sending the take back out to a browser
+    // to be decoded would be a download and a decode to draw a picture of audio
+    // the service was holding.
+    const [asset] = await storeResult(
+      handle,
+      { projectId, jobId, label: 'drawn' },
+      { audio: tone, sampleRate: undefined, channels: undefined, namedOutputs: [] },
+    );
+
+    expect(asset?.peaks).toBeDefined();
+    expect(validatePeaks(asset?.peaks)).toMatchObject({ ok: true });
+    expect(asset?.peaks?.[0]?.some((value) => value > 0)).toBe(true);
+  });
+
+  it('still saves a take whose waveform could not be read', async () => {
+    // A WAV in a sample format the reader does not handle. The take is worth
+    // far more than the picture of it.
+    const odd = Buffer.from(readFileSync(join(fixtures, 'tone.flac')));
+    const [asset] = await storeResult(
+      handle,
+      { projectId, jobId, label: 'flac take' },
+      { audio: odd.toString('base64'), sampleRate: undefined, channels: undefined, namedOutputs: [] },
+    );
+
+    expect(asset).toBeDefined();
+    expect(asset?.format).toBe('flac');
+    expect(asset?.peaks).toBeUndefined();
   });
 });

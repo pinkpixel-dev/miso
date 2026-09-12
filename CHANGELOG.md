@@ -3,6 +3,27 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.7.0 - September 12, 2026
+
+### ✨ Added
+
+- **A generated take arrives with its waveform already drawn.** The service reads it from
+  the audio it is already holding, which takes about a tenth of a second for a three minute
+  track. Before this every device that opened the project downloaded the whole 34 MB file and
+  decoded it just to draw the picture, which was cheap at the old 30 second default and is
+  not at three minutes. Imported mp3, flac, and m4a still draw in the browser, which has the
+  decoder for them.
+
+### 🔧 Changed
+
+- The bucketing that turns samples into a waveform is shared between the service and the
+  browser, so a generated take and an imported one draw the same way.
+
+### 🧹 Maintenance
+
+- Takes generated before this update still have no stored waveform. Press Draw waveform once
+  on each and it is saved for every device.
+
 ## 0.6.2 - September 12, 2026
 
 ### 🐛 Fixes

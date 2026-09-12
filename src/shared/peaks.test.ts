@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bucketPeaks } from './computePeaks.ts';
+import { bucketPeaks } from './peaks.ts';
 
 describe('bucketPeaks', () => {
   it('produces exactly the number of buckets asked for', () => {
