@@ -128,6 +128,69 @@ The models directory you bind into the container must be writable by uid 1000, w
 user audio.cpp runs as. If Docker created it for you as root, installs fail with
 `could not create package staging directory`.
 
+## Coming back to it
+
+You only do the setup above once. After that, starting everything again is two commands.
+
+The container already exists, so start it rather than running `docker run` a second time.
+Running it again fails because the name is taken, and if you work around that with a new
+name you end up with two containers fighting over port 8080.
+
+```bash
+docker start miso-audiocpp
+npm run dev
+```
+
+Then open <http://127.0.0.1:5170>.
+
+Check the server is actually up and on the GPU:
+
+```bash
+curl http://127.0.0.1:8080/health
+```
+
+You want `"backend":"cuda"` in the response.
+
+### Every command
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Client on 5170 and service on 5171, both watching for changes |
+| `npm run build` | Builds the client into `dist/client` |
+| `npm start` | Production run, the whole app on 5171, needs a build first |
+| `npm test` | Runs the test suite once |
+| `npm run typecheck` | Type checks without emitting anything |
+| `npm run vendor:specs` | Re-copies the vendored model specs from audio.cpp |
+
+Use `npm run dev` while you are working on Miso. Use `npm run build` and `npm start` when you
+want the single-port version, which is also the one to point a phone at.
+
+### Container commands
+
+| Command | What it does |
+|---|---|
+| `docker start miso-audiocpp` | Starts the server again |
+| `docker stop miso-audiocpp` | Stops it |
+| `docker logs -f miso-audiocpp` | Follows its output, useful when a model fails to load |
+| `docker ps` | Shows whether it is running |
+
+Miso itself stops with Ctrl-C in the terminal running it. The container keeps running until
+you stop it, which is usually what you want, since model loads are slow.
+
+### If something is not working
+
+Miso not loading at all usually means `npm run dev` is not running, or something else took
+port 5170.
+
+The Models screen complaining while the Library works fine means audio.cpp is down or
+unreachable. That split is by design: the library never calls audio.cpp, so projects,
+imports, playback, and export keep working with the server stopped. Check Settings, press
+Test connection, and start the container if it is not up.
+
+`"backend":"cpu"` in the health response means the GPU is not reaching the container. That is
+almost always `--gpus all` instead of `--runtime=nvidia`, written up in
+[DOCS/ERRORS.md](DOCS/ERRORS.md).
+
 ## Running the server somewhere else
 
 Miso never assumes audio.cpp is on the same machine, and never assumes a shared filesystem.
