@@ -128,8 +128,9 @@ lyricsRoutes.post('/lyrics/write', async (c) => {
  * Offers a richer prompt for the song as the form stands.
  *
  * Run twice on the same form this gives two different prompts, which is the
- * cheapest way there is to get a second take on the same idea. The temperature
- * is high for exactly that reason.
+ * cheapest way there is to get a second take on the same idea. That variation
+ * comes from the provider's own default sampling, which every one of them sets
+ * high enough. See the note in lyrics/client.ts on why nothing is sent.
  */
 lyricsRoutes.post('/lyrics/enhance', async (c) => {
   const engine = activeEngine();
@@ -150,7 +151,6 @@ lyricsRoutes.post('/lyrics/enhance', async (c) => {
     engine.engine,
     ENHANCE_SYSTEM,
     describeStudio(state.value, wanted.value),
-    { temperature: 1 },
   );
   if (!answer.ok) {
     return c.json<ApiError>({ error: 'The prompt could not be expanded', detail: answer.message }, 502);

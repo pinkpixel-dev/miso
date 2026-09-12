@@ -53,12 +53,19 @@ function readError(body: unknown, fallback: string): string {
   return fallback;
 }
 
-export async function chat(
-  engine: ChatEngine,
-  system: string,
-  user: string,
-  options: { temperature?: number } = {},
-): Promise<ChatResult> {
+/**
+ * Temperature is not sent.
+ *
+ * Both things Miso asks for want a varied answer, and every provider's default
+ * is already varied: 1 on OpenAI-compatible APIs, 0.8 on llama.cpp. Sending a
+ * number gained nothing and cost compatibility. The GPT-5 and o-series models
+ * reject any temperature but their default outright, with
+ * "Unsupported value: 'temperature' does not support 0.9 with this model",
+ * which failed every request to a current OpenAI model. Naming the models that
+ * refuse it would be a list to maintain forever; not sending it is a line to
+ * delete once.
+ */
+export async function chat(engine: ChatEngine, system: string, user: string): Promise<ChatResult> {
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     accept: 'application/json',
@@ -72,7 +79,6 @@ export async function chat(
       signal: AbortSignal.timeout(TIMEOUT_MS),
       body: JSON.stringify({
         model: engine.model,
-        temperature: options.temperature ?? 0.9,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },

@@ -61,6 +61,19 @@ describe('chat', () => {
     ]);
   });
 
+  it('sends no temperature, which the current OpenAI models refuse', async () => {
+    // GPT-5 and the o-series reject any temperature but their own default, and
+    // every provider's default is already varied enough for lyrics.
+    const mock = respondWith(answer);
+    await chat(external, 'system', 'user');
+
+    const body = JSON.parse((mock.mock.calls[0]?.[1] as RequestInit).body as string) as Record<
+      string,
+      unknown
+    >;
+    expect('temperature' in body).toBe(false);
+  });
+
   it('says the key was refused rather than repeating a status code', async () => {
     respondWith({ error: { message: 'Incorrect API key provided' } }, 401);
     const result = await chat(external, 'system', 'user');

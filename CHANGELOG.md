@@ -3,6 +3,16 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.6.1 - September 12, 2026
+
+### 🐛 Fixes
+
+- The lyrics assistant no longer sends a temperature. GPT-5 and the o-series reject any value
+  but their own default, which failed every request to a current OpenAI model with
+  "Unsupported value: 'temperature' does not support 0.9 with this model". Every provider's
+  default is already varied enough for lyrics and for a second take on a prompt, so nothing
+  is lost by leaving it out.
+
 ## 0.6.0 - September 12, 2026
 
 The lyrics assistant. Describe what the song is about and a language model writes the sheet,
