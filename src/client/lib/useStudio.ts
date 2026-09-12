@@ -18,6 +18,9 @@ export interface StudioValue {
   projectId: string | undefined;
   project: Project | undefined;
   assets: Asset[];
+  /** Complete job history, including finished jobs hidden from the queue. */
+  allJobs: Job[];
+  /** Jobs currently visible in the queue. */
   jobs: Job[];
   tasks: StudioTask[];
   catalog: Catalog | undefined;
@@ -40,6 +43,7 @@ export interface StudioValue {
   /** How many finished jobs the queue is holding back. */
   dismissedCount: number;
   importFile: (file: File) => void;
+  renameProject: (name: string) => void;
   renameAsset: (assetId: string, label: string) => void;
   removeAsset: (assetId: string) => void;
   computePeaksFor: (assetId: string) => void;

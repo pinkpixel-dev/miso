@@ -34,10 +34,14 @@ function formatDuration(seconds: number | undefined): string {
 
 export function TakeRow({
   asset,
+  detailsOpen,
+  onOpenDetails,
   onRename,
   onRemove,
 }: {
   asset: Asset;
+  detailsOpen: boolean;
+  onOpenDetails: (trigger: HTMLButtonElement) => void;
   onRename: (label: string) => void;
   onRemove: () => void;
 }) {
@@ -87,12 +91,19 @@ export function TakeRow({
             />
           </form>
         ) : (
-          <>
+          <button
+            type="button"
+            aria-label={`View details for ${asset.label}`}
+            aria-controls="take-detail-panel"
+            aria-expanded={detailsOpen}
+            onClick={(event) => onOpenDetails(event.currentTarget)}
+            className="block w-full min-w-0 rounded-sm px-1 py-0.5 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
             <p className="truncate text-sm text-ink">{asset.label}</p>
             <p className="truncate text-xs text-ink-faint">
               {formatDuration(asset.durationSeconds)} · {asset.format} · {formatBytes(asset.bytes)}
             </p>
-          </>
+          </button>
         )}
       </div>
 

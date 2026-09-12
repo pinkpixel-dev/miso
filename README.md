@@ -94,16 +94,23 @@ That puts the whole app on <http://127.0.0.1:5171>.
 ### 3. Make a project and import a song
 
 The Library screen is the front door. Give a project a name, press Create project, and Miso
-opens it.
+opens it. Use the pencil beside the project name to rename it later.
 
-Inside a project, drag an audio file onto the drop zone, or press Choose an audio file if
-you are on a phone. Miso accepts wav, flac, mp3, and m4a up to 200 MB. The upload shows a
-progress bar, then your browser works out the waveform and sends it up, which is why the
-waveform appears a moment after the upload finishes.
+Inside a project, use the audio file block above the song list. Drop a file onto it, or press
+Choose an audio file. Miso accepts wav, flac, mp3, and m4a up to 200 MB. The upload shows a
+progress bar, then your browser works out the waveform and sends it up. The waveform appears
+a moment after the upload finishes.
 
-Pick a track to load it into the player. Click anywhere along the waveform to seek, and
-playback continues from there. Each track can be renamed, exported, or deleted, and Export
-gives you back exactly the bytes you imported under the name you imported them with.
+Songs and queue jobs have separate scroll areas on desktop, so one long list does not bury
+the other. Queue jobs stay in one list instead of folding older entries behind an expander.
+
+Press Play on a track to load it into the player. Click anywhere along the waveform to seek,
+and playback continues from there. Click the track name to open its details over the song
+list. A generated take shows the exact prompt and lyrics that made it. Imported audio says
+plainly that it has no generation history.
+
+Each track can be renamed, exported, or deleted. Export gives you back exactly the bytes you
+imported under the name you imported them with.
 
 A few things worth knowing:
 

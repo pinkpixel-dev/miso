@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Job, JobState } from '../../shared/types.ts';
 import { isPending, parseStamp } from '../lib/useJobs.ts';
-import { Disclosure } from './Disclosure.tsx';
 import { Button, Panel, Pill } from './ui.tsx';
 
 /**
@@ -10,17 +9,11 @@ import { Button, Panel, Pill } from './ui.tsx';
  * Every state says what it means in words as well as colour, because a state
  * pill is the only thing on this screen that explains a five minute wait.
  *
- * Finished work is folded away rather than deleted. A job row holds the prompt,
- * the lyrics, the seed and every other setting that produced a take, which is
- * the whole record of how a track came to exist and what phase 5 reopens when
- * somebody wants that prompt back. Clearing the list would throw that away to
- * tidy a screen. Anything still waiting or running always shows, and so do the
- * most recent few results, because that is the part anybody is actually
- * watching.
+ * Finished work stays in the same list rather than being collapsed. A job row
+ * holds the prompt, lyrics, seed and every other setting that produced a take,
+ * so Clear finished hides rows without deleting that history. Live work stays
+ * first, followed by every visible finished job.
  */
-
-/** How many finished jobs stay on screen before the rest fold away. */
-const RECENT = 4;
 
 const STATES: Record<JobState, { label: string; tone: 'good' | 'bad' | 'warn' | 'neutral' }> = {
   queued: { label: 'Waiting', tone: 'neutral' },
@@ -97,22 +90,6 @@ function Row({ job, onCancel }: { job: Job; onCancel: (jobId: string) => void })
   );
 }
 
-/**
- * Says what clearing did.
- *
- * An empty queue after a clear should not read as work that went missing. The
- * rows are still there and every take can still say what made it, so the note
- * says that plainly rather than leaving people to guess.
- */
-function ClearedNote({ count }: { count: number }) {
-  return (
-    <p className="mt-3 border-t border-line pt-3 text-sm text-ink-faint">
-      {count === 1 ? '1 finished job is' : `${count} finished jobs are`} cleared from this list.
-      Nothing was deleted, so each take can still show the prompt and lyrics that made it.
-    </p>
-  );
-}
-
 export function JobList({
   jobs,
   hiddenCount = 0,
@@ -134,17 +111,14 @@ export function JobList({
             ? 'Nothing running.'
             : 'Nothing generated yet. Write a prompt on the left.'}
         </p>
-        {hiddenCount > 0 ? <ClearedNote count={hiddenCount} /> : null}
       </Panel>
     );
   }
 
-  // Anything in flight, then the newest handful of results. The list arrives
-  // newest first, so the split needs no sorting of its own.
+  // Anything in flight, then every visible result. Each group keeps the
+  // newest-first ordering supplied by the service.
   const live = jobs.filter(isPending);
   const finished = jobs.filter((job) => !isPending(job));
-  const shown = finished.slice(0, RECENT);
-  const earlier = finished.slice(RECENT);
 
   return (
     <Panel
@@ -158,26 +132,10 @@ export function JobList({
       }
     >
       <ul className="flex flex-col divide-y divide-line">
-        {[...live, ...shown].map((job) => (
+        {[...live, ...finished].map((job) => (
           <Row key={job.id} job={job} onCancel={onCancel} />
         ))}
       </ul>
-
-      {earlier.length > 0 ? (
-        <div className="mt-3 border-t border-line pt-3">
-          <Disclosure
-            summary={`${earlier.length} earlier ${earlier.length === 1 ? 'job' : 'jobs'}`}
-          >
-            <ul className="flex flex-col divide-y divide-line">
-              {earlier.map((job) => (
-                <Row key={job.id} job={job} onCancel={onCancel} />
-              ))}
-            </ul>
-          </Disclosure>
-        </div>
-      ) : null}
-
-      {hiddenCount > 0 ? <ClearedNote count={hiddenCount} /> : null}
     </Panel>
   );
 }

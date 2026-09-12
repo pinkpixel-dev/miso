@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Asset, Project } from '../../shared/types.ts';
 import { api } from './api.ts';
 import { computePeaks } from './computePeaks.ts';
+import { publishProjectUpdate } from './projectUpdates.ts';
 import { uploadAsset } from './upload.ts';
 
 export interface ImportProgress {
@@ -95,7 +96,9 @@ export function useProject(id: string | undefined) {
     async (name: string) => {
       if (id === undefined) return;
       try {
-        setProject(await api.renameProject(id, name));
+        const updated = await api.renameProject(id, name);
+        setProject(updated);
+        publishProjectUpdate(updated);
         setError(undefined);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));

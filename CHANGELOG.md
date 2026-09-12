@@ -3,6 +3,31 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.9.0 - September 12, 2026
+
+### ✨ Projects
+
+- Projects can now be renamed from the workspace header. The new name also updates in the
+  project sidebar without a reload.
+- Clicking a song name now opens its generation details over the workspace. Generated takes
+  show the exact prompt and lyrics stored with their job, including jobs hidden by Clear
+  finished. Imported audio says that it has no generation history.
+
+### 🎨 Workspace
+
+- The audio file block now stays above the song list, so imports remain reachable in a busy
+  project.
+- Songs and queue jobs have separate desktop scroll areas. Both lists stay usable as they
+  grow, while narrow windows keep one stacked page scroll.
+- Songs and queue jobs now stay in complete lists instead of folding older entries behind
+  expanders. Clear finished still hides completed queue rows without deleting their history.
+- A cleared queue now says only that nothing is running. The longer explanation about hidden
+  jobs has been removed from the panel.
+
+### 🏷️ Versioning
+
+- Bumped the app version to 0.9.0.
+
 ## 0.8.1 - September 12, 2026
 
 ### 🎨 Branding

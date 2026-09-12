@@ -147,6 +147,8 @@ export function useJobs(projectId: string | undefined, onComplete?: () => void) 
 
   return {
     jobs: visible,
+    /** Complete history, including finished jobs hidden from the queue. */
+    allJobs: jobs,
     /** Finished jobs being held back, so the queue can say so rather than lie. */
     dismissedCount: jobs.length - visible.length,
     tasks,

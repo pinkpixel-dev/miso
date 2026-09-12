@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Project } from '../../shared/types.ts';
 import { api } from './api.ts';
+import { publishProjectUpdate, subscribeToProjectUpdates } from './projectUpdates.ts';
 
 /**
  * The projects list.
@@ -28,6 +29,16 @@ export function useProjects() {
     void load();
   }, [load]);
 
+  useEffect(
+    () =>
+      subscribeToProjectUpdates((updated) => {
+        setProjects((current) =>
+          current.map((project) => (project.id === updated.id ? updated : project)),
+        );
+      }),
+    [],
+  );
+
   /** Answers with the new project so the caller can navigate into it. */
   const create = useCallback(async (name: string): Promise<Project | undefined> => {
     try {
@@ -45,6 +56,7 @@ export function useProjects() {
     try {
       const updated = await api.renameProject(id, name);
       setProjects((current) => current.map((p) => (p.id === id ? updated : p)));
+      publishProjectUpdate(updated);
       setError(undefined);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
