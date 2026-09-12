@@ -45,6 +45,8 @@ export interface NewAsset {
   durationSeconds?: number;
   sampleRate?: number;
   channels?: number;
+  /** The job that produced this asset. Absent for an imported file. */
+  jobId?: string;
 }
 
 function parsePeaks(raw: string | null): number[][] | undefined {
@@ -94,8 +96,8 @@ export function insertAsset(handle: Database, input: NewAsset): Asset {
     .prepare(
       `INSERT INTO assets
          (id, project_id, kind, label, filename, format, bytes, checksum,
-          duration_seconds, sample_rate, channels)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          duration_seconds, sample_rate, channels, job_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       id,
@@ -109,6 +111,7 @@ export function insertAsset(handle: Database, input: NewAsset): Asset {
       input.durationSeconds ?? null,
       input.sampleRate ?? null,
       input.channels ?? null,
+      input.jobId ?? null,
     );
 
   const asset = readAsset(handle, id);

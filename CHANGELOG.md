@@ -3,6 +3,39 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.4.0 - September 11, 2026
+
+Miso generates music now. Write a prompt on a project screen, pick an installed ACE-Step
+package, and the track lands in the project with the prompt and the settings that made it
+recorded beside it.
+
+### ✨ Added
+
+- **Generate panel.** A prompt, optional lyrics, length, steps, guidance, and a seed, on
+  every project screen. The form is built from what the service says the task takes, so a new
+  task does not need a new screen.
+- **Job queue.** One job at a time, with waiting, preparing, generating, done, failed, and
+  cancelled states. It starts the moment you press Generate and keeps going while you look at
+  something else.
+- **Queue list.** Elapsed time that counts up while a job runs, the reason a job failed, and
+  an estimate from how long past runs on the same model took.
+- **Cancel.** Available on a job that has not started. A running generation cannot be
+  interrupted, and the queue says so rather than offering a button that does nothing.
+- **Model residency.** Miso loads a package when a job needs it, keeps it loaded for the next
+  job that can use it, and frees it when the queue moves to a different model. Settings for
+  the card can be reclaimed through the new unload route.
+- **Takes.** A generated track is saved as an asset that knows which job made it, alongside
+  imported audio in the same track list.
+
+### 🔧 Changed
+
+- The queue runs jobs grouped by model, so six jobs across two models cost two weight loads
+  rather than six.
+- A busy backend no longer fails a job. It goes back in the queue, and the wait doubles from
+  five seconds to two minutes before the job gives up.
+- Jobs left running when the service stops are marked failed at the next start, with the
+  reason stated, rather than sitting in the queue forever.
+
 ## 0.3.0 - September 11, 2026
 
 Miso holds your work now. You can make a project, import a song, see its waveform, play and

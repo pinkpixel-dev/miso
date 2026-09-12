@@ -6,6 +6,7 @@ import { relative } from 'node:path';
 import { clientDistDir, host, isProduction, port, projectRoot } from './config.ts';
 import { db } from './db/index.ts';
 import { sweepTempFiles } from './library/storage.ts';
+import { startWorker } from './jobs/worker.ts';
 import { api } from './routes/api.ts';
 
 const app = new Hono();
@@ -36,6 +37,10 @@ db();
 void sweepTempFiles().then((removed) => {
   if (removed > 0) console.log(`[miso] swept ${removed} abandoned upload(s)`);
 });
+
+// Jobs that were mid-flight belong to the process that died with them. The
+// worker clears those out and then picks up anything still queued.
+startWorker();
 
 serve({ fetch: app.fetch, hostname: host, port }, (info) => {
   const where = `http://${host}:${info.port}`;

@@ -136,17 +136,24 @@ export interface InstallReport {
   message: string | undefined;
 }
 
-/** Makes a management request and turns every expected failure into a ManagementResult. */
+/**
+ * Makes a request and turns every expected failure into a ManagementResult.
+ *
+ * The timeout is a parameter because the two kinds of call on this boundary are
+ * nothing alike. A metadata call that takes ten seconds is broken; a model load
+ * that takes ten seconds is normal.
+ */
 async function call<T>(
   baseUrl: string,
   path: string,
   init: RequestInit,
   read: (body: unknown) => T,
+  timeoutMs: number = MANAGEMENT_TIMEOUT_MS,
 ): Promise<ManagementResult<T>> {
   try {
     const response = await fetch(`${baseUrl}${path}`, {
       ...init,
-      signal: AbortSignal.timeout(MANAGEMENT_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       headers: { accept: 'application/json', ...init.headers },
     });
 
@@ -169,7 +176,7 @@ async function call<T>(
     return { ok: true, value: read(await response.json()) };
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      return { ok: false, reason: 'unreachable', message: `No response within ${MANAGEMENT_TIMEOUT_MS} ms.` };
+      return { ok: false, reason: 'unreachable', message: `No response within ${timeoutMs} ms.` };
     }
     if (error instanceof TypeError) {
       return { ok: false, reason: 'unreachable', message: `Could not reach ${baseUrl}.` };
@@ -276,4 +283,256 @@ export function cleanPartial(baseUrl: string, packageId: string): Promise<Manage
     const found = message?.match(/cleaned\s+(\d+)\s+partial/i);
     return found ? Number(found[1]) : undefined;
   });
+}
+
+/**
+ * Generation, staging, and model residency.
+ *
+ * These share the boundary rule above: nothing outside this file knows the
+ * route names or the field spellings. The shapes below were confirmed against
+ * ghcr.io/0xshug0/audio.cpp:full-cuda13 on September 11, 2026, and the
+ * responses are recorded in ./fixtures.
+ *
+ * Timeouts here are nothing like the management ones. A 20 second track took
+ * 40 seconds to generate on a 4090 laptop including the weight load, so a four
+ * minute song at higher settings can run for many minutes and the budget has to
+ * assume the slow case rather than the measured one.
+ */
+
+/** Loading 6 GB of weights off a cold page cache is the slow case here. */
+const LOAD_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** A ceiling, not an expectation. Miso's queue is what makes waiting bearable. */
+const RUN_TIMEOUT_MS = 60 * 60 * 1000;
+
+/** A 200 MB source file over a LAN to a NAS. */
+const UPLOAD_TIMEOUT_MS = 30 * 60 * 1000;
+
+export interface RegisteredModel {
+  id: string;
+  family: string;
+  task: string;
+  /** False for a model the server knows about but has unloaded from memory. */
+  loaded: boolean;
+  path: string;
+}
+
+export interface TaskResult {
+  /** Base64 PCM16 WAV, exactly as the server sent it. */
+  audio: string;
+  sampleRate: number | undefined;
+  channels: number | undefined;
+  /** Named outputs, for the stem routes in phase 6. Empty for a single result. */
+  namedOutputs: { id: string; audio: string }[];
+}
+
+/**
+ * Why a task request did not return audio.
+ *
+ * `busy` is the one the queue treats as temporary: the server refuses new work
+ * with a 503 while it is mid-inference, and the right answer is to wait and ask
+ * again rather than to fail the job.
+ */
+export type RunFailure = 'busy' | 'unknown_model' | 'unreachable' | 'error';
+
+export type RunResult =
+  | { ok: true; value: TaskResult }
+  | { ok: false; reason: RunFailure; message: string };
+
+/** Reads the server's own error wording out of its error envelope. */
+function errorMessage(body: unknown, fallback: string): string {
+  const error = (body as { error?: { message?: unknown } } | null)?.error;
+  return typeof error?.message === 'string' && error.message !== '' ? error.message : fallback;
+}
+
+/**
+ * Where the server keeps installed packages.
+ *
+ * The route is /v1/ui/models-root, not under /v1/ui/models/ like the rest of
+ * the management surface. It answers with the active root and the default,
+ * which are the same path unless the server was started with an override.
+ */
+export function fetchModelsRoot(baseUrl: string): Promise<ManagementResult<string>> {
+  return call(baseUrl, '/v1/ui/models-root', { method: 'GET' }, (body) => {
+    const root = str((body as Record<string, unknown> | null)?.models_root);
+    if (!root) throw new Error('The server did not report a models root');
+    return root;
+  });
+}
+
+/**
+ * Every model the server has registered, loaded or not.
+ *
+ * A registration outlives an unload: unloading frees the weights and leaves the
+ * entry behind with `loaded:false`. That is how Miso can unload everything
+ * without losing the paths it would need to load them again.
+ */
+export function fetchRegisteredModels(baseUrl: string): Promise<ManagementResult<RegisteredModel[]>> {
+  return call(baseUrl, '/v1/models', { method: 'GET' }, (body) => {
+    const entries = Array.isArray((body as { data?: unknown } | null)?.data)
+      ? ((body as { data: unknown[] }).data)
+      : [];
+
+    return entries.flatMap((entry) => {
+      const row = (entry ?? {}) as Record<string, unknown>;
+      const id = str(row.id);
+      if (!id) return [];
+      return [
+        {
+          id,
+          family: str(row.family) ?? '',
+          task: str(row.task) ?? '',
+          loaded: row.loaded === true,
+          path: str(row.path) ?? '',
+        },
+      ];
+    });
+  });
+}
+
+export interface LoadRequest {
+  /** Miso's name for this registration. Reused on every later request. */
+  id: string;
+  family: string;
+  /** Absolute path on the server, including the GGUF variant directory. */
+  path: string;
+  /** The runtime task kind, never a spec task word. */
+  task: string;
+  sessionOptions?: Record<string, string>;
+}
+
+/**
+ * Registers a model and loads its weights.
+ *
+ * Calling this for an id that already exists reconfigures it instead of
+ * failing, which is how a job switches mem_saver on for a family that was
+ * loaded without it.
+ */
+export function loadModel(baseUrl: string, request: LoadRequest): Promise<ManagementResult<void>> {
+  const body = {
+    id: request.id,
+    family: request.family,
+    path: request.path,
+    task: request.task,
+    mode: 'offline',
+    ...(request.sessionOptions ? { session_options: request.sessionOptions } : {}),
+  };
+
+  return call(baseUrl, '/v1/models/load', json(body), () => undefined, LOAD_TIMEOUT_MS);
+}
+
+/** Frees a model's weights. The registration stays, so it can be loaded again. */
+export function unloadModel(baseUrl: string, id: string): Promise<ManagementResult<void>> {
+  return call(baseUrl, '/v1/models/unload', json({ id }), () => undefined, LOAD_TIMEOUT_MS);
+}
+
+/**
+ * Uploads a file so a task can name it as source audio.
+ *
+ * This is what makes a remote backend work: audio.cpp never sees Miso's disk,
+ * so the bytes travel over HTTP and the server answers with a path of its own.
+ * There is no matching delete route, so Miso records what it staged and cleans
+ * up itself.
+ */
+export async function stageAudio(
+  baseUrl: string,
+  body: ReadableStream<Uint8Array>,
+  filename: string,
+): Promise<ManagementResult<string>> {
+  return call(
+    baseUrl,
+    '/v1/ui/upload',
+    {
+      method: 'POST',
+      body,
+      // Node needs this to stream a request body rather than buffer it.
+      duplex: 'half',
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-audiocpp-filename': encodeURIComponent(filename),
+      },
+    } as RequestInit,
+    (payload) => {
+      const path = str((payload as Record<string, unknown> | null)?.path);
+      if (!path) throw new Error('The server accepted the upload but did not return a path');
+      return path;
+    },
+    UPLOAD_TIMEOUT_MS,
+  );
+}
+
+/**
+ * Runs one task and waits for the audio.
+ *
+ * Two things about this route are worth knowing before changing it. It loads a
+ * registered model that is not resident, so a job never has to check first. And
+ * it fills in a default for every field the request leaves out, including the
+ * prompt, so a request object that is missing generates a track rather than
+ * refusing. Send the whole request or none of it.
+ */
+export async function runTask(
+  baseUrl: string,
+  model: string,
+  request: Record<string, unknown>,
+): Promise<RunResult> {
+  try {
+    const response = await fetch(`${baseUrl}/v1/tasks/run`, {
+      method: 'POST',
+      body: JSON.stringify({ model, request }),
+      signal: AbortSignal.timeout(RUN_TIMEOUT_MS),
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+    });
+
+    if (response.status === 503) {
+      return { ok: false, reason: 'busy', message: 'The server is already running a task.' };
+    }
+
+    if (!response.ok) {
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        body = null;
+      }
+      const message = errorMessage(body, `The server answered with HTTP ${response.status}.`);
+      const reason: RunFailure = message.includes('unknown model id') ? 'unknown_model' : 'error';
+      return { ok: false, reason, message };
+    }
+
+    return { ok: true, value: readTaskResult(await response.json()) };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return {
+        ok: false,
+        reason: 'unreachable',
+        message: `The task did not finish within ${Math.round(RUN_TIMEOUT_MS / 60000)} minutes.`,
+      };
+    }
+    if (error instanceof TypeError) {
+      return { ok: false, reason: 'unreachable', message: `Could not reach ${baseUrl}.` };
+    }
+    return { ok: false, reason: 'error', message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export function readTaskResult(body: unknown): TaskResult {
+  const root = (body ?? {}) as Record<string, unknown>;
+  const named = Array.isArray(root.named_audio_outputs) ? root.named_audio_outputs : [];
+
+  const namedOutputs = named.flatMap((entry) => {
+    const row = (entry ?? {}) as Record<string, unknown>;
+    const id = str(row.id);
+    const audio = str(row.audio);
+    return id && audio ? [{ id, audio }] : [];
+  });
+
+  const audio = str(root.audio) ?? namedOutputs[0]?.audio;
+  if (!audio) throw new Error('The server finished the task but returned no audio');
+
+  return {
+    audio,
+    sampleRate: num(root.sample_rate),
+    channels: num(root.channels),
+    namedOutputs,
+  };
 }

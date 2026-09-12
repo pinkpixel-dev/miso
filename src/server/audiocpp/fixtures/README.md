@@ -14,6 +14,13 @@ Re-record them when the image is updated, using the commands in Task 1 of
 | `/v1/ui/models/install/stop` | POST | `{"id":"<package_id>"}` | not recorded, see notes |
 | `/v1/ui/models/delete` | POST | `{"id":"<package_id>"}` | not recorded, see notes |
 | `/v1/ui/models/clean-partial` | POST | `{"id":"<package_id>"}` | not recorded, see notes |
+| `/v1/ui/models-root` | GET | none | `models-root.json` |
+| `/v1/models` | GET | none | `models-list.json` |
+| `/v1/models/load` | POST | `{"id","family","path","task","mode","session_options"}` | `model-load.json` |
+| `/v1/models/unload` | POST | `{"id":"<registration_id>"}` | `model-unload.json` |
+
+The four generation-side routes were captured on 2026-09-11 from the same image, loading and
+unloading `ace_step_turbo_q8_0` from `/app/models/ACE-Step1.5-GGUF/turbo`.
 
 ## Notes
 
@@ -54,3 +61,16 @@ Re-record them when the image is updated, using the commands in Task 1 of
   `{"error":{"message":"installation is not running for <id>","type":"server_error"}}`.
   `clean-partial` on a package with nothing to clean returns
   `{"id":"<id>","cleaned":true,"message":"Cleaned 0 partial download directories for <id>"}`.
+
+- The models root is at `/v1/ui/models-root`, one level up from the rest of the `/v1/ui/`
+  management surface. `/v1/ui/models/models-root`, `/v1/ui/models/root`, and
+  `/v1/ui/models_root` all answer `unknown endpoint`.
+- There is no unload-everything route. `/v1/models/unload-all` and `/v1/models/unload_all`
+  are both unknown endpoints, so unloading everything means listing `/v1/models` and
+  unloading each entry whose `loaded` is true.
+- An unload keeps the registration. The entry stays in `/v1/models` with `loaded:false` and
+  its path intact, which is what lets it be reloaded without registering again.
+- Loading an id that is already registered answers `reconfigured` rather than failing.
+- `/v1/tasks/run` validates only the `model` key. Every field inside `request` has a default,
+  so a request object that is missing generates audio from defaults rather than erroring, and
+  the route loads an unloaded model to do it. See `DOCS/ERRORS.md`.

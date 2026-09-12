@@ -1,0 +1,15 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "miso-probe-ace-step",
+      "object": "model",
+      "owned_by": "engine",
+      "family": "ace_step",
+      "task": "gen",
+      "mode": "offline",
+      "loaded": true,
+      "path": "/app/models/ACE-Step1.5-GGUF/turbo"
+    }
+  ]
+}

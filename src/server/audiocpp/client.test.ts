@@ -6,7 +6,11 @@ import {
   cleanPartial,
   deletePackage,
   fetchInstallStatus,
+  fetchModelsRoot,
   fetchPackageSizes,
+  fetchRegisteredModels,
+  readTaskResult,
+  runTask,
   startInstall,
   stopInstall,
 } from './client.ts';
@@ -188,5 +192,87 @@ describe('cleanPartial', () => {
     respondWith({ id: 'p1', cleaned: true, message: 'Removed the leftovers' });
     const result = await cleanPartial('http://backend', 'p1');
     expect(result).toEqual({ ok: true, value: undefined });
+  });
+});
+
+describe('fetchModelsRoot', () => {
+  it('reads where the server keeps packages', async () => {
+    respondWith(load('models-root.json'));
+    const result = await fetchModelsRoot('http://backend');
+    expect(result).toEqual({ ok: true, value: '/app/models' });
+  });
+
+  it('treats a response with no root as an error rather than an empty path', async () => {
+    respondWith({ is_default: true });
+    const result = await fetchModelsRoot('http://backend');
+    expect(result).toMatchObject({ ok: false, reason: 'error' });
+  });
+});
+
+describe('fetchRegisteredModels', () => {
+  it('reads what the server has registered, loaded or not', async () => {
+    respondWith(load('models-list.json'));
+    const result = await fetchRegisteredModels('http://backend');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toEqual([
+        {
+          id: 'miso-probe-ace-step',
+          family: 'ace_step',
+          task: 'gen',
+          loaded: true,
+          path: '/app/models/ACE-Step1.5-GGUF/turbo',
+        },
+      ]);
+    }
+  });
+
+  it('answers with an empty list when nothing is registered', async () => {
+    respondWith({ object: 'list', data: [] });
+    const result = await fetchRegisteredModels('http://backend');
+    expect(result).toEqual({ ok: true, value: [] });
+  });
+});
+
+describe('readTaskResult', () => {
+  it('reads a single audio result', () => {
+    const result = readTaskResult({ audio: 'AAA=', sample_rate: 48000, channels: 2 });
+    expect(result).toEqual({ audio: 'AAA=', sampleRate: 48000, channels: 2, namedOutputs: [] });
+  });
+
+  it('reads the named outputs a separation returns', () => {
+    const result = readTaskResult({
+      named_audio_outputs: [
+        { id: 'vocals', audio: 'AAA=' },
+        { id: 'drums', audio: 'BBB=' },
+      ],
+    });
+    expect(result.namedOutputs.map((output) => output.id)).toEqual(['vocals', 'drums']);
+    // With no top level audio, the first named output stands in as the result.
+    expect(result.audio).toBe('AAA=');
+  });
+
+  it('throws when a finished task returned no audio at all', () => {
+    expect(() => readTaskResult({ timing: {} })).toThrow(/no audio/i);
+  });
+});
+
+describe('runTask', () => {
+  it('treats a 503 as busy rather than a failure', async () => {
+    respondWith({ error: { message: 'server_busy' } }, 503);
+    const result = await runTask('http://backend', 'miso:ace', { task_route: 'text2music' });
+    expect(result).toMatchObject({ ok: false, reason: 'busy' });
+  });
+
+  it('names an unknown model so the caller can say what to install', async () => {
+    respondWith({ error: { message: 'unknown model id: nope' } }, 400);
+    const result = await runTask('http://backend', 'nope', {});
+    expect(result).toMatchObject({ ok: false, reason: 'unknown_model', message: 'unknown model id: nope' });
+  });
+
+  it('returns the audio on success', async () => {
+    respondWith({ audio: 'AAA=', sample_rate: 48000, channels: 2 });
+    const result = await runTask('http://backend', 'miso:ace', { task_route: 'text2music' });
+    expect(result.ok && result.value.audio).toBe('AAA=');
   });
 });

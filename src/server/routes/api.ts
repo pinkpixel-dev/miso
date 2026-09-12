@@ -4,6 +4,7 @@ import { checkHealth } from '../audiocpp/client.ts';
 import { readSettings, writeSettings } from '../db/settings.ts';
 import { assetRoutes } from './assets.ts';
 import { catalogRoutes } from './catalog.ts';
+import { jobRoutes } from './jobs.ts';
 import { projectRoutes } from './projects.ts';
 import { storageRoutes } from './storage.ts';
 
@@ -48,3 +49,4 @@ api.route('/', catalogRoutes);
 api.route('/', projectRoutes);
 api.route('/', assetRoutes);
 api.route('/', storageRoutes);
+api.route('/', jobRoutes);

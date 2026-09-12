@@ -4,10 +4,12 @@ import type {
   BackendStatus,
   Catalog,
   CleanPartialsResult,
+  Job,
   Project,
   ProjectDetail,
   Settings,
   StorageUsage,
+  StudioTask,
 } from '../../shared/types.ts';
 
 /**
@@ -94,6 +96,32 @@ export const api = {
     ),
 
   getStorage: () => request<StorageUsage>('/storage'),
+
+  getTasks: () => request<StudioTask[]>('/tasks'),
+
+  getJobs: (projectId: string) => request<Job[]>(`/projects/${encodeURIComponent(projectId)}/jobs`),
+
+  createJob: (
+    projectId: string,
+    body: {
+      taskId: string;
+      modelId: string;
+      params: Record<string, string | number>;
+      inputs?: { assetId: string; role: string }[];
+    },
+  ) =>
+    request<Job>(`/projects/${encodeURIComponent(projectId)}/jobs`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  cancelJob: (projectId: string, jobId: string) =>
+    request<Job>(`/projects/${encodeURIComponent(projectId)}/jobs/${encodeURIComponent(jobId)}`, {
+      method: 'DELETE',
+    }),
+
+  /** Frees every model on the backend, for when the GPU is wanted elsewhere. */
+  unloadModels: () => request<{ unloaded: boolean }>('/backend/unload', { method: 'POST' }),
 };
 
 /**

@@ -167,3 +167,62 @@ export interface StorageUsage {
   totalBytes: number;
   projects: Project[];
 }
+
+/**
+ * Where a job has got to.
+ *
+ * `staging` is its own state because uploading a source asset to audio.cpp
+ * happens before any GPU work and fails for its own reasons, usually a backend
+ * that went away. `cancelled` only ever applies to a job that had not started:
+ * a GPU call in flight cannot be interrupted, so Miso does not pretend it can.
+ */
+export type JobState = 'queued' | 'staging' | 'running' | 'complete' | 'failed' | 'cancelled';
+
+/** One queued or finished piece of work. */
+export interface Job {
+  id: string;
+  projectId: string;
+  /** Registry task id, for example generate.text2music. */
+  taskId: string;
+  /** The catalog package the task runs on, for example ace_step_turbo_q8_0. */
+  modelId: string;
+  /** The parameters the person chose, as the task registry validated them. */
+  params: Record<string, unknown>;
+  state: JobState;
+  error?: string;
+  attempts: number;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  /** Assets this job produced. Empty until it completes. */
+  outputAssetIds: string[];
+}
+
+/** One parameter of a task, as the studio form renders it. */
+export interface TaskField {
+  name: string;
+  label: string;
+  kind: 'text' | 'lyrics' | 'number';
+  required: boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  default?: string | number;
+  help?: string;
+}
+
+/**
+ * A task the studio can offer, with the model family it runs on.
+ *
+ * Which packages of that family are installed is not in here on purpose. The
+ * catalog endpoint already answers that, and it needs the backend, while this
+ * list is the same whether the backend is up or not.
+ */
+export interface StudioTask {
+  id: string;
+  label: string;
+  summary: string;
+  family: string;
+  fields: TaskField[];
+}

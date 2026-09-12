@@ -1,4 +1,9 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  TextareaHTMLAttributes,
+} from 'react';
 
 /**
  * The handful of primitives Miso needs so far.
@@ -65,6 +70,48 @@ export function Field({ label, hint, error, id, className, ...rest }: FieldProps
         aria-invalid={error ? true : undefined}
         className={cx(
           'w-full rounded-md border bg-canvas px-3 py-2 text-sm text-ink transition-colors duration-150',
+          'placeholder:text-ink-faint hover:border-line-strong',
+          error ? 'border-bad' : 'border-line',
+          'disabled:cursor-not-allowed disabled:opacity-45',
+          className,
+        )}
+        {...rest}
+      />
+      {error ? (
+        <p id={`${inputId}-error`} role="alert" className="text-sm text-bad">
+          {error}
+        </p>
+      ) : hint ? (
+        <p id={`${inputId}-hint`} className="text-sm text-ink-faint">
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label: string;
+  hint?: ReactNode;
+  error?: string;
+};
+
+/** Field's longer sibling, for a prompt or a verse. Same states, same markup rules. */
+export function TextArea({ label, hint, error, id, className, ...rest }: TextAreaProps) {
+  const inputId = id ?? `field-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  const describedBy = error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={inputId} className="text-sm font-medium text-ink">
+        {label}
+      </label>
+      <textarea
+        id={inputId}
+        aria-describedby={describedBy}
+        aria-invalid={error ? true : undefined}
+        className={cx(
+          'w-full rounded-md border bg-canvas px-3 py-2 text-sm leading-relaxed text-ink transition-colors duration-150',
           'placeholder:text-ink-faint hover:border-line-strong',
           error ? 'border-bad' : 'border-line',
           'disabled:cursor-not-allowed disabled:opacity-45',

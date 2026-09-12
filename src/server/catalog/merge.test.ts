@@ -10,8 +10,8 @@ const ace: ModelSpec = {
   tasks: ['music', 'edit'],
   languages: ['multilingual'],
   packages: [
-    { id: 'ace_turbo_q8', label: 'Turbo Q8', precision: 'q8_0' },
-    { id: 'ace_turbo_bf16', label: 'Turbo BF16', precision: 'bf16' },
+    { id: 'ace_turbo_q8', label: 'Turbo Q8', precision: 'q8_0', directory: 'ACE-Step1.5-GGUF/turbo' },
+    { id: 'ace_turbo_bf16', label: 'Turbo BF16', precision: 'bf16', directory: 'ACE-Step1.5-GGUF/turbo' },
   ],
   recommendedPackageId: 'ace_turbo_q8',
 };

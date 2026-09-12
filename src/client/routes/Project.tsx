@@ -3,9 +3,13 @@ import { Link, useParams } from 'react-router-dom';
 import type { Asset } from '../../shared/types.ts';
 import { AssetRow } from '../components/AssetRow.tsx';
 import { ConfirmDialog } from '../components/Dialog.tsx';
+import { GeneratePanel } from '../components/GeneratePanel.tsx';
 import { ImportDropZone } from '../components/ImportDropZone.tsx';
+import { JobList } from '../components/JobList.tsx';
 import { WaveformPlayer } from '../components/WaveformPlayer.tsx';
 import { Panel } from '../components/ui.tsx';
+import { useCatalog } from '../lib/useCatalog.ts';
+import { useJobs } from '../lib/useJobs.ts';
 import { useProject } from '../lib/useProject.ts';
 
 export function ProjectRoute() {
@@ -20,7 +24,13 @@ export function ProjectRoute() {
     renameAsset,
     removeAsset,
     computePeaksFor,
+    reload,
   } = useProject(id);
+
+  // A finished job has written a new take, so the track list is stale the
+  // moment the queue reports one.
+  const { jobs, tasks, error: jobError, submit, cancel } = useJobs(id, reload);
+  const { catalog, loading: catalogLoading } = useCatalog();
 
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [pendingRemoval, setPendingRemoval] = useState<Asset | undefined>();
@@ -60,14 +70,24 @@ export function ProjectRoute() {
         </p>
       </div>
 
-      {error ? (
+      {error ?? jobError ? (
         <p
           role="alert"
           className="rounded-md border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-ink"
         >
-          {error}
+          {error ?? jobError}
         </p>
       ) : null}
+
+      <GeneratePanel
+        tasks={tasks}
+        jobs={jobs}
+        catalog={catalog}
+        catalogLoading={catalogLoading}
+        onSubmit={submit}
+      />
+
+      <JobList jobs={jobs} onCancel={(jobId) => void cancel(jobId)} />
 
       <ImportDropZone onFile={(file) => void importFile(file)} importing={importing} />
 
