@@ -27,14 +27,21 @@ this runtime exposes that as a timeline edit.
 
 ## What you need
 
-- **A GPU worth using.** These are diffusion and transformer models. A 16 GB card runs
-  everything comfortably in Q8. Less will limit which models you can load.
-- **Docker**, with the NVIDIA container toolkit for GPU access. You can also build
-  audio.cpp yourself if you prefer.
-- **Node 22 or newer.**
+- **A desktop or workstation with an NVIDIA GPU.** These are diffusion and transformer
+  models. A 16 GB card runs everything comfortably in Q8. Less will limit which models you
+  can load.
+- **Docker**, with the NVIDIA container toolkit for GPU access. This is the primary
+  deployment path. You can also build audio.cpp yourself if you prefer.
+- **Node 22 or newer**, for the current source setup. The planned Compose stack will include
+  Miso's Node runtime.
 - **Disk.** Models are large. ACE-Step is around 6 GB and MiniMax Music 3 is around 13 GB.
 
 ## Getting started
+
+The steps below are the current source setup. The planned release install is one Docker
+Compose stack containing Miso and audio.cpp on the same machine. It will keep project
+data and downloaded models in separate persistent volumes. Until that stack is built, start
+audio.cpp in Docker and run Miso through Node.
 
 ### 1. Start an audio.cpp server
 
@@ -242,12 +249,15 @@ Test connection, and start the container if it is not up.
 almost always `--gpus all` instead of `--runtime=nvidia`, written up in
 [DOCS/ERRORS.md](DOCS/ERRORS.md).
 
-## Running the server somewhere else
+## Optional remote backend
 
-Miso never assumes audio.cpp is on the same machine, and never assumes a shared filesystem.
-Audio is uploaded to the server and results come back over HTTP. So you can put the server
-on a home server or a NAS, point Miso at it, and keep the model library on the machine with
-the storage. Set the address in Settings.
+The normal installation keeps Miso and audio.cpp together on one GPU desktop or workstation.
+Miso still supports a remote audio.cpp server and never assumes a shared filesystem. Audio
+goes to the server over HTTP, and results come back the same way.
+
+This is useful when the GPU is in another computer or in a GPU-capable NAS. A CPU-only NAS
+is not a recommended inference host. Set the audio.cpp address in Settings when you need
+this arrangement.
 
 ## How it fits together
 
