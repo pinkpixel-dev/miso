@@ -19,7 +19,7 @@ export function isPending(job: Job): boolean {
   return job.state === 'queued' || job.state === 'staging' || job.state === 'running';
 }
 
-export function useJobs(projectId: string, onComplete?: () => void) {
+export function useJobs(projectId: string | undefined, onComplete?: () => void) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [tasks, setTasks] = useState<StudioTask[]>([]);
   const [error, setError] = useState<string | undefined>();
@@ -32,6 +32,11 @@ export function useJobs(projectId: string, onComplete?: () => void) {
   onCompleteRef.current = onComplete;
 
   const load = useCallback(async () => {
+    if (projectId === undefined) {
+      setJobs([]);
+      return;
+    }
+
     try {
       const next = await api.getJobs(projectId);
       setJobs(next);
@@ -58,6 +63,11 @@ export function useJobs(projectId: string, onComplete?: () => void) {
   // The first load seeds the set of already finished jobs, so opening a project
   // with old takes in it does not look like five jobs finishing at once.
   useEffect(() => {
+    if (projectId === undefined) {
+      setJobs([]);
+      return;
+    }
+
     let cancelled = false;
     void (async () => {
       const next = await api.getJobs(projectId).catch(() => [] as Job[]);
@@ -87,6 +97,7 @@ export function useJobs(projectId: string, onComplete?: () => void) {
       originalPrompt?: string;
       inputs?: { assetId: string; role: string }[];
     }) => {
+      if (projectId === undefined) return false;
       try {
         const job = await api.createJob(projectId, body);
         setJobs((current) => [job, ...current]);
@@ -102,6 +113,7 @@ export function useJobs(projectId: string, onComplete?: () => void) {
 
   const cancel = useCallback(
     async (jobId: string) => {
+      if (projectId === undefined) return;
       try {
         const job = await api.cancelJob(projectId, jobId);
         setJobs((current) => current.map((entry) => (entry.id === jobId ? job : entry)));

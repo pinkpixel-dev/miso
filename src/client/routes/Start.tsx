@@ -1,12 +1,22 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Project } from '../../shared/types.ts';
-import { ConfirmDialog } from '../components/Dialog.tsx';
 import { Button, Field, Panel } from '../components/ui.tsx';
 import { useProjects } from '../lib/useProjects.ts';
 
-/** Bytes as something a person reads. Matches the wording on the Models screen. */
+/**
+ * What you land on with no project open.
+ *
+ * This replaced the Library screen. The rail already lists every project, so a
+ * second grid of the same projects was one answer to a question that was
+ * already answered. What is left is the part the rail cannot do: making a new
+ * project, and a short way back into the ones you touched last.
+ */
+
+function countLabel(count: number): string {
+  return count === 1 ? '1 take' : `${count} takes`;
+}
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return 'empty';
   const gb = bytes / 1_000_000_000;
@@ -14,15 +24,13 @@ function formatBytes(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1_000_000))} MB`;
 }
 
-function countLabel(count: number): string {
-  return count === 1 ? '1 track' : `${count} tracks`;
-}
+/** Enough to get back to what you were doing, not a second library screen. */
+const RECENT = 5;
 
-export function LibraryRoute() {
-  const { projects, error, loading, create, remove } = useProjects();
+export function StartRoute() {
+  const { projects, error, loading, create } = useProjects();
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [pendingRemoval, setPendingRemoval] = useState<Project | undefined>();
   const navigate = useNavigate();
 
   async function submit(event: FormEvent) {
@@ -39,11 +47,15 @@ export function LibraryRoute() {
     }
   }
 
+  const recent = projects.slice(0, RECENT);
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl">Library</h1>
-        <p className="mt-1 text-ink-muted">Your projects and everything you have made.</p>
+        <h1 className="text-2xl">Start something</h1>
+        <p className="mt-1 text-ink-muted">
+          Make a project, then generate a take or drop a song into it.
+        </p>
       </div>
 
       {error ? (
@@ -73,19 +85,13 @@ export function LibraryRoute() {
         </form>
       </Panel>
 
-      <Panel title="Projects">
-        {loading ? (
-          <p className="text-sm text-ink-muted">Loading your projects.</p>
-        ) : projects.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            No projects yet. Make one above, then drop a song into it.
-          </p>
-        ) : (
+      {loading && projects.length === 0 ? null : recent.length === 0 ? null : (
+        <Panel title="Recent">
           <ul className="flex flex-col">
-            {projects.map((project) => (
+            {recent.map((project) => (
               <li
                 key={project.id}
-                className="flex flex-col gap-2 border-t border-line py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between"
+                className="flex items-center justify-between gap-4 border-t border-line py-3 first:border-t-0"
               >
                 <div className="min-w-0">
                   <button
@@ -99,40 +105,17 @@ export function LibraryRoute() {
                     {countLabel(project.assetCount)}, {formatBytes(project.bytes)}
                   </p>
                 </div>
-
-                <div className="flex shrink-0 gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => void navigate(`/projects/${project.id}`)}
-                  >
-                    Open
-                  </Button>
-                  <Button variant="ghost" onClick={() => setPendingRemoval(project)}>
-                    Delete
-                  </Button>
-                </div>
+                <Button
+                  variant="secondary"
+                  onClick={() => void navigate(`/projects/${project.id}`)}
+                >
+                  Open
+                </Button>
               </li>
             ))}
           </ul>
-        )}
-      </Panel>
-
-      <ConfirmDialog
-        open={pendingRemoval !== undefined}
-        title={`Delete ${pendingRemoval?.name ?? 'this project'}?`}
-        body={
-          pendingRemoval
-            ? `This removes ${countLabel(pendingRemoval.assetCount)} and frees ${formatBytes(pendingRemoval.bytes)}. It cannot be undone.`
-            : ''
-        }
-        confirmLabel="Delete project"
-        destructive
-        onConfirm={() => {
-          if (pendingRemoval) void remove(pendingRemoval.id);
-          setPendingRemoval(undefined);
-        }}
-        onCancel={() => setPendingRemoval(undefined)}
-      />
+        </Panel>
+      )}
     </div>
   );
 }

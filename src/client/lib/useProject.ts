@@ -18,7 +18,7 @@ export interface ImportProgress {
  * can do on a long uncompressed file, costs the waveform and never the upload.
  * A peaks failure is therefore not surfaced as an import error.
  */
-export function useProject(id: string) {
+export function useProject(id: string | undefined) {
   const [project, setProject] = useState<Project | undefined>();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [error, setError] = useState<string | undefined>();
@@ -26,6 +26,16 @@ export function useProject(id: string) {
   const [importing, setImporting] = useState<ImportProgress | undefined>();
 
   const load = useCallback(async () => {
+    // No project selected is a real state now that the shell outlives the
+    // route. It is emptiness, not an error, so nothing is reported.
+    if (id === undefined) {
+      setProject(undefined);
+      setAssets([]);
+      setError(undefined);
+      setLoading(false);
+      return;
+    }
+
     try {
       const detail = await api.getProject(id);
       setProject(detail.project);
@@ -45,6 +55,7 @@ export function useProject(id: string) {
 
   const importFile = useCallback(
     async (file: File) => {
+      if (id === undefined) return;
       setImporting({ filename: file.name, fraction: 0, stage: 'uploading' });
       setError(undefined);
 
@@ -82,6 +93,7 @@ export function useProject(id: string) {
 
   const renameProject = useCallback(
     async (name: string) => {
+      if (id === undefined) return;
       try {
         setProject(await api.renameProject(id, name));
         setError(undefined);
@@ -94,6 +106,7 @@ export function useProject(id: string) {
 
   const renameAsset = useCallback(
     async (assetId: string, label: string) => {
+      if (id === undefined) return;
       try {
         const updated = await api.renameAsset(id, assetId, label);
         setAssets((current) => current.map((a) => (a.id === assetId ? updated : a)));
@@ -107,6 +120,7 @@ export function useProject(id: string) {
 
   const removeAsset = useCallback(
     async (assetId: string) => {
+      if (id === undefined) return;
       try {
         setAssets(await api.deleteAsset(id, assetId));
         setError(undefined);
@@ -131,6 +145,7 @@ export function useProject(id: string) {
    */
   const computePeaksFor = useCallback(
     async (assetId: string) => {
+      if (id === undefined) return;
       const asset = assets.find((a) => a.id === assetId);
       if (!asset) return;
 

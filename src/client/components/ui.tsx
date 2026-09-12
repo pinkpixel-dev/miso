@@ -1,3 +1,5 @@
+import * as RadixTooltip from '@radix-ui/react-tooltip';
+import type { LucideIcon } from 'lucide-react';
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -20,6 +22,83 @@ import type {
 
 export function cx(...parts: (string | false | undefined)[]): string {
   return parts.filter(Boolean).join(' ');
+}
+
+/**
+ * A label that appears on hover and on keyboard focus.
+ *
+ * Radix is used rather than the native title attribute because title only
+ * appears for a mouse, waits about a second, and cannot be styled. The studio
+ * layout leans on icon-only controls, so the label has to reach a keyboard too.
+ * This is never the only accessible name: the button underneath still carries
+ * one, and this repeats it visibly.
+ */
+export function Tooltip({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <RadixTooltip.Root>
+      <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
+      <RadixTooltip.Portal>
+        <RadixTooltip.Content
+          sideOffset={6}
+          className="z-50 rounded-md border border-line bg-raised px-2.5 py-1.5 text-xs text-ink shadow-lg"
+        >
+          {label}
+          <RadixTooltip.Arrow className="fill-line" />
+        </RadixTooltip.Content>
+      </RadixTooltip.Portal>
+    </RadixTooltip.Root>
+  );
+}
+
+type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label'> & {
+  /** Both the accessible name and the tooltip text. Never optional. */
+  label: string;
+  icon: LucideIcon;
+  variant?: 'primary' | 'secondary' | 'ghost';
+  /** Larger hit area for the dock transport, which is the one people aim at. */
+  size?: 'md' | 'lg';
+};
+
+/**
+ * An icon with a name attached.
+ *
+ * The label is a required prop rather than an optional one because an icon
+ * button without an accessible name is invisible to a screen reader, and this
+ * layout has a lot of them. Making it required means that cannot be forgotten.
+ */
+export function IconButton({
+  label,
+  icon: Icon,
+  variant = 'ghost',
+  size = 'md',
+  className,
+  ...rest
+}: IconButtonProps) {
+  const variants = {
+    primary: 'bg-accent text-accent-ink hover:bg-accent/90 active:bg-accent/80',
+    secondary:
+      'bg-raised text-ink border border-line hover:border-line-strong hover:bg-raised/70 active:bg-raised',
+    ghost: 'text-ink-muted hover:bg-raised hover:text-ink active:bg-raised/70',
+  } as const;
+
+  return (
+    <Tooltip label={label}>
+      <button
+        type="button"
+        aria-label={label}
+        className={cx(
+          'inline-flex shrink-0 items-center justify-center rounded-md transition-colors duration-150',
+          'disabled:cursor-not-allowed disabled:opacity-45',
+          size === 'lg' ? 'h-11 w-11' : 'h-9 w-9',
+          variants[variant],
+          className,
+        )}
+        {...rest}
+      >
+        <Icon aria-hidden="true" className={size === 'lg' ? 'h-5 w-5' : 'h-4 w-4'} />
+      </button>
+    </Tooltip>
+  );
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
