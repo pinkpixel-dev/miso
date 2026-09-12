@@ -37,8 +37,8 @@
   --color-ink-faint: oklch(0.6 0.007 285);
 
   /* Meaning. */
-  --color-accent: oklch(0.78 0.15 75);
-  --color-accent-ink: oklch(0.2 0.04 75);
+  --color-accent: oklch(0.79 0.17 65);
+  --color-accent-ink: oklch(0.2 0.04 65);
   --color-good: oklch(0.75 0.14 155);
   --color-bad: oklch(0.68 0.17 25);
   --color-warn: oklch(0.8 0.13 90);

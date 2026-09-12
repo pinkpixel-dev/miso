@@ -3,6 +3,19 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.8.1 - September 12, 2026
+
+### 🎨 Branding
+
+- The Miso logo now sits beside the name in the sidebar and stays visible when the sidebar
+  is collapsed.
+- Browser and saved app icons now use the supplied Miso artwork.
+- The app accent is warmer and more orange, matching the gold and orange in the logo.
+
+### 🏷️ Versioning
+
+- Bumped the app version to 0.8.1.
+
 ## 0.8.0 - September 12, 2026
 
 A three minute track is 34 MB, and a browser asked to fetch that much just to draw a waveform

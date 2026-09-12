@@ -71,14 +71,15 @@ export function NavRail() {
       <div
         className={cx(
           'flex shrink-0 items-center gap-2 px-2 py-2',
-          collapsed ? 'lg:justify-center' : 'justify-between',
+          collapsed ? 'lg:flex-col lg:justify-center' : 'justify-between',
         )}
       >
-        {collapsed ? null : (
-          <span className="px-1 font-display text-lg font-semibold tracking-tight text-ink">
-            miso
-          </span>
-        )}
+        <div className="flex min-w-0 items-center gap-2 px-1">
+          <img src="/logo.png" alt="" aria-hidden="true" className="h-8 w-8 shrink-0 object-contain" />
+          {collapsed ? null : (
+            <span className="font-display text-lg font-semibold tracking-tight text-ink">miso</span>
+          )}
+        </div>
         <IconButton
           label={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
           icon={collapsed ? ChevronRight : ChevronLeft}
