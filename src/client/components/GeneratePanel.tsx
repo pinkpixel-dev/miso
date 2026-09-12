@@ -245,10 +245,17 @@ export function GeneratePanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-4">
+      {/*
+        The head of the column is a toolbar, not the first row of the form. The
+        mode switch and the model are choices about the whole job, so they sit
+        above the cards at a size that does not compete with them.
+      */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {guidedAvailable ? (
           <SegmentedControl
             label="Prompt"
+            labelHidden
+            size="sm"
             name="prompt-mode"
             options={MODES}
             value={mode}
@@ -264,13 +271,13 @@ export function GeneratePanel({
           />
         ) : null}
 
-        <label className="flex min-w-52 flex-1 flex-col gap-1.5">
-          <span className="text-sm font-medium text-ink">Model</span>
+        <label className="flex min-w-0 flex-1 items-center justify-end gap-2">
+          <span className="shrink-0 text-xs font-medium text-ink-faint">Model</span>
           <select
             value={chosenModel ?? ''}
             disabled={installed.length === 0}
             onChange={(event) => setModelId(event.target.value)}
-            className="min-h-11 w-full rounded-md border border-line bg-canvas px-3 py-2 text-sm text-ink hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-45"
+            className="min-h-9 min-w-0 max-w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink transition-colors duration-150 hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-45"
           >
             {installed.length === 0 ? (
               <option value="">No model installed</option>
@@ -283,13 +290,12 @@ export function GeneratePanel({
               ))
             )}
           </select>
-          <span className="text-sm text-ink-faint">
-            {describeEstimate(
-              chosenModel ? estimateSeconds(jobs, task.id, chosenModel) : undefined,
-            )}
-          </span>
         </label>
       </div>
+
+      <p className="-mt-2 text-xs text-ink-faint">
+        {describeEstimate(chosenModel ? estimateSeconds(jobs, task.id, chosenModel) : undefined)}
+      </p>
 
       {tasks.length > 1 ? (
         <label className="flex flex-col gap-1.5">
@@ -312,13 +318,27 @@ export function GeneratePanel({
         </label>
       ) : null}
 
-      <Field
-        label="Song title"
-        placeholder="Midnight Drive"
-        hint="What the take is called in your library. Not sent to the model."
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-      />
+      {/*
+        The title is the name of the thing being made, so it reads as one:
+        larger type, no label above it, at the top of the column. The label is
+        still there for a screen reader, and the hint still says what it is for.
+      */}
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="song-title" className="sr-only">
+          Song title
+        </label>
+        <input
+          id="song-title"
+          value={title}
+          placeholder="Song title"
+          aria-describedby="song-title-hint"
+          onChange={(event) => setTitle(event.target.value)}
+          className="w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 font-display text-base text-ink transition-colors duration-150 placeholder:text-ink-faint hover:border-line-strong"
+        />
+        <p id="song-title-hint" className="text-sm text-ink-faint">
+          What the take is called in your library. Not sent to the model.
+        </p>
+      </div>
 
       {guided ? (
         <PromptBuilder
@@ -461,7 +481,7 @@ export function GeneratePanel({
         the cards are stacked, and the one thing you always want to reach is the
         one thing that was always at the bottom.
       */}
-      <div className="sticky bottom-0 -mx-5 mt-1 border-t border-line bg-canvas px-5 py-3">
+      <div className="sticky bottom-0 z-10 -mx-5 mt-2 border-t border-line bg-canvas px-5 pb-4 pt-3">
         <Button
           variant="primary"
           onClick={() => void submit()}

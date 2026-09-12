@@ -215,22 +215,36 @@ export function TextArea({ label, hint, error, id, className, ...rest }: TextAre
   );
 }
 
+/**
+ * A titled container.
+ *
+ * The header and body metrics are deliberately the same as BuilderCard's. The
+ * two used to run on different padding and rounding scales, which put the queue
+ * and the prompt cards on screen together looking like parts of two different
+ * applications.
+ */
 export function Panel({
   title,
   description,
+  actions,
   children,
 }: {
   title: string;
   description?: string;
+  /** Controls for the panel itself, sitting in its header rather than its body. */
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="rounded-lg border border-line bg-surface">
-      <header className="border-b border-line px-5 py-4">
-        <h2 className="text-base text-ink">{title}</h2>
-        {description ? <p className="mt-1 text-sm text-ink-muted">{description}</p> : null}
+      <header className="flex items-center gap-2 px-4 py-2.5">
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-medium text-ink">{title}</h2>
+          {description ? <p className="mt-1 text-sm text-ink-muted">{description}</p> : null}
+        </div>
+        {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
       </header>
-      <div className="px-5 py-5">{children}</div>
+      <div className="border-t border-line px-4 py-4">{children}</div>
     </section>
   );
 }
@@ -271,6 +285,8 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   hint,
+  size = 'md',
+  labelHidden = false,
 }: {
   label: string;
   name: string;
@@ -278,22 +294,43 @@ export function SegmentedControl<T extends string>({
   value: T;
   onChange: (value: T) => void;
   hint?: string;
+  /**
+   * Small is the toolbar version: one pill holding both halves, sized to sit in
+   * a row of controls rather than in the flow of a form.
+   */
+  size?: 'md' | 'sm';
+  /** Keeps the accessible name and drops the visible one, for a toolbar. */
+  labelHidden?: boolean;
 }) {
+  const small = size === 'sm';
+
   return (
-    <fieldset className="flex flex-col gap-2 border-0 p-0">
-      <legend className="mb-2 p-0 text-sm font-medium text-ink">{label}</legend>
-      <div className="flex flex-wrap gap-2">
+    <fieldset className="flex min-w-0 flex-col gap-2 border-0 p-0">
+      <legend
+        className={cx('p-0 text-sm font-medium text-ink', labelHidden ? 'sr-only' : 'mb-2')}
+      >
+        {label}
+      </legend>
+      <div
+        className={cx(
+          'flex flex-wrap',
+          small ? 'gap-0.5 rounded-md border border-line bg-surface p-1' : 'gap-2',
+        )}
+      >
         {options.map((option) => {
           const on = option.value === value;
           return (
             <label
               key={option.value}
               className={cx(
-                'inline-flex min-h-11 cursor-pointer items-center rounded-md border px-4 text-sm transition-colors duration-150',
+                'inline-flex cursor-pointer items-center justify-center rounded-md border transition-colors duration-150',
                 'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent',
+                small ? 'min-h-8 px-3 text-xs' : 'min-h-11 px-4 text-sm',
                 on
                   ? 'border-accent bg-accent text-accent-ink'
-                  : 'border-line bg-raised text-ink-muted hover:border-line-strong hover:text-ink active:bg-raised/70',
+                  : small
+                    ? 'border-transparent text-ink-muted hover:text-ink active:bg-raised'
+                    : 'border-line bg-raised text-ink-muted hover:border-line-strong hover:text-ink active:bg-raised/70',
               )}
             >
               <input

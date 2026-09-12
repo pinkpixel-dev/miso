@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pause, Play } from 'lucide-react';
+import { Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react';
 import WaveSurfer from 'wavesurfer.js';
 import { audioUrl } from '../../lib/api.ts';
 import { usePlayer, usePlayerInternals } from '../../lib/usePlayer.ts';
@@ -26,8 +26,20 @@ function formatTime(seconds: number | undefined): string {
 }
 
 export function PlayerDock() {
-  const { nowPlaying, playing, toggle } = usePlayer();
-  const { surfer, autoplay, setPlaying } = usePlayerInternals();
+  const {
+    nowPlaying,
+    playing,
+    toggle,
+    next,
+    previous,
+    hasNext,
+    hasPrevious,
+    shuffle,
+    toggleShuffle,
+    repeat,
+    cycleRepeat,
+  } = usePlayer();
+  const { surfer, autoplay, setPlaying, onFinish } = usePlayerInternals();
   const { assets, computePeaksFor } = useStudio();
 
   const container = useRef<HTMLDivElement>(null);
@@ -90,7 +102,13 @@ export function PlayerDock() {
     });
     instance.on('play', () => setPlaying(true));
     instance.on('pause', () => setPlaying(false));
-    instance.on('finish', () => setPlaying(false));
+    // What happens next is the provider's decision, because it is the only
+    // thing holding the queue and the repeat mode. See PlayerInternals for why
+    // this arrives as a ref rather than a dependency of this effect.
+    instance.on('finish', () => {
+      setPlaying(false);
+      onFinish.current(instance);
+    });
     instance.on('timeupdate', (time: number) => setElapsed(time));
 
     // Without this a load that fails leaves a disabled play button next to an
@@ -106,57 +124,103 @@ export function PlayerDock() {
       instance.destroy();
       surfer.current = undefined;
     };
-  }, [assetId, projectId, hasPeaks, duration, autoplay, setPlaying, surfer]);
+  }, [assetId, projectId, hasPeaks, duration, autoplay, setPlaying, surfer, onFinish]);
+
+  const repeatLabel =
+    repeat === 'off'
+      ? 'Repeat is off'
+      : repeat === 'all'
+        ? 'Repeating the whole list'
+        : 'Repeating this take';
 
   return (
     <div className="shrink-0 border-t border-line bg-surface">
-      <div className="flex items-center gap-4 px-4 py-2.5">
-        <IconButton
-          label={
-            asset === undefined
-              ? 'Nothing to play'
-              : playing
-                ? `Pause ${asset.label}`
-                : `Play ${asset.label}`
-          }
-          icon={playing ? Pause : Play}
-          variant="primary"
-          disabled={!ready}
-          onClick={toggle}
-        />
-
-        <div className="min-w-0 w-44 shrink-0 sm:w-56">
-          {asset ? (
-            <>
-              <p className="truncate text-sm text-ink">{asset.label}</p>
-              <p className="truncate text-xs text-ink-faint">{asset.format}</p>
-            </>
-          ) : (
-            <p className="truncate text-sm text-ink-faint">Nothing playing</p>
-          )}
-        </div>
-
+      <div className="flex flex-col gap-2 px-4 py-3">
         {/*
           The container stays mounted whether or not anything is loaded, so
           wavesurfer always has somewhere to attach and the dock never changes
-          height when playback starts.
+          height when playback starts. With nothing loaded it collapses to no
+          height, and the rule below stands in for the waveform so the row keeps
+          its shape.
         */}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <div ref={container} className="w-full" />
           {asset === undefined ? (
-            <div className="h-12 rounded-sm border border-dashed border-line" aria-hidden="true" />
+            <div className="flex h-12 items-center" aria-hidden="true">
+              <div className="h-px w-full bg-line" />
+            </div>
           ) : null}
         </div>
 
-        <p className="shrink-0 font-mono text-xs text-ink-muted tabular-nums">
-          {formatTime(asset ? elapsed : undefined)} / {formatTime(asset?.durationSeconds)}
-        </p>
+        {/*
+          Three tracks rather than a flex row, so the transport stays centred
+          under the waveform whatever the length of the take's name.
+        */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <div className="min-w-0">
+            {asset ? (
+              <>
+                <p className="truncate text-sm text-ink">{asset.label}</p>
+                <p className="truncate text-xs text-ink-faint">{asset.format}</p>
+              </>
+            ) : (
+              <p className="truncate text-sm text-ink-faint">Nothing playing</p>
+            )}
+          </div>
 
-        {asset && !hasPeaks ? (
-          <Button variant="ghost" onClick={() => void computePeaksFor(asset.id)}>
-            Save waveform
-          </Button>
-        ) : null}
+          <div className="flex items-center gap-1">
+            <IconButton
+              label={shuffle ? 'Shuffle is on' : 'Shuffle is off'}
+              icon={Shuffle}
+              aria-pressed={shuffle}
+              variant={shuffle ? 'secondary' : 'ghost'}
+              onClick={toggleShuffle}
+            />
+            <IconButton
+              label="Previous take"
+              icon={SkipBack}
+              disabled={!hasPrevious}
+              onClick={previous}
+            />
+            <IconButton
+              label={
+                asset === undefined
+                  ? 'Nothing to play'
+                  : playing
+                    ? `Pause ${asset.label}`
+                    : `Play ${asset.label}`
+              }
+              icon={playing ? Pause : Play}
+              variant="primary"
+              size="lg"
+              disabled={!ready}
+              onClick={toggle}
+            />
+            <IconButton
+              label="Next take"
+              icon={SkipForward}
+              disabled={!hasNext}
+              onClick={next}
+            />
+            <IconButton
+              label={repeatLabel}
+              icon={repeat === 'one' ? Repeat1 : Repeat}
+              variant={repeat === 'off' ? 'ghost' : 'secondary'}
+              onClick={cycleRepeat}
+            />
+          </div>
+
+          <div className="flex min-w-0 items-center justify-end gap-3">
+            {asset && !hasPeaks ? (
+              <Button variant="ghost" onClick={() => void computePeaksFor(asset.id)}>
+                Save waveform
+              </Button>
+            ) : null}
+            <p className="shrink-0 font-mono text-xs text-ink-muted tabular-nums">
+              {formatTime(asset ? elapsed : undefined)} / {formatTime(asset?.durationSeconds)}
+            </p>
+          </div>
+        </div>
       </div>
 
       {error && asset ? (

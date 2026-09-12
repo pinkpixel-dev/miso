@@ -24,6 +24,12 @@ import { Workspace } from './Workspace.tsx';
  * order create, takes, rail, and the dock stays where it is. That is not a
  * phone experience and is not meant to be one: it is the desktop studio not
  * breaking when the window is small.
+ *
+ * The page itself cannot scroll. styles.css pins html, body and #root to full
+ * height with overflow hidden, and this frame fills that rather than measuring
+ * the viewport itself. A document scrollbar here would let you drag the whole
+ * studio off the screen and look at the background below it, which is what it
+ * did before, so the height comes from the parent and not from a 100dvh guess.
  */
 export function StudioShell() {
   return (
@@ -41,7 +47,7 @@ function ShellFrame() {
   const { status, checking, recheck } = useBackendStatus();
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-canvas">
+    <div className="flex h-full flex-col overflow-hidden bg-canvas">
       <BackendBanner status={status} checking={checking} onRetry={recheck} />
 
       {/*

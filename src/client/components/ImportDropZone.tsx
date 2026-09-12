@@ -71,8 +71,8 @@ export function ImportDropZone({
         take(event.dataTransfer.files[0]);
       }}
       className={[
-        'rounded-md border border-dashed p-6 text-center transition-colors',
-        over ? 'border-accent bg-raised' : 'border-line-strong bg-surface',
+        'flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-dashed px-3 py-2.5 transition-colors',
+        over ? 'border-accent bg-raised' : 'border-line-strong bg-surface/60',
       ].join(' ')}
     >
       <button
@@ -82,7 +82,7 @@ export function ImportDropZone({
       >
         Choose an audio file
       </button>
-      <p className="mt-2 text-sm text-ink-muted">
+      <p className="text-xs text-ink-faint">
         Or drag one here. {formats} up to {limit}.
       </p>
 

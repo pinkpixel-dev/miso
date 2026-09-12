@@ -45,6 +45,22 @@
 }
 
 @layer base {
+  /*
+   * The page itself never scrolls. The studio is a fixed frame with its own
+   * scrolling regions inside it, and a document scrollbar on top of that lets
+   * you drag the whole app off the screen and stare at the background.
+   *
+   * Height is pinned the whole way down rather than left to one 100dvh child,
+   * because a single tall element anywhere else is enough to give the document
+   * something to scroll. Anything that overflows now has to say so in its own
+   * region, which is what the regions are for.
+   */
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
   html {
     background-color: var(--color-canvas);
     color-scheme: dark;
@@ -52,6 +68,7 @@
 
   body {
     margin: 0;
+    overflow: hidden;
     background-color: var(--color-canvas);
     color: var(--color-ink);
     font-family: var(--font-sans);

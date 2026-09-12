@@ -147,15 +147,16 @@ export function JobList({
   const earlier = finished.slice(RECENT);
 
   return (
-    <Panel title="Queue">
-      {finished.length > 0 && onClear ? (
-        <div className="mb-2 flex justify-end">
+    <Panel
+      title="Queue"
+      actions={
+        finished.length > 0 && onClear ? (
           <Button variant="ghost" onClick={onClear}>
             Clear finished
           </Button>
-        </div>
-      ) : null}
-
+        ) : undefined
+      }
+    >
       <ul className="flex flex-col divide-y divide-line">
         {[...live, ...shown].map((job) => (
           <Row key={job.id} job={job} onCancel={onCancel} />

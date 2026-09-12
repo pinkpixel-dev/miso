@@ -34,9 +34,12 @@ export function ProjectRoute() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl">{project.name}</h1>
-      </div>
+      {/*
+        The workspace column already carries the project name, and having it
+        twice on one screen made the create column look like a page rather than
+        part of a studio. The heading stays for anything reading the structure.
+      */}
+      <h1 className="sr-only">{project.name}</h1>
 
       {error ? (
         <p

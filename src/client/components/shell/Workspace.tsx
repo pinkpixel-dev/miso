@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Asset } from '../../../shared/types.ts';
 import { usePlayer } from '../../lib/usePlayer.ts';
 import { useStudio } from '../../lib/useStudio.ts';
@@ -49,15 +49,23 @@ export function Workspace() {
     dismissJobs,
     dismissedCount,
   } = useStudio();
-  const { clear } = usePlayer();
+  const { clear, setQueue } = usePlayer();
   const [pendingRemoval, setPendingRemoval] = useState<Asset | undefined>();
+
+  // The dock's skip buttons move through this list. It is handed over from here
+  // because the player sits above the studio data on purpose, so it cannot read
+  // the open project itself. Order matches what is on screen, so Next means the
+  // row below rather than some private ordering of its own.
+  useEffect(() => {
+    setQueue(assets);
+  }, [assets, setQueue]);
 
   return (
     <aside
       aria-label="Takes and queue"
       className="order-2 flex min-w-0 shrink-0 flex-col gap-5 border-line bg-canvas px-4 py-5 lg:order-none lg:overflow-y-auto lg:border-l"
     >
-      <div className="min-w-0">
+      <div className="min-w-0 border-b border-line pb-3">
         <h2 className="truncate text-sm font-medium text-ink">
           {project ? project.name : 'No project open'}
         </h2>
@@ -79,7 +87,7 @@ export function Workspace() {
               </p>
             ) : (
               <>
-                <ul className="flex flex-col gap-1">
+                <ul className="flex flex-col gap-2">
                   {assets.slice(0, RECENT_TAKES).map((asset) => (
                     <TakeRow
                       key={asset.id}
@@ -96,7 +104,7 @@ export function Workspace() {
                       assets.length - RECENT_TAKES === 1 ? 'take' : 'takes'
                     }`}
                   >
-                    <ul className="flex flex-col gap-1">
+                    <ul className="flex flex-col gap-2">
                       {assets.slice(RECENT_TAKES).map((asset) => (
                         <TakeRow
                           key={asset.id}

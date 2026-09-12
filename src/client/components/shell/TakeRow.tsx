@@ -57,8 +57,10 @@ export function TakeRow({
   return (
     <li
       className={cx(
-        'flex items-center gap-2 rounded-md border px-2 py-2 transition-colors duration-150',
-        current ? 'border-accent/40 bg-raised/50' : 'border-transparent hover:bg-raised/40',
+        'flex items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors duration-150',
+        current
+          ? 'border-accent/50 bg-raised'
+          : 'border-line bg-surface hover:border-line-strong hover:bg-raised/60',
       )}
     >
       <IconButton

@@ -14,6 +14,9 @@ import type { Asset } from '../../shared/types.ts';
  * between projects, the models screen and settings never interrupts it. That is
  * the whole reason this exists as context instead of route state.
  */
+/** What happens when a take reaches its end. */
+export type RepeatMode = 'off' | 'all' | 'one';
+
 export interface PlayerValue {
   /** The take the dock is holding, whether or not it is running right now. */
   nowPlaying: Asset | undefined;
@@ -27,6 +30,28 @@ export interface PlayerValue {
    * being held, which is what deleting a track needs.
    */
   clear: (assetId?: string) => void;
+
+  /**
+   * The takes the skip buttons move through.
+   *
+   * The workspace column hands this over because it is the thing that knows
+   * what is in the open project. The provider deliberately does not read the
+   * project itself: it sits above the studio data so that playback survives a
+   * change of project, and reaching down for a list would undo that.
+   */
+  setQueue: (assets: Asset[]) => void;
+  /** How many takes are skippable. Zero means the queue has not been set yet. */
+  queueLength: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+  next: () => void;
+  previous: () => void;
+
+  shuffle: boolean;
+  toggleShuffle: () => void;
+  repeat: RepeatMode;
+  /** Steps off, all, one, and back to off. */
+  cycleRepeat: () => void;
 }
 
 /**
@@ -43,6 +68,17 @@ export interface PlayerInternals {
   /** Set when a take was chosen by a person, so the dock starts it once ready. */
   autoplay: RefObject<boolean>;
   setPlaying: (playing: boolean) => void;
+  /**
+   * What to do when a take ends, handed over as a ref.
+   *
+   * It has to be a ref rather than a callback prop because the dock builds its
+   * wavesurfer instance inside an effect, and anything in that effect's
+   * dependencies rebuilds the player. Changing the repeat mode mid track would
+   * then cut the track off, which is the exact failure DOCS/ERRORS.md records
+   * for peaks. A ref lets the provider keep this current without the dock
+   * noticing it changed.
+   */
+  onFinish: RefObject<(surfer: WaveSurfer) => void>;
 }
 
 export const PlayerContext = createContext<PlayerValue | undefined>(undefined);
