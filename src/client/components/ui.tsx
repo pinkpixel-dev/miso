@@ -2,6 +2,7 @@ import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
+  Ref,
   TextareaHTMLAttributes,
 } from 'react';
 
@@ -94,6 +95,9 @@ type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label: string;
   hint?: ReactNode;
   error?: string;
+  /** React 19 passes this through as an ordinary prop. The lyrics editor needs
+   * it to put the caret after a section tag it just inserted. */
+  ref?: Ref<HTMLTextAreaElement>;
 };
 
 /** Field's longer sibling, for a prompt or a verse. Same states, same markup rules. */
@@ -170,6 +174,120 @@ export function Pill({ tone, children }: { tone: 'good' | 'bad' | 'warn' | 'neut
     >
       {children}
     </span>
+  );
+}
+
+/**
+ * A row of choices that can each be on or off.
+ *
+ * Every chip is a real button with aria-pressed, so a screen reader says
+ * "Synthwave, pressed" rather than reading a styled div, and the keyboard tabs
+ * through them in order. They are 44 pixels tall because this app gets used on
+ * a phone, where anything smaller is a game of chance.
+ */
+export function ChipGroup({
+  label,
+  options,
+  selected,
+  onToggle,
+  hint,
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  hint?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span id={`chips-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} className="text-sm font-medium text-ink">
+        {label}
+      </span>
+      <div
+        role="group"
+        aria-labelledby={`chips-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+        className="flex flex-wrap gap-2"
+      >
+        {options.map((option) => {
+          const on = selected.includes(option);
+          return (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onToggle(option)}
+              className={cx(
+                'inline-flex min-h-11 items-center rounded-full border px-4 text-sm transition-colors duration-150',
+                on
+                  ? 'border-accent bg-accent text-accent-ink hover:bg-accent/90 active:bg-accent/80'
+                  : 'border-line bg-raised text-ink-muted hover:border-line-strong hover:text-ink active:bg-raised/70',
+              )}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+      {hint ? <p className="text-sm text-ink-faint">{hint}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * One choice out of a few, laid out as a row.
+ *
+ * These are real radio inputs with the box hidden, which is what makes the
+ * arrow keys move between them and the group announce itself as a group. A row
+ * of buttons pretending to be radios would need all of that written by hand and
+ * would get some of it wrong.
+ */
+export function SegmentedControl<T extends string>({
+  label,
+  name,
+  options,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string;
+  name: string;
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  hint?: string;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-2 border-0 p-0">
+      <legend className="mb-2 p-0 text-sm font-medium text-ink">{label}</legend>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => {
+          const on = option.value === value;
+          return (
+            <label
+              key={option.value}
+              className={cx(
+                'inline-flex min-h-11 cursor-pointer items-center rounded-md border px-4 text-sm transition-colors duration-150',
+                'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent',
+                on
+                  ? 'border-accent bg-accent text-accent-ink'
+                  : 'border-line bg-raised text-ink-muted hover:border-line-strong hover:text-ink active:bg-raised/70',
+              )}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={option.value}
+                checked={on}
+                onChange={() => onChange(option.value)}
+                className="sr-only"
+              />
+              {option.label}
+            </label>
+          );
+        })}
+      </div>
+      {hint ? <p className="text-sm text-ink-faint">{hint}</p> : null}
+    </fieldset>
   );
 }
 

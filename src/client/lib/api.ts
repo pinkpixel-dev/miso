@@ -9,6 +9,7 @@ import type {
   ProjectDetail,
   Settings,
   StorageUsage,
+  StudioState,
   StudioTask,
 } from '../../shared/types.ts';
 
@@ -107,6 +108,8 @@ export const api = {
       taskId: string;
       modelId: string;
       params: Record<string, string | number>;
+      title?: string;
+      studio?: StudioState;
       inputs?: { assetId: string; role: string }[];
     },
   ) =>

@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import type { Job, JobState } from '../../shared/types.ts';
+import type { Job, JobState, StudioState } from '../../shared/types.ts';
 
 /**
  * Job rows, their lineage links, and the record of what Miso has staged to a
@@ -19,6 +19,8 @@ interface Record_ {
   task_id: string;
   model_id: string;
   params: string;
+  title: string | null;
+  studio: string | null;
   state: string;
   error: string | null;
   attempts: number;
@@ -33,6 +35,10 @@ export interface NewJob {
   taskId: string;
   modelId: string;
   params: Record<string, unknown>;
+  /** What the person called the song, if they named it. */
+  title?: string;
+  /** The guided builder's own state, absent when the plain form wrote the job. */
+  studio?: StudioState;
   /** Assets this job reads, by the role the task gives them. */
   inputs?: { assetId: string; role: string }[];
 }
@@ -52,12 +58,25 @@ function toJob(handle: Database, record: Record_): Job {
     params = {};
   }
 
+  // Same reasoning for the builder state, one step further: a job without it
+  // simply opens in the plain form instead of the builder.
+  let studio: StudioState | undefined;
+  if (record.studio !== null) {
+    try {
+      studio = JSON.parse(record.studio) as StudioState;
+    } catch {
+      studio = undefined;
+    }
+  }
+
   return {
     id: record.id,
     projectId: record.project_id,
     taskId: record.task_id,
     modelId: record.model_id,
     params,
+    title: record.title ?? undefined,
+    studio,
     state: record.state as JobState,
     error: record.error ?? undefined,
     attempts: record.attempts,
@@ -96,10 +115,18 @@ export function createJob(handle: Database, id: string, input: NewJob): Job {
   handle.transaction(() => {
     handle
       .prepare(
-        `INSERT INTO jobs (id, project_id, task_id, model_id, params, state)
-         VALUES (?, ?, ?, ?, ?, 'queued')`,
+        `INSERT INTO jobs (id, project_id, task_id, model_id, params, title, studio, state)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'queued')`,
       )
-      .run(id, input.projectId, input.taskId, input.modelId, JSON.stringify(input.params));
+      .run(
+        id,
+        input.projectId,
+        input.taskId,
+        input.modelId,
+        JSON.stringify(input.params),
+        input.title ?? null,
+        input.studio === undefined ? null : JSON.stringify(input.studio),
+      );
 
     const link = handle.prepare('INSERT INTO asset_lineage (job_id, asset_id, role) VALUES (?, ?, ?)');
     for (const input_ of input.inputs ?? []) link.run(id, input_.assetId, input_.role);

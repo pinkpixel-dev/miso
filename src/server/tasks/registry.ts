@@ -33,6 +33,14 @@ export interface ParamField {
   default?: ParamValue;
   /** One sentence shown under the field. */
   help?: string;
+  /**
+   * Whether this belongs behind the advanced drawer rather than on the form.
+   *
+   * The test is whether somebody writing a song has a reason to touch it. A
+   * prompt and a length do. A sampler seed does, but only once something has
+   * gone wrong or gone right and needs repeating.
+   */
+  advanced?: boolean;
 }
 
 export interface TaskDefinition {
@@ -102,6 +110,31 @@ const text2music: TaskDefinition = {
       default: 30,
     },
     {
+      name: 'bpm',
+      label: 'Tempo in BPM',
+      kind: 'number',
+      required: false,
+      min: 40,
+      max: 220,
+      step: 1,
+      help: 'Leave this empty and the model picks a tempo to suit the prompt.',
+    },
+    {
+      name: 'keyscale',
+      label: 'Key',
+      kind: 'text',
+      required: false,
+      help: 'For example C major or A minor. Empty lets the model choose.',
+    },
+    {
+      name: 'negativePrompt',
+      label: 'Negative prompt',
+      kind: 'text',
+      required: false,
+      advanced: true,
+      help: 'What to keep out of the track, such as distorted vocals or crowd noise.',
+    },
+    {
       name: 'steps',
       label: 'Steps',
       kind: 'number',
@@ -110,6 +143,7 @@ const text2music: TaskDefinition = {
       max: 100,
       step: 1,
       default: 8,
+      advanced: true,
       help: 'More steps take longer and change the result more than they improve it.',
     },
     {
@@ -121,6 +155,7 @@ const text2music: TaskDefinition = {
       max: 20,
       step: 0.1,
       default: 1,
+      advanced: true,
       help: 'How closely the model follows the prompt.',
     },
     {
@@ -131,6 +166,7 @@ const text2music: TaskDefinition = {
       min: 0,
       max: 2_147_483_647,
       step: 1,
+      advanced: true,
       help: 'Leave this empty for a different result every time.',
     },
   ],
@@ -148,6 +184,16 @@ const text2music: TaskDefinition = {
     if (params.steps !== undefined) request.num_inference_steps = params.steps;
     if (params.guidanceScale !== undefined) request.guidance_scale = params.guidanceScale;
     if (params.seed !== undefined) request.seed = params.seed;
+
+    // bpm, keyscale, and negative_prompt are request options on the CLI and
+    // plain fields of the same request object over HTTP. Left out rather than
+    // sent empty: unset means the planner chooses the tempo and the key, which
+    // is not the same instruction as being told to use nothing.
+    if (params.bpm !== undefined) request.bpm = params.bpm;
+    if (params.keyscale !== undefined && params.keyscale !== '') request.keyscale = params.keyscale;
+    if (params.negativePrompt !== undefined && params.negativePrompt !== '') {
+      request.negative_prompt = params.negativePrompt;
+    }
 
     return request;
   },

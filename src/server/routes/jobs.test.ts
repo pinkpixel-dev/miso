@@ -89,6 +89,57 @@ describe('POST /api/projects/:id/jobs', () => {
     );
     expect(response.status).toBe(400);
   });
+
+  it('keeps the song title and the builder state beside the job', async () => {
+    const studio = {
+      genre: ['Synthwave'],
+      mood: ['Dreamy'],
+      customStyle: 'warm analogue tape',
+      vocalStyle: 'airy',
+      vocalMode: 'female',
+    };
+
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({ ...good, title: '  Midnight Drive  ', studio }),
+    );
+    expect(response.status).toBe(201);
+
+    const created = (await response.json()) as Job;
+    expect(created.title).toBe('Midnight Drive');
+    expect(created.studio).toEqual(studio);
+
+    // And it survives the round trip through the row rather than only the
+    // response the route happened to build.
+    const listed = (await (await app().request(`/api/projects/${projectId}/jobs`)).json()) as Job[];
+    expect(listed[0]?.title).toBe('Midnight Drive');
+    expect(listed[0]?.studio).toEqual(studio);
+  });
+
+  it('queues a job written from the plain form, with neither of them', async () => {
+    const response = await app().request(`/api/projects/${projectId}/jobs`, json(good));
+    const job = (await response.json()) as Job;
+
+    expect(job.title).toBeUndefined();
+    expect(job.studio).toBeUndefined();
+  });
+
+  it('refuses a builder state it cannot trust', async () => {
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({ ...good, studio: { vocalMode: 'robot' } }),
+    );
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as ApiError).error).toMatch(/vocal mode/i);
+  });
+
+  it('refuses a title longer than a track name', async () => {
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({ ...good, title: 'x'.repeat(200) }),
+    );
+    expect(response.status).toBe(400);
+  });
 });
 
 describe('DELETE /api/projects/:id/jobs/:jobId', () => {

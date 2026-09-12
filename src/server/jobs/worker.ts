@@ -58,11 +58,18 @@ function backoffFor(attempts: number): number {
 /**
  * What to call the take this job produces.
  *
- * The prompt is the most useful thing a person can recognize a take by, so its
- * first line becomes the name. A task with no prompt falls back to its own
- * label, which is still better than a bare id.
+ * A title the person typed wins, because it is the only name here that somebody
+ * actually chose. Without one the first line of the prompt is the next best
+ * thing to recognize a take by, and a task with no prompt falls back to its own
+ * label, which still beats a bare id.
+ *
+ * Exported for its own test. It is the rule that decides what a finished track
+ * is called in the library, and the rest of this file cannot be reached without
+ * a backend to run against.
  */
-function labelFor(job: Job, task: TaskDefinition): string {
+export function labelFor(job: Job, task: TaskDefinition): string {
+  if (job.title !== undefined && job.title.trim() !== '') return job.title.trim();
+
   const prompt = job.params.prompt;
   if (typeof prompt === 'string' && prompt.trim() !== '') {
     const line = prompt.trim().split('\n')[0] ?? '';

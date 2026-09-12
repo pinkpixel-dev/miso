@@ -8,10 +8,10 @@ Miso runs on [audio.cpp](https://github.com/0xShug0/audio.cpp), a C++ inference 
 audio models. Miso is the studio around it: projects that persist, a history of every take,
 and a record of exactly how each clip was made so you can change one thing and try again.
 
-> **Early days.** Phases 1 through 3 of the [roadmap](DOCS/ROADMAP.md) are done, so the app
-> runs, connects to a server, installs models, and holds your projects and audio. Generation
-> arrives in phase 4 and remix in phase 5, so Miso cannot make music yet. What it can do
-> today is keep it.
+> **Early days.** Phases 1 through 4 of the [roadmap](DOCS/ROADMAP.md) are mostly done. Miso
+> installs models, holds your projects and audio, and generates music with ACE-Step from a
+> guided prompt builder. Still to come in phase 4: the AI lyrics assistant. Remix, stems,
+> and the timeline editing Miso is really built for arrive in phases 5 and 6.
 
 ## Why it exists
 

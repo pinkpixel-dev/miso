@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Job, StudioTask } from '../../shared/types.ts';
+import type { Job, StudioState, StudioTask } from '../../shared/types.ts';
 import { api } from './api.ts';
 
 /**
@@ -82,6 +82,8 @@ export function useJobs(projectId: string, onComplete?: () => void) {
       taskId: string;
       modelId: string;
       params: Record<string, string | number>;
+      title?: string;
+      studio?: StudioState;
       inputs?: { assetId: string; role: string }[];
     }) => {
       try {

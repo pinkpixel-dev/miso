@@ -81,4 +81,43 @@ describe('buildRequest', () => {
     expect('lyrics' in request).toBe(false);
     expect('seed' in request).toBe(false);
   });
+
+  it('sends the tempo, the key, and the negative prompt under their request-option names', () => {
+    const params = validateParams(text2music, {
+      prompt: 'synth pop',
+      bpm: 128,
+      keyscale: 'A minor',
+      negativePrompt: 'crowd noise',
+    });
+    const request = text2music.buildRequest(params.ok ? params.value : {}, {});
+
+    expect(request).toMatchObject({ bpm: 128, keyscale: 'A minor', negative_prompt: 'crowd noise' });
+  });
+
+  it('leaves the tempo and the key out when they are set to auto', () => {
+    // Empty means the planner chooses, which is not the same instruction as
+    // being told to use nothing.
+    const params = validateParams(text2music, { prompt: 'synth pop', keyscale: '' });
+    const request = text2music.buildRequest(params.ok ? params.value : {}, {});
+
+    expect('bpm' in request).toBe(false);
+    expect('keyscale' in request).toBe(false);
+    expect('negative_prompt' in request).toBe(false);
+  });
+
+  it('holds the tempo to a range a song could actually be', () => {
+    expect(validateParams(text2music, { prompt: 'x', bpm: 39 })).toMatchObject({ ok: false });
+    expect(validateParams(text2music, { prompt: 'x', bpm: 221 })).toMatchObject({ ok: false });
+    expect(validateParams(text2music, { prompt: 'x', bpm: 128 })).toMatchObject({ ok: true });
+  });
+});
+
+describe('the advanced flag', () => {
+  it('keeps the prompt and the length on the form, and the sampler behind the drawer', () => {
+    const advanced = new Set(
+      text2music.fields.filter((field) => field.advanced).map((field) => field.name),
+    );
+
+    expect(advanced).toEqual(new Set(['negativePrompt', 'steps', 'guidanceScale', 'seed']));
+  });
 });

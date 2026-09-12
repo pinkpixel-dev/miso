@@ -7,6 +7,7 @@ import { createJob, listJobs, readJob, setJobState } from '../db/jobs.ts';
 import { readProject } from '../db/projects.ts';
 import { readSettings } from '../db/settings.ts';
 import { unloadAll } from '../jobs/residency.ts';
+import { parseStudioState, parseTitle } from '../jobs/studioState.ts';
 import { wake } from '../jobs/worker.ts';
 import { findTask, listTasks, packageRunsTask, validateParams } from '../tasks/registry.ts';
 
@@ -53,10 +54,12 @@ jobRoutes.post('/projects/:id/jobs', async (c) => {
     return c.json<ApiError>({ error: 'Request body must be JSON' }, 400);
   }
 
-  const { taskId, modelId, params, inputs } = (body ?? {}) as {
+  const { taskId, modelId, params, title, studio, inputs } = (body ?? {}) as {
     taskId?: unknown;
     modelId?: unknown;
     params?: unknown;
+    title?: unknown;
+    studio?: unknown;
     inputs?: unknown;
   };
 
@@ -81,6 +84,12 @@ jobRoutes.post('/projects/:id/jobs', async (c) => {
   const validated = validateParams(task, params ?? {});
   if (!validated.ok) return c.json<ApiError>({ error: validated.error }, 400);
 
+  const songTitle = parseTitle(title);
+  if (!songTitle.ok) return c.json<ApiError>({ error: songTitle.error }, 400);
+
+  const studioState = parseStudioState(studio);
+  if (!studioState.ok) return c.json<ApiError>({ error: studioState.error }, 400);
+
   // Input assets have to exist and belong to this project. Without the second
   // check a job could name a track from someone else's project and stage it to
   // the backend.
@@ -99,6 +108,8 @@ jobRoutes.post('/projects/:id/jobs', async (c) => {
     taskId: task.id,
     modelId,
     params: validated.value,
+    title: songTitle.value,
+    studio: studioState.value,
     inputs: links,
   });
 

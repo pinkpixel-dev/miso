@@ -178,6 +178,28 @@ export interface StorageUsage {
  */
 export type JobState = 'queued' | 'staging' | 'running' | 'complete' | 'failed' | 'cancelled';
 
+/**
+ * What the guided prompt builder cannot get back from a finished job.
+ *
+ * The builder compiles chips and toggles into one sentence, and a sentence
+ * cannot be taken apart into the chips it came from. Everything here is
+ * therefore stored beside the job. Everything that survives compilation is not:
+ * the tempo, the key, and the lyrics are all job parameters in their own right,
+ * and reading them from two places would eventually mean reading two different
+ * answers.
+ */
+export interface StudioState {
+  /** Genre chips, as chosen. Free text typed by hand goes in customStyle. */
+  genre: string[];
+  customStyle: string;
+  mood: string[];
+  vocalMode: VocalMode;
+  /** Words for the voice itself: raspy, airy, soulful. */
+  vocalStyle: string;
+}
+
+export type VocalMode = 'female' | 'male' | 'duet' | 'instrumental';
+
 /** One queued or finished piece of work. */
 export interface Job {
   id: string;
@@ -188,6 +210,10 @@ export interface Job {
   modelId: string;
   /** The parameters the person chose, as the task registry validated them. */
   params: Record<string, unknown>;
+  /** What the person called the song. The take is named after it. */
+  title?: string;
+  /** Present when the guided builder wrote this job, absent when the form did. */
+  studio?: StudioState;
   state: JobState;
   error?: string;
   attempts: number;
@@ -210,6 +236,8 @@ export interface TaskField {
   step?: number;
   default?: string | number;
   help?: string;
+  /** Shown inside the advanced drawer, closed until somebody opens it. */
+  advanced?: boolean;
 }
 
 /**

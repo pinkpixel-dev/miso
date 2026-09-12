@@ -43,8 +43,14 @@ function Elapsed({ job }: { job: Job }) {
   return <span className="font-mono text-xs text-ink-muted">{formatElapsed(seconds)}</span>;
 }
 
-/** The prompt is what a person recognizes a job by, so it is the title. */
+/**
+ * What to call a job in the queue.
+ *
+ * The song title if there is one, because that is the name somebody chose. The
+ * prompt otherwise, which is still how a person recognizes their own job.
+ */
 function titleOf(job: Job): string {
+  if (job.title !== undefined && job.title.trim() !== '') return job.title.trim();
   const prompt = job.params.prompt;
   return typeof prompt === 'string' && prompt.trim() !== '' ? prompt.trim() : job.taskId;
 }

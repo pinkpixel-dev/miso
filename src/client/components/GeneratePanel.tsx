@@ -1,22 +1,44 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Catalog, CatalogPackage, Job, StudioTask } from '../../shared/types.ts';
+import type {
+  Catalog,
+  CatalogPackage,
+  Job,
+  StudioState,
+  StudioTask,
+  TaskField,
+} from '../../shared/types.ts';
+import { EMPTY_STUDIO, compilePrompt, supportsGuided, wantsLyrics } from '../lib/studio.ts';
 import { estimateSeconds } from '../lib/useJobs.ts';
-import { Button, Field, Panel, TextArea } from './ui.tsx';
+import { Disclosure } from './Disclosure.tsx';
+import { LyricsEditor } from './LyricsEditor.tsx';
+import { PromptBuilder } from './PromptBuilder.tsx';
+import { Button, Field, Panel, SegmentedControl, TextArea } from './ui.tsx';
 
 /**
- * The studio form: pick a task, pick a model, fill in the fields, generate.
+ * The studio form.
  *
- * The fields are rendered from what the service says the task takes, not from a
- * layout written here. That is the point of the task registry: a new task
- * arrives as data and gets a working form without a new screen.
+ * There are two ways in and they write the same job. Guided mode collects
+ * chips and toggles and compiles them into the prompt. Custom mode is the
+ * fields the task declares, rendered as they come, for when the prompt is
+ * already in somebody's head and the chips are in the way.
  *
- * The guided prompt builder, with its genre chips and tempo and vocal
- * controls, sits on top of this later in phase 4. This is the surface it
- * compiles into.
+ * The fields themselves still come from what the service says the task takes,
+ * in both modes. That is the point of the task registry: a new task arrives as
+ * data and gets a working form without a new screen. What guided mode adds on
+ * top is the compiler, which knows one family so far.
  */
 
 type Values = Record<string, string>;
+type Mode = 'guided' | 'custom';
+
+const MODES: { value: Mode; label: string }[] = [
+  { value: 'guided', label: 'Guided' },
+  { value: 'custom', label: 'Custom' },
+];
+
+/** Fields guided mode draws itself, so the plain renderer must not draw them again. */
+const BUILT_BY_GUIDED = new Set(['prompt', 'lyrics', 'bpm', 'keyscale']);
 
 function initialValues(task: StudioTask): Values {
   const values: Values = {};
@@ -39,6 +61,48 @@ function describeEstimate(seconds: number | undefined): string {
   return `Past runs took about ${Math.round(seconds / 60)} minutes.`;
 }
 
+/** One task field, drawn the way its kind asks to be drawn. */
+function PlainField({
+  field,
+  value,
+  onChange,
+}: {
+  field: TaskField;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  if (field.kind === 'number') {
+    return (
+      <Field
+        label={field.label}
+        type="number"
+        inputMode="decimal"
+        min={field.min}
+        max={field.max}
+        step={field.step}
+        hint={field.help}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  }
+
+  if (field.kind === 'lyrics') {
+    return <LyricsEditor label={field.label} hint={field.help} value={value} onChange={onChange} />;
+  }
+
+  return (
+    <TextArea
+      label={field.label}
+      rows={3}
+      hint={field.help}
+      placeholder="cinematic synth pop with clear vocals"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  );
+}
+
 export function GeneratePanel({
   tasks,
   jobs,
@@ -54,11 +118,16 @@ export function GeneratePanel({
     taskId: string;
     modelId: string;
     params: Record<string, string | number>;
+    title?: string;
+    studio?: StudioState;
   }) => Promise<boolean>;
 }) {
   const [taskId, setTaskId] = useState<string | undefined>();
   const [modelId, setModelId] = useState<string | undefined>();
   const [values, setValues] = useState<Values>({});
+  const [title, setTitle] = useState('');
+  const [builder, setBuilder] = useState<StudioState>(EMPTY_STUDIO);
+  const [mode, setMode] = useState<Mode>('guided');
   const [submitting, setSubmitting] = useState(false);
 
   const task = tasks.find((entry) => entry.id === taskId) ?? tasks[0];
@@ -76,9 +145,27 @@ export function GeneratePanel({
     );
   }
 
-  const missing = task.fields.some(
-    (field) => field.required && (fieldValues[field.name] ?? '').trim() === '',
+  // A family with no compilation rules has no guided mode to offer, so the
+  // switch disappears rather than sitting there doing nothing.
+  const guidedAvailable = supportsGuided(task.family);
+  const guided = guidedAvailable && mode === 'guided';
+
+  const setValue = (name: string, value: string) =>
+    setValues({ ...fieldValues, [name]: value });
+
+  const prompt = guided ? compilePrompt(builder) : (fieldValues.prompt ?? '').trim();
+  const instrumental = guided && !wantsLyrics(builder);
+
+  const plainFields = task.fields.filter(
+    (field) => !field.advanced && !(guided && BUILT_BY_GUIDED.has(field.name)),
   );
+  const advancedFields = task.fields.filter((field) => field.advanced);
+
+  const missing = task.fields.some((field) => {
+    if (!field.required) return false;
+    if (guided && field.name === 'prompt') return prompt === '';
+    return (fieldValues[field.name] ?? '').trim() === '';
+  });
 
   const submit = async () => {
     if (!chosenModel) return;
@@ -86,22 +173,37 @@ export function GeneratePanel({
 
     const params: Record<string, string | number> = {};
     for (const field of task.fields) {
+      // The compiled prompt is the prompt in guided mode, and the lyrics box
+      // is off while the vocals are instrumental, so what is in it is kept for
+      // later rather than sent now.
+      if (guided && field.name === 'prompt') {
+        if (prompt !== '') params.prompt = prompt;
+        continue;
+      }
+      if (instrumental && field.kind === 'lyrics') continue;
+
       const raw = (fieldValues[field.name] ?? '').trim();
       if (raw === '') continue;
       params[field.name] = field.kind === 'number' ? Number(raw) : raw;
     }
 
-    const ok = await onSubmit({ taskId: task.id, modelId: chosenModel, params });
+    const ok = await onSubmit({
+      taskId: task.id,
+      modelId: chosenModel,
+      params,
+      title: title.trim() === '' ? undefined : title.trim(),
+      studio: guided ? builder : undefined,
+    });
     setSubmitting(false);
 
-    // The prompt stays on a success, because the next thing people do is change
+    // The form stays on a success, because the next thing people do is change
     // one word and run it again. Only the queue tells them it worked.
     if (ok) return;
   };
 
   return (
     <Panel title="Generate" description={task.summary}>
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-6">
         {tasks.length > 1 ? (
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-ink">Task</span>
@@ -112,7 +214,7 @@ export function GeneratePanel({
                 setValues({});
                 setModelId(undefined);
               }}
-              className="w-full rounded-md border border-line bg-canvas px-3 py-2 text-sm text-ink hover:border-line-strong"
+              className="min-h-11 w-full rounded-md border border-line bg-canvas px-3 py-2 text-sm text-ink hover:border-line-strong"
             >
               {tasks.map((entry) => (
                 <option key={entry.id} value={entry.id}>
@@ -123,40 +225,76 @@ export function GeneratePanel({
           </label>
         ) : null}
 
-        {task.fields.map((field) =>
-          field.kind === 'number' ? (
-            <Field
-              key={field.name}
-              label={field.label}
-              type="number"
-              inputMode="decimal"
-              min={field.min}
-              max={field.max}
-              step={field.step}
-              hint={field.help}
-              value={fieldValues[field.name] ?? ''}
-              onChange={(event) =>
-                setValues({ ...fieldValues, [field.name]: event.target.value })
+        <Field
+          label="Song title"
+          placeholder="Midnight Drive"
+          hint="What the take is called in your library. Not sent to the model."
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+
+        {guidedAvailable ? (
+          <SegmentedControl
+            label="How to write the prompt"
+            name="prompt-mode"
+            options={MODES}
+            value={mode}
+            onChange={(next) => {
+              // Custom mode opens on whatever guided mode had built, so the
+              // switch is a handover rather than a blank page. What is already
+              // in the box wins, because that was typed.
+              if (next === 'custom' && (fieldValues.prompt ?? '').trim() === '' && prompt !== '') {
+                setValues({ ...fieldValues, prompt });
               }
-            />
-          ) : (
-            <TextArea
-              key={field.name}
-              label={field.label}
-              rows={field.kind === 'lyrics' ? 8 : 3}
-              hint={field.help}
-              placeholder={
-                field.kind === 'lyrics'
-                  ? '[Verse]\nThe first line of the song'
-                  : 'cinematic synth pop with clear vocals'
-              }
-              value={fieldValues[field.name] ?? ''}
-              onChange={(event) =>
-                setValues({ ...fieldValues, [field.name]: event.target.value })
-              }
-            />
-          ),
-        )}
+              setMode(next);
+            }}
+            hint={
+              mode === 'guided'
+                ? 'Pick the pieces and Miso writes the prompt.'
+                : 'Write the prompt yourself, exactly as the model receives it.'
+            }
+          />
+        ) : null}
+
+        {guided ? (
+          <PromptBuilder
+            task={task}
+            builder={builder}
+            onBuilder={setBuilder}
+            values={fieldValues}
+            onValue={setValue}
+          />
+        ) : null}
+
+        {plainFields.map((field) => (
+          <PlainField
+            key={field.name}
+            field={field}
+            value={fieldValues[field.name] ?? ''}
+            onChange={(value) => setValue(field.name, value)}
+          />
+        ))}
+
+        {advancedFields.length > 0 ? (
+          <Disclosure
+            summary={`Advanced options (${advancedFields.length})`}
+          >
+            <div className="flex flex-col gap-5 border-l border-line pl-4">
+              <p className="text-sm text-ink-faint">
+                Left alone these use the model's own defaults. A seed is worth setting when a
+                take came out right and you want it again.
+              </p>
+              {advancedFields.map((field) => (
+                <PlainField
+                  key={field.name}
+                  field={field}
+                  value={fieldValues[field.name] ?? ''}
+                  onChange={(value) => setValue(field.name, value)}
+                />
+              ))}
+            </div>
+          </Disclosure>
+        ) : null}
 
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-ink">Model</span>
@@ -164,7 +302,7 @@ export function GeneratePanel({
             value={chosenModel ?? ''}
             disabled={installed.length === 0}
             onChange={(event) => setModelId(event.target.value)}
-            className="w-full rounded-md border border-line bg-canvas px-3 py-2 text-sm text-ink hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-45"
+            className="min-h-11 w-full rounded-md border border-line bg-canvas px-3 py-2 text-sm text-ink hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-45"
           >
             {installed.length === 0 ? (
               <option value="">No model installed</option>
@@ -198,6 +336,7 @@ export function GeneratePanel({
             onClick={() => void submit()}
             busy={submitting}
             disabled={missing || !chosenModel}
+            className="min-h-11"
           >
             {submitting ? 'Queueing' : 'Generate'}
           </Button>

@@ -3,6 +3,49 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.5.0 - September 12, 2026
+
+The guided prompt builder. Pick a style, a mood, a tempo and a voice, and Miso writes the
+prompt for you. It shows you the sentence it built before anything is queued, so nothing
+about it is a guess.
+
+### ✨ Added
+
+- **Guided mode.** Style and mood chips, a free text box for anything the chips do not
+  cover, a vocal toggle for female, male, duet, or instrumental, and a voice description.
+  The prompt compiled from them is shown under the form, in full, as the model receives it.
+- **Tempo and key.** A BPM box with a slider and a tap tempo button that measures from up to
+  eight taps. A key dropdown covering the major and minor keys. Both default to auto, which
+  leaves the choice to the model rather than forcing one.
+- **Lyrics editor.** Section buttons for intro, verse, pre-chorus, chorus, bridge, and outro.
+  Each drops its tag at the caret and leaves the caret under it. ACE-Step reads these tags,
+  so they are how you tell the model where the chorus is.
+- **Song title.** A take is now named after the title you gave it, in the library and in the
+  queue. The prompt is still the fallback for a take with no title.
+- **Custom mode.** The old form, unchanged, one switch away. Guided mode is the default for
+  ACE-Step, and any family without compilation rules opens straight into custom.
+- **Advanced drawer.** Steps, guidance, seed, and the new negative prompt, folded away until
+  you want them. A field says whether it belongs there, so the drawer fills itself as tasks
+  gain options.
+- **Negative prompt, tempo, and key parameters** on `generate.text2music`, which ACE-Step
+  takes as `negative_prompt`, `bpm`, and `keyscale`.
+
+### 🔧 Changed
+
+- A job carries the song title and the builder state that produced it, in two new columns.
+  The compiled prompt cannot be taken apart into the chips it came from, so the chips are
+  kept. This is what a take needs to be reopened in the builder it was written in.
+- Chips are lowercased into the prompt. Anything you type by hand is sent exactly as typed,
+  because a band name is capitalised on purpose.
+- The lyrics box switches off while the vocals are set to instrumental, and what is in it is
+  kept rather than cleared.
+
+### 🧹 Maintenance
+
+- `busy_timeout_ms` is dropped from the plan. It appears nowhere in the audio.cpp server
+  README, the vendored docs, or the live server, and the 503 retry path already covers the
+  case it was meant to cover.
+
 ## 0.4.0 - September 11, 2026
 
 Miso generates music now. Write a prompt on a project screen, pick an installed ACE-Step
