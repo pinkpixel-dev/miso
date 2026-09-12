@@ -89,6 +89,13 @@ export const api = {
       { method: 'PUT', body: JSON.stringify({ peaks }) },
     ),
 
+  /** Asks the service to read a stored WAV's waveform. Refuses other formats. */
+  readAssetPeaks: (projectId: string, assetId: string) =>
+    request<Asset>(
+      `/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/peaks/read`,
+      { method: 'POST' },
+    ),
+
   renameAsset: (projectId: string, assetId: string, label: string) =>
     request<Asset>(
       `/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}`,

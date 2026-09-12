@@ -14,6 +14,17 @@ import { Button } from './ui.tsx';
  * When the asset has peaks, they are handed to wavesurfer with the duration, so
  * it renders from stored numbers and never downloads or decodes the file to
  * draw. Playback still streams through the media element by range request.
+ *
+ * Without peaks a waveform still appears, because wavesurfer falls back to
+ * downloading the whole file and decoding it. That is the state the Save
+ * waveform button is for: the picture is there, it simply was not kept, and
+ * every device that opens the track pays for it again. At three minutes that
+ * is a 34 MB download per view, and a request that size is one a browser
+ * extension can decide to intercept.
+ *
+ * Generated takes now arrive with their waveform already stored and imports
+ * store theirs as they are imported, so this state is the exception rather
+ * than the normal first look at a track.
  */
 export function WaveformPlayer({
   asset,
@@ -100,7 +111,7 @@ export function WaveformPlayer({
           </Button>
           {asset.peaks ? null : (
             <Button variant="secondary" onClick={onComputePeaks}>
-              Draw waveform
+              {error ? 'Draw waveform' : 'Save waveform'}
             </Button>
           )}
         </div>
@@ -115,8 +126,9 @@ export function WaveformPlayer({
         </p>
       ) : asset.peaks ? null : (
         <p className="text-sm text-ink-muted">
-          No waveform stored for this track yet. It plays normally. Choose Draw waveform to work it
-          out in this browser and save it for every device.
+          This waveform was worked out in this browser just now and is not saved, so every device
+          that opens the track downloads the whole file to draw it again. Choose Save waveform to
+          store it once for all of them.
         </p>
       )}
     </div>

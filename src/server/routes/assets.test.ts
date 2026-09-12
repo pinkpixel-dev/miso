@@ -253,3 +253,37 @@ describe('GET /api/projects/:id/assets/:assetId/download', () => {
     expect(disposition).toContain("filename*=UTF-8''ma%C3%B1ana.mp3");
   });
 });
+
+describe('POST /api/projects/:id/assets/:assetId/peaks/read', () => {
+  it('reads a stored WAV without the browser fetching anything', async () => {
+    const asset = await imported();
+
+    const response = await app().request(
+      `/api/projects/${projectId}/assets/${asset.id}/peaks/read`,
+      { method: 'POST' },
+    );
+    expect(response.status).toBe(200);
+
+    const updated = (await response.json()) as Asset;
+    expect(updated.peaks?.[0]).toHaveLength(PEAK_BUCKETS);
+    expect(updated.peaks?.[0]?.some((value) => value > 0)).toBe(true);
+  });
+
+  it('refuses a format only a browser can decode, and says so', async () => {
+    const asset = (await (await importFile(projectId, 'tone.mp3')).json()) as Asset;
+
+    const response = await app().request(
+      `/api/projects/${projectId}/assets/${asset.id}/peaks/read`,
+      { method: 'POST' },
+    );
+    expect(response.status).toBe(415);
+    expect(((await response.json()) as ApiError).detail).toMatch(/browser/i);
+  });
+
+  it('answers 404 for an asset that is not in this project', async () => {
+    const response = await app().request(`/api/projects/${projectId}/assets/nope/peaks/read`, {
+      method: 'POST',
+    });
+    expect(response.status).toBe(404);
+  });
+});

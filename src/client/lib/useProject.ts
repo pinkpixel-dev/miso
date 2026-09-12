@@ -119,10 +119,32 @@ export function useProject(id: string) {
   );
 
   /** Fills in a waveform for an asset that has none, from this browser. */
+  /**
+   * Draws a track's waveform and stores it.
+   *
+   * The service is asked first. It can read a WAV without the browser fetching
+   * anything, which matters because the browser route has to pull the whole
+   * file: 34 MB for a three minute track, large enough that an extension can
+   * intercept it, and when one does there is no way to draw the waveform at
+   * all. Anything the service will not read, which is every compressed format,
+   * falls through to decoding here, where the decoder is.
+   */
   const computePeaksFor = useCallback(
     async (assetId: string) => {
       const asset = assets.find((a) => a.id === assetId);
       if (!asset) return;
+
+      const store = (updated: Asset) =>
+        setAssets((current) => current.map((a) => (a.id === assetId ? updated : a)));
+
+      try {
+        store(await api.readAssetPeaks(id, assetId));
+        setError(undefined);
+        return;
+      } catch {
+        // Not an error worth showing. It means this format is the browser's
+        // job, which is the next thing that happens.
+      }
 
       try {
         const response = await fetch(
@@ -130,8 +152,8 @@ export function useProject(id: string) {
         );
         const blob = await response.blob();
         const peaks = await computePeaks(new File([blob], asset.filename));
-        const updated = await api.setAssetPeaks(id, assetId, peaks);
-        setAssets((current) => current.map((a) => (a.id === assetId ? updated : a)));
+        store(await api.setAssetPeaks(id, assetId, peaks));
+        setError(undefined);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
       }

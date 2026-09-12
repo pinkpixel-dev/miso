@@ -3,6 +3,29 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.8.0 - September 12, 2026
+
+A three minute track is 34 MB, and a browser asked to fetch that much just to draw a waveform
+can be stopped by an extension before the request ever leaves. When that happened the track
+would not draw or play, and the button meant to fix it made the same blocked request. The
+service does the reading now, so the browser never has to ask.
+
+### ✨ Added
+
+- **Existing takes get their waveform filled in** the next time the service starts. Nothing to
+  press. New takes already arrive with theirs, so the run after that finds nothing to do.
+- **Save waveform asks the service first** and reads a stored WAV without the browser
+  downloading anything. Compressed imports still decode in the browser, which has the decoder
+  for them.
+
+### 🔧 Changed
+
+- The message under an unsaved waveform says what it actually means. It used to read "No
+  waveform stored for this track yet" directly beneath a waveform that was plainly visible,
+  which made the button look like it did nothing. The waveform was real, it simply was not
+  kept, and every device that opened the track worked it out again. The button is called Save
+  waveform now, because saving is what it does.
+
 ## 0.7.0 - September 12, 2026
 
 ### ✨ Added
@@ -18,11 +41,6 @@ this file, so the earlier history lives in the git log.
 
 - The bucketing that turns samples into a waveform is shared between the service and the
   browser, so a generated take and an imported one draw the same way.
-
-### 🧹 Maintenance
-
-- Takes generated before this update still have no stored waveform. Press Draw waveform once
-  on each and it is saved for every device.
 
 ## 0.6.2 - September 12, 2026
 

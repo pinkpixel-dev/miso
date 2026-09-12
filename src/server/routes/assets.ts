@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { rename, stat } from 'node:fs/promises';
+import { readFile, rename, stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { MAX_ASSET_BYTES, isAcceptedFormat } from '../../shared/limits.ts';
 import type { ApiError, Asset, AssetFormat } from '../../shared/types.ts';
@@ -17,6 +17,7 @@ import { db } from '../db/index.ts';
 import { readProject } from '../db/projects.ts';
 import { readAudioFacts } from '../library/metadata.ts';
 import { validatePeaks } from '../library/peaks.ts';
+import { peaksFromWav } from '../library/wavPeaks.ts';
 import { parseRange } from '../library/range.ts';
 import { receiveToFile } from '../library/receive.ts';
 import {
@@ -260,6 +261,58 @@ assetRoutes.delete('/projects/:id/assets/:assetId', async (c) => {
   deleteAsset(db(), assetId);
 
   return c.json<Asset[]>(listAssets(db(), projectId));
+});
+
+/**
+ * Reads a stored track's waveform on the service and saves it.
+ *
+ * The browser route below it still exists and still handles mp3, flac, and m4a,
+ * which need a real decoder. This handles WAV, and it matters more than a small
+ * saving: drawing a waveform in the browser means fetching the entire file, and
+ * a three minute WAV is 34 MB. That request is large enough for a browser
+ * extension to intercept, and when one does it fails with "Failed to fetch" and
+ * there is no way for the person to draw the waveform at all. Reading it here
+ * needs nothing from the browser but the request.
+ */
+assetRoutes.post('/projects/:id/assets/:assetId/peaks/read', async (c) => {
+  const projectId = c.req.param('id');
+  const assetId = c.req.param('assetId');
+
+  const asset = assetIn(projectId, assetId);
+  if (!asset) return c.json<ApiError>({ error: `No asset with the id ${assetId}` }, 404);
+
+  if (asset.format !== 'wav') {
+    return c.json<ApiError>(
+      {
+        error: `Miso cannot read the waveform of a ${asset.format} file`,
+        detail: 'Only WAV is read here. Everything else is decoded in the browser.',
+      },
+      415,
+    );
+  }
+
+  let bytes: Buffer;
+  try {
+    bytes = await readFile(assetPath(projectId, assetId, asset.format));
+  } catch {
+    return c.json<ApiError>({ error: `The file for ${asset.label} is missing from disk` }, 404);
+  }
+
+  const peaks = peaksFromWav(bytes);
+  if (!peaks) {
+    return c.json<ApiError>(
+      {
+        error: `The waveform of ${asset.label} could not be read`,
+        detail: 'Its samples are in a layout Miso does not read. The browser may manage it.',
+      },
+      415,
+    );
+  }
+
+  const updated = setAssetPeaks(db(), assetId, peaks);
+  if (!updated) return c.json<ApiError>({ error: `No asset with the id ${assetId}` }, 404);
+
+  return c.json<Asset>(updated);
 });
 
 assetRoutes.get('/projects/:id/assets/:assetId/audio', async (c) => {
