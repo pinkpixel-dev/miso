@@ -26,12 +26,26 @@ export function WaveformPlayer({
   const surfer = useRef<WaveSurfer | undefined>(undefined);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  // Peaks are read through a ref rather than depended on.
+  //
+  // Every refetch of the project parses the JSON again and hands back an array
+  // that is equal to the last one and is not the same object. Depending on it
+  // rebuilt the player on any reload, which stops playback mid track: finish a
+  // generation while listening to something and the track you were playing
+  // would cut out. What actually matters is whether peaks exist at all, which
+  // changes once, when Draw waveform finishes.
+  const peaks = useRef(asset.peaks);
+  peaks.current = asset.peaks;
+  const hasPeaks = asset.peaks !== undefined;
 
   useEffect(() => {
     if (!container.current) return;
 
     setReady(false);
     setPlaying(false);
+    setError(undefined);
 
     const instance = WaveSurfer.create({
       container: container.current,
@@ -46,7 +60,7 @@ export function WaveformPlayer({
       // whole file. This is what makes seeking a range request.
       backend: 'MediaElement',
       url: audioUrl(asset.projectId, asset.id),
-      ...(asset.peaks ? { peaks: asset.peaks, duration: asset.durationSeconds } : {}),
+      ...(peaks.current ? { peaks: peaks.current, duration: asset.durationSeconds } : {}),
     });
 
     instance.on('ready', () => setReady(true));
@@ -54,13 +68,22 @@ export function WaveformPlayer({
     instance.on('pause', () => setPlaying(false));
     instance.on('finish', () => setPlaying(false));
 
+    // Without this a load that fails leaves a disabled Play button next to an
+    // empty box, and nothing on the screen says why. The track is usually fine:
+    // Export it and it plays. Saying so is the difference between a bug and a
+    // stale tab nobody can tell apart.
+    instance.on('error', (cause) => {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      setReady(false);
+    });
+
     surfer.current = instance;
 
     return () => {
       instance.destroy();
       surfer.current = undefined;
     };
-  }, [asset.id, asset.projectId, asset.peaks, asset.durationSeconds]);
+  }, [asset.id, asset.projectId, hasPeaks, asset.durationSeconds]);
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-line bg-surface p-4">
@@ -85,7 +108,12 @@ export function WaveformPlayer({
 
       <div ref={container} className="w-full" />
 
-      {asset.peaks ? null : (
+      {error ? (
+        <p role="alert" className="rounded-md border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-ink">
+          This track could not be loaded for playback: {error} The file itself is probably fine, so
+          try Export to check. If it plays there, reload this page.
+        </p>
+      ) : asset.peaks ? null : (
         <p className="text-sm text-ink-muted">
           No waveform stored for this track yet. It plays normally. Choose Draw waveform to work it
           out in this browser and save it for every device.

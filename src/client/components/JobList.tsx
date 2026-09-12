@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Job, JobState } from '../../shared/types.ts';
 import { isPending, parseStamp } from '../lib/useJobs.ts';
+import { Disclosure } from './Disclosure.tsx';
 import { Button, Panel, Pill } from './ui.tsx';
 
 /**
@@ -8,7 +9,18 @@ import { Button, Panel, Pill } from './ui.tsx';
  *
  * Every state says what it means in words as well as colour, because a state
  * pill is the only thing on this screen that explains a five minute wait.
+ *
+ * Finished work is folded away rather than deleted. A job row holds the prompt,
+ * the lyrics, the seed and every other setting that produced a take, which is
+ * the whole record of how a track came to exist and what phase 5 reopens when
+ * somebody wants that prompt back. Clearing the list would throw that away to
+ * tidy a screen. Anything still waiting or running always shows, and so do the
+ * most recent few results, because that is the part anybody is actually
+ * watching.
  */
+
+/** How many finished jobs stay on screen before the rest fold away. */
+const RECENT = 4;
 
 const STATES: Record<JobState, { label: string; tone: 'good' | 'bad' | 'warn' | 'neutral' }> = {
   queued: { label: 'Waiting', tone: 'neutral' },
@@ -55,6 +67,36 @@ function titleOf(job: Job): string {
   return typeof prompt === 'string' && prompt.trim() !== '' ? prompt.trim() : job.taskId;
 }
 
+function Row({ job, onCancel }: { job: Job; onCancel: (jobId: string) => void }) {
+  const state = STATES[job.state];
+
+  return (
+    <li className="flex flex-wrap items-start gap-x-3 gap-y-2 py-3 first:pt-0 last:pb-0">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-ink">{titleOf(job)}</p>
+        {job.error ? (
+          <p role="alert" className="mt-1 text-sm text-bad">
+            {job.error}
+          </p>
+        ) : null}
+        {job.state === 'running' ? (
+          <p className="mt-1 text-sm text-ink-faint">A running generation cannot be interrupted.</p>
+        ) : null}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-3">
+        <Elapsed job={job} />
+        <Pill tone={state.tone}>{state.label}</Pill>
+        {job.state === 'queued' ? (
+          <Button variant="ghost" onClick={() => onCancel(job.id)}>
+            Cancel
+          </Button>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
 export function JobList({ jobs, onCancel }: { jobs: Job[]; onCancel: (jobId: string) => void }) {
   if (jobs.length === 0) {
     return (
@@ -64,40 +106,34 @@ export function JobList({ jobs, onCancel }: { jobs: Job[]; onCancel: (jobId: str
     );
   }
 
+  // Anything in flight, then the newest handful of results. The list arrives
+  // newest first, so the split needs no sorting of its own.
+  const live = jobs.filter(isPending);
+  const finished = jobs.filter((job) => !isPending(job));
+  const shown = finished.slice(0, RECENT);
+  const earlier = finished.slice(RECENT);
+
   return (
     <Panel title="Queue">
       <ul className="flex flex-col divide-y divide-line">
-        {jobs.map((job) => {
-          const state = STATES[job.state];
-          return (
-            <li key={job.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 py-3 first:pt-0 last:pb-0">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-ink">{titleOf(job)}</p>
-                {job.error ? (
-                  <p role="alert" className="mt-1 text-sm text-bad">
-                    {job.error}
-                  </p>
-                ) : null}
-                {job.state === 'running' ? (
-                  <p className="mt-1 text-sm text-ink-faint">
-                    A running generation cannot be interrupted.
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="flex shrink-0 items-center gap-3">
-                <Elapsed job={job} />
-                <Pill tone={state.tone}>{state.label}</Pill>
-                {job.state === 'queued' ? (
-                  <Button variant="ghost" onClick={() => onCancel(job.id)}>
-                    Cancel
-                  </Button>
-                ) : null}
-              </div>
-            </li>
-          );
-        })}
+        {[...live, ...shown].map((job) => (
+          <Row key={job.id} job={job} onCancel={onCancel} />
+        ))}
       </ul>
+
+      {earlier.length > 0 ? (
+        <div className="mt-3 border-t border-line pt-3">
+          <Disclosure
+            summary={`${earlier.length} earlier ${earlier.length === 1 ? 'job' : 'jobs'}`}
+          >
+            <ul className="flex flex-col divide-y divide-line">
+              {earlier.map((job) => (
+                <Row key={job.id} job={job} onCancel={onCancel} />
+              ))}
+            </ul>
+          </Disclosure>
+        </div>
+      ) : null}
     </Panel>
   );
 }

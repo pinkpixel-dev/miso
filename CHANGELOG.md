@@ -3,6 +3,25 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.6.2 - September 12, 2026
+
+### 🐛 Fixes
+
+- A track that fails to load for playback now says so. Before this it left a Play button that
+  could not be pressed beside an empty box, with nothing on screen to tell a broken file apart
+  from a stale browser tab. The message also says to try Export, since a track that plays
+  there is fine and the page is what needs reloading.
+- Playback no longer stops when the project reloads. Every refetch parses the stored waveform
+  again and hands back a new array, which rebuilt the player, so finishing a generation while
+  listening to something cut that track off mid play.
+
+### 🎨 Queue
+
+- Finished jobs past the most recent four fold away behind an expander, so the queue stops
+  growing without limit on a project you keep working in. Anything waiting or running always
+  shows. Nothing is deleted: a job row holds the prompt, the lyrics, and the settings that
+  produced a take, which is the record of how a track was made and what phase 5 reopens.
+
 ## 0.6.1 - September 12, 2026
 
 ### 🐛 Fixes
