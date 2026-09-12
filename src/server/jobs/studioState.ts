@@ -19,6 +19,7 @@ const MAX_TITLE = 120;
 const MAX_CHIPS = 24;
 const MAX_CHIP = 60;
 const MAX_FREE_TEXT = 400;
+const MAX_PROMPT = 4_000;
 
 const VOCAL_MODES: VocalMode[] = ['female', 'male', 'duet', 'instrumental'];
 
@@ -35,6 +36,30 @@ export function parseTitle(raw: unknown): StudioResult<string | undefined> {
     return { ok: false, error: `The title cannot be longer than ${MAX_TITLE} characters` };
   }
   return { ok: true, value: title };
+}
+
+/**
+ * The prompt as the person wrote it, before the assistant expanded it.
+ *
+ * Dropped when it matches the prompt that actually ran, because a job holding
+ * the same text in two columns would claim an enhancement that never happened,
+ * and a lineage view reading it would show a take being derived from itself.
+ */
+export function parseOriginalPrompt(
+  raw: unknown,
+  sent: unknown,
+): StudioResult<string | undefined> {
+  if (raw === undefined || raw === null) return { ok: true, value: undefined };
+  if (typeof raw !== 'string') return { ok: false, error: 'The original prompt must be text' };
+
+  const original = raw.trim();
+  if (original === '') return { ok: true, value: undefined };
+  if (original.length > MAX_PROMPT) {
+    return { ok: false, error: `The original prompt cannot be longer than ${MAX_PROMPT} characters` };
+  }
+  if (typeof sent === 'string' && sent.trim() === original) return { ok: true, value: undefined };
+
+  return { ok: true, value: original };
 }
 
 function parseChips(raw: unknown, label: string): StudioResult<string[]> {

@@ -107,7 +107,8 @@ const text2music: TaskDefinition = {
       min: 5,
       max: 300,
       step: 5,
-      default: 30,
+      default: 180,
+      help: 'Three minutes by default, which is a song. Generation time scales with this.',
     },
     {
       name: 'bpm',

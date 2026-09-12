@@ -21,6 +21,7 @@ interface Record_ {
   params: string;
   title: string | null;
   studio: string | null;
+  original_prompt: string | null;
   state: string;
   error: string | null;
   attempts: number;
@@ -39,6 +40,8 @@ export interface NewJob {
   title?: string;
   /** The guided builder's own state, absent when the plain form wrote the job. */
   studio?: StudioState;
+  /** What the person wrote, when an expansion of it is what ran. */
+  originalPrompt?: string;
   /** Assets this job reads, by the role the task gives them. */
   inputs?: { assetId: string; role: string }[];
 }
@@ -77,6 +80,7 @@ function toJob(handle: Database, record: Record_): Job {
     params,
     title: record.title ?? undefined,
     studio,
+    originalPrompt: record.original_prompt ?? undefined,
     state: record.state as JobState,
     error: record.error ?? undefined,
     attempts: record.attempts,
@@ -115,8 +119,8 @@ export function createJob(handle: Database, id: string, input: NewJob): Job {
   handle.transaction(() => {
     handle
       .prepare(
-        `INSERT INTO jobs (id, project_id, task_id, model_id, params, title, studio, state)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'queued')`,
+        `INSERT INTO jobs (id, project_id, task_id, model_id, params, title, studio, original_prompt, state)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued')`,
       )
       .run(
         id,
@@ -126,6 +130,7 @@ export function createJob(handle: Database, id: string, input: NewJob): Job {
         JSON.stringify(input.params),
         input.title ?? null,
         input.studio === undefined ? null : JSON.stringify(input.studio),
+        input.originalPrompt ?? null,
       );
 
     const link = handle.prepare('INSERT INTO asset_lineage (job_id, asset_id, role) VALUES (?, ?, ?)');

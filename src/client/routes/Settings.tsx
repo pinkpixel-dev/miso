@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { BackendStatus, Settings as SettingsData } from '../../shared/types.ts';
 import { api } from '../lib/api.ts';
+import { LyricsSettings } from '../components/LyricsSettings.tsx';
 import { StorageUsage } from '../components/StorageUsage.tsx';
 import { Button, CodeBlock, Field, Panel, Pill } from '../components/ui.tsx';
 
@@ -60,7 +61,7 @@ export function SettingsRoute() {
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-2xl">Settings</h1>
-        <p className="mt-1 text-ink-muted">Where Miso finds the models it runs.</p>
+        <p className="mt-1 text-ink-muted">Where Miso finds the models it runs, and who writes your lyrics.</p>
       </div>
 
       <Panel
@@ -117,6 +118,8 @@ export function SettingsRoute() {
           </div>
         </div>
       </Panel>
+
+      {saved ? <LyricsSettings settings={saved} onSaved={setSaved} /> : null}
 
       <StorageUsage />
     </div>

@@ -51,7 +51,7 @@ describe('POST /api/projects/:id/jobs', () => {
 
     const job = (await response.json()) as Job;
     expect(job.state).toBe('queued');
-    expect(job.params.durationSeconds).toBe(30);
+    expect(job.params.durationSeconds).toBe(180);
   });
 
   it('refuses a task this build does not have', async () => {

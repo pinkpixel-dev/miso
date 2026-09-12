@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
-import type { StudioState, StudioTask, TaskField } from '../../shared/types.ts';
+import type { LyricsDraft, StudioState, StudioTask, TaskField } from '../../shared/types.ts';
 import { GENRES, KEYS, MOODS, VOCAL_MODES, compilePrompt, wantsLyrics } from '../lib/studio.ts';
+import { LyricsAssistant } from './LyricsAssistant.tsx';
 import { LyricsEditor } from './LyricsEditor.tsx';
+import { SavedPrompts } from './SavedPrompts.tsx';
 import { Button, ChipGroup, Field, SegmentedControl, cx } from './ui.tsx';
 
 /**
@@ -153,13 +155,17 @@ export function PromptBuilder({
   onBuilder,
   values,
   onValue,
+  onTitle,
 }: {
   task: StudioTask;
   builder: StudioState;
   onBuilder: (next: StudioState) => void;
   values: Record<string, string>;
   onValue: (name: string, value: string) => void;
+  /** Used only when the assistant named the song and the title box is empty. */
+  onTitle: (title: string) => void;
 }) {
+  const [writing, setWriting] = useState(false);
   const field = (name: string) => task.fields.find((entry) => entry.name === name);
 
   const toggle = (key: 'genre' | 'mood', option: string) => {
@@ -238,17 +244,50 @@ export function PromptBuilder({
       </div>
 
       {lyricsField ? (
-        <LyricsEditor
-          label={lyricsField.label}
-          hint={
-            instrumental
-              ? 'Not used while the vocals are set to instrumental. Nothing you have written is lost.'
-              : 'Section tags tell the model where the chorus is.'
-          }
-          disabled={instrumental}
-          value={values[lyricsField.name] ?? ''}
-          onChange={(next) => onValue(lyricsField.name, next)}
-        />
+        <div className="flex flex-col gap-3">
+          <LyricsEditor
+            label={lyricsField.label}
+            hint={
+              instrumental
+                ? 'Not used while the vocals are set to instrumental. Nothing you have written is lost.'
+                : 'Section tags tell the model where the chorus is.'
+            }
+            disabled={instrumental}
+            value={values[lyricsField.name] ?? ''}
+            onChange={(next) => onValue(lyricsField.name, next)}
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              className="min-h-11"
+              disabled={instrumental}
+              onClick={() => setWriting(true)}
+            >
+              Write lyrics for me
+            </Button>
+            <SavedPrompts
+              kind="lyrics"
+              body={values[lyricsField.name] ?? ''}
+              disabled={instrumental}
+              onLoad={(body) => onValue(lyricsField.name, body)}
+            />
+          </div>
+
+          <LyricsAssistant
+            open={writing}
+            studio={builder}
+            hasLyrics={(values[lyricsField.name] ?? '').trim() !== ''}
+            onApply={(draft: LyricsDraft) => {
+              onValue(lyricsField.name, draft.lyrics);
+              // The title the assistant gave the song is only used when the
+              // box is empty. Overwriting a name somebody chose would be the
+              // assistant deciding what the song is called.
+              if (draft.title !== undefined) onTitle(draft.title);
+            }}
+            onClose={() => setWriting(false)}
+          />
+        </div>
       ) : null}
 
       <div className="flex flex-col gap-1.5">

@@ -7,7 +7,7 @@ import { createJob, listJobs, readJob, setJobState } from '../db/jobs.ts';
 import { readProject } from '../db/projects.ts';
 import { readSettings } from '../db/settings.ts';
 import { unloadAll } from '../jobs/residency.ts';
-import { parseStudioState, parseTitle } from '../jobs/studioState.ts';
+import { parseOriginalPrompt, parseStudioState, parseTitle } from '../jobs/studioState.ts';
 import { wake } from '../jobs/worker.ts';
 import { findTask, listTasks, packageRunsTask, validateParams } from '../tasks/registry.ts';
 
@@ -54,12 +54,13 @@ jobRoutes.post('/projects/:id/jobs', async (c) => {
     return c.json<ApiError>({ error: 'Request body must be JSON' }, 400);
   }
 
-  const { taskId, modelId, params, title, studio, inputs } = (body ?? {}) as {
+  const { taskId, modelId, params, title, studio, originalPrompt, inputs } = (body ?? {}) as {
     taskId?: unknown;
     modelId?: unknown;
     params?: unknown;
     title?: unknown;
     studio?: unknown;
+    originalPrompt?: unknown;
     inputs?: unknown;
   };
 
@@ -90,6 +91,12 @@ jobRoutes.post('/projects/:id/jobs', async (c) => {
   const studioState = parseStudioState(studio);
   if (!studioState.ok) return c.json<ApiError>({ error: studioState.error }, 400);
 
+  // The prompt before the assistant expanded it. Recorded only when it differs
+  // from what actually ran, because a job that stored the same text twice would
+  // claim an enhancement that never happened.
+  const written = parseOriginalPrompt(originalPrompt, validated.value.prompt);
+  if (!written.ok) return c.json<ApiError>({ error: written.error }, 400);
+
   // Input assets have to exist and belong to this project. Without the second
   // check a job could name a track from someone else's project and stage it to
   // the backend.
@@ -110,6 +117,7 @@ jobRoutes.post('/projects/:id/jobs', async (c) => {
     params: validated.value,
     title: songTitle.value,
     studio: studioState.value,
+    originalPrompt: written.value,
     inputs: links,
   });
 

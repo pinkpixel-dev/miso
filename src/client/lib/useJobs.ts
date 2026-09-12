@@ -84,6 +84,7 @@ export function useJobs(projectId: string, onComplete?: () => void) {
       params: Record<string, string | number>;
       title?: string;
       studio?: StudioState;
+      originalPrompt?: string;
       inputs?: { assetId: string; role: string }[];
     }) => {
       try {

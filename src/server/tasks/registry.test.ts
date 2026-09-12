@@ -27,7 +27,7 @@ describe('validateParams', () => {
     const result = validateParams(text2music, { prompt: 'synth pop' });
     expect(result.ok && result.value).toMatchObject({
       prompt: 'synth pop',
-      durationSeconds: 30,
+      durationSeconds: 180,
       steps: 8,
       guidanceScale: 1,
     });
@@ -68,7 +68,7 @@ describe('buildRequest', () => {
       task_route: 'text2music',
       text: 'synth pop',
       lyrics: 'we rise',
-      duration_seconds: 30,
+      duration_seconds: 180,
       num_inference_steps: 8,
       guidance_scale: 1,
     });

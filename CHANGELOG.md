@@ -3,6 +3,42 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.6.0 - September 12, 2026
+
+The lyrics assistant. Describe what the song is about and a language model writes the sheet,
+with a title. It can also take your prompt and hand back a richer one, which you accept,
+edit, or ignore.
+
+### ✨ Added
+
+- **Write lyrics.** A description of the song goes to a language model along with the style
+  and mood from the builder, and comes back as a tagged lyric sheet with a title. It lands in
+  a preview you can edit, and it reaches the editor only when you say so. When the editor
+  already has words in it, the button says it is replacing them.
+- **Make the prompt richer.** Sends the form as it stands and offers an expanded prompt
+  beside the one you wrote. Ask twice and you get two different answers, which is a cheap way
+  to get a fresh take on the same idea. A job records both prompts, so a take shows the idea
+  as well as the expansion.
+- **Two engines, both configured at once.** An OpenAI-compatible provider, or a llama.cpp
+  server on your own network. A switch in Settings says which one is used, and moving between
+  them does not mean typing a key back in.
+- **Saved prompts and lyric sheets.** Keep a good one by name and reach for it in any
+  project. Separate from job history, which records everything you ran rather than what was
+  worth keeping. Saving over a name replaces it.
+
+### 🔧 Changed
+
+- The default song length is 180 seconds rather than 30. Three minutes is a song, and 30
+  seconds is a sketch.
+- The API key is write only. It goes into Miso's database on the machine running the service
+  and never comes back to the browser, so the settings screen reports that a key is stored
+  rather than showing it.
+- A job carries the prompt you wrote when what ran was an expansion of it. The two columns
+  are only ever different: a prompt sent as written records nothing extra, so an enhancement
+  cannot be claimed where none happened.
+- An accepted expansion stops applying as soon as you change the form it was made from. A
+  prompt written for a different set of chips is not an expansion of the current one.
+
 ## 0.5.0 - September 12, 2026
 
 The guided prompt builder. Pick a style, a mood, a tempo and a voice, and Miso writes the

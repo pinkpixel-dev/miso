@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseStudioState, parseTitle } from './studioState.ts';
+import { parseOriginalPrompt, parseStudioState, parseTitle } from './studioState.ts';
 
 describe('parseTitle', () => {
   it('treats an absent, empty, or blank title the same way', () => {
@@ -70,5 +70,31 @@ describe('parseStudioState', () => {
     expect(parseStudioState({ ...good, vocalStyle: 'x'.repeat(401) })).toMatchObject({ ok: false });
     expect(parseStudioState({ ...good, genre: [7] })).toMatchObject({ ok: false });
     expect(parseStudioState({ ...good, genre: 'Pop' })).toMatchObject({ ok: false });
+  });
+});
+
+describe('parseOriginalPrompt', () => {
+  it('keeps what the person wrote when an expansion of it ran', () => {
+    expect(parseOriginalPrompt('synthwave', 'synthwave, dreamy, warm tape saturation')).toEqual({
+      ok: true,
+      value: 'synthwave',
+    });
+  });
+
+  it('drops it when it is the same as the prompt that ran', () => {
+    // Two columns holding the same text would claim an enhancement that never
+    // happened, and a lineage view would show a take derived from itself.
+    expect(parseOriginalPrompt('synthwave', 'synthwave')).toEqual({ ok: true, value: undefined });
+    expect(parseOriginalPrompt('  synthwave  ', 'synthwave')).toEqual({ ok: true, value: undefined });
+  });
+
+  it('treats absent and empty the same way', () => {
+    expect(parseOriginalPrompt(undefined, 'x')).toEqual({ ok: true, value: undefined });
+    expect(parseOriginalPrompt('   ', 'x')).toEqual({ ok: true, value: undefined });
+  });
+
+  it('refuses one that is not text, and one too long to be a prompt', () => {
+    expect(parseOriginalPrompt(7, 'x')).toMatchObject({ ok: false });
+    expect(parseOriginalPrompt('x'.repeat(4001), 'y')).toMatchObject({ ok: false });
   });
 });

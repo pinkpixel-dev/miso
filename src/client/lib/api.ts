@@ -5,9 +5,14 @@ import type {
   Catalog,
   CleanPartialsResult,
   Job,
+  LyricsDraft,
   Project,
   ProjectDetail,
+  PromptSuggestion,
+  SavedPrompt,
+  SavedPromptKind,
   Settings,
+  SettingsPatch,
   StorageUsage,
   StudioState,
   StudioTask,
@@ -41,7 +46,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   getSettings: () => request<Settings>('/settings'),
 
-  saveSettings: (patch: Partial<Settings>) =>
+  saveSettings: (patch: SettingsPatch) =>
     request<Settings>('/settings', { method: 'PUT', body: JSON.stringify(patch) }),
 
   /** Omit `url` to check the saved backend, pass one to test before saving. */
@@ -110,6 +115,7 @@ export const api = {
       params: Record<string, string | number>;
       title?: string;
       studio?: StudioState;
+      originalPrompt?: string;
       inputs?: { assetId: string; role: string }[];
     },
   ) =>
@@ -122,6 +128,24 @@ export const api = {
     request<Job>(`/projects/${encodeURIComponent(projectId)}/jobs/${encodeURIComponent(jobId)}`, {
       method: 'DELETE',
     }),
+
+  /** Asks the configured language model for a lyric sheet and a title. */
+  writeLyrics: (body: { description: string; studio?: StudioState }) =>
+    request<LyricsDraft>('/lyrics/write', { method: 'POST', body: JSON.stringify(body) }),
+
+  /** Asks for a richer prompt. Offered, never applied. */
+  enhancePrompt: (body: { prompt: string; studio?: StudioState }) =>
+    request<PromptSuggestion>('/lyrics/enhance', { method: 'POST', body: JSON.stringify(body) }),
+
+  getSaved: (kind?: SavedPromptKind) =>
+    request<SavedPrompt[]>(`/saved${kind ? `?kind=${kind}` : ''}`),
+
+  /** Saving over a name replaces what was under it. */
+  savePrompt: (body: { kind: SavedPromptKind; name: string; body: string }) =>
+    request<SavedPrompt>('/saved', { method: 'POST', body: JSON.stringify(body) }),
+
+  deleteSaved: (id: string) =>
+    request<SavedPrompt[]>(`/saved/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   /** Frees every model on the backend, for when the GPU is wanted elsewhere. */
   unloadModels: () => request<{ unloaded: boolean }>('/backend/unload', { method: 'POST' }),

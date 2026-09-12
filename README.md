@@ -8,10 +8,10 @@ Miso runs on [audio.cpp](https://github.com/0xShug0/audio.cpp), a C++ inference 
 audio models. Miso is the studio around it: projects that persist, a history of every take,
 and a record of exactly how each clip was made so you can change one thing and try again.
 
-> **Early days.** Phases 1 through 4 of the [roadmap](DOCS/ROADMAP.md) are mostly done. Miso
-> installs models, holds your projects and audio, and generates music with ACE-Step from a
-> guided prompt builder. Still to come in phase 4: the AI lyrics assistant. Remix, stems,
-> and the timeline editing Miso is really built for arrive in phases 5 and 6.
+> **Early days.** Phases 1 through 4 of the [roadmap](DOCS/ROADMAP.md) are done. Miso installs
+> models, holds your projects and audio, and generates music with ACE-Step from a guided
+> prompt builder, with lyrics written for you if you want them. Remix, stems, and the timeline
+> editing Miso is really built for arrive in phases 5 and 6.
 
 ## Why it exists
 
@@ -128,6 +128,57 @@ The models directory you bind into the container must be writable by uid 1000, w
 user audio.cpp runs as. If Docker created it for you as root, installs fail with
 `could not create package staging directory`.
 
+### 5. Write a song
+
+Open a project and use the Generate panel.
+
+Guided mode is the default. Give the song a title, pick style and mood chips, choose a vocal
+mode, and set a tempo and a key if you want them. Miso builds the prompt from those and shows
+it under the form, so you can read exactly what the model is going to receive. Anything the
+chips do not cover goes in the style box and is sent as you typed it.
+
+Write lyrics in the editor below. The section buttons drop tags like `[Verse]` and `[Chorus]`
+at your cursor, and ACE-Step reads those tags, so they are how you tell it where the chorus
+is. Set the vocals to Instrumental and the editor switches off without losing what is in it.
+
+Press Generate. The job goes in the queue, the model loads if it is not already loaded, and
+the finished take lands in the project under the title you gave it. The first run is slower
+because it loads the weights. Steps, guidance, seed, and a negative prompt are in the advanced
+drawer if you want them.
+
+Custom mode is one switch away and gives you the prompt box directly. It opens on whatever
+guided mode had built, so you can start with the chips and finish by hand.
+
+### Lyrics written for you
+
+Miso can write the lyrics if you would rather not. This needs a language model, which is not
+something Miso runs itself, so you point it at one in Settings. Two options:
+
+- **An API provider.** Any OpenAI-compatible endpoint: OpenAI, OpenRouter, Anthropic, Groq,
+  and others. Give Miso the base URL including the version path, a model id, and your API key.
+  This uses no GPU memory of yours at all, which is why it is the recommended one.
+- **A local llama.cpp server.** Point Miso at its address, for example
+  `http://127.0.0.1:8081/v1`. No key needed. On a single card, remember that a language model
+  and a 13 GB music model do not both fit, so free the card with Unload models first.
+
+Both stay configured and a switch says which one is used, so you can keep an API key and a
+local server set up at once.
+
+With that done, Write lyrics for me appears under the lyrics editor. Describe what the song
+is about and the style and mood from your builder are sent along with it. You get back a
+tagged lyric sheet and a title, in a preview you can edit. Nothing reaches the editor until
+you accept it, and if the editor already has words in it, the button says it is replacing
+them.
+
+Make the prompt richer does the same thing for your prompt. It sends the form as it stands
+and offers an expanded version beside the one you wrote. Take it, edit it, or ignore it. Ask
+twice and you get two different answers, which is a cheap way to get a fresh take on the same
+idea. Either way the take records both prompts, so you can always see the idea as well as the
+expansion.
+
+Anything worth keeping can be saved by name with Save this prompt or Save these lyrics. Saved
+items work in any project, and saving over a name replaces it.
+
 ## Coming back to it
 
 You only do the setup above once. After that, starting everything again is two commands.
@@ -220,6 +271,11 @@ which can run to hundreds of megabytes, out of the browser.
 | `MISO_HOST` | `127.0.0.1` | Interface it binds to |
 | `MISO_DATA_DIR` | `./data` | Where the database and audio assets live |
 | `MISO_BACKEND_URL` | `http://127.0.0.1:8080` | audio.cpp address used before you set one |
+
+The lyrics assistant is configured in Settings rather than through the environment. Your API
+key is stored in Miso's database under `MISO_DATA_DIR` and is sent only to the endpoint you
+configured. It is never returned to the browser, so Settings tells you a key is stored but
+cannot show it back to you.
 
 ## Project docs
 

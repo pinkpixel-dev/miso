@@ -4,15 +4,19 @@ import type {
   Catalog,
   CatalogPackage,
   Job,
+  PromptSuggestion,
   StudioState,
   StudioTask,
   TaskField,
 } from '../../shared/types.ts';
+import { api } from '../lib/api.ts';
 import { EMPTY_STUDIO, compilePrompt, supportsGuided, wantsLyrics } from '../lib/studio.ts';
 import { estimateSeconds } from '../lib/useJobs.ts';
 import { Disclosure } from './Disclosure.tsx';
 import { LyricsEditor } from './LyricsEditor.tsx';
 import { PromptBuilder } from './PromptBuilder.tsx';
+import { PromptSuggestionDialog } from './PromptSuggestionDialog.tsx';
+import { SavedPrompts } from './SavedPrompts.tsx';
 import { Button, Field, Panel, SegmentedControl, TextArea } from './ui.tsx';
 
 /**
@@ -120,6 +124,7 @@ export function GeneratePanel({
     params: Record<string, string | number>;
     title?: string;
     studio?: StudioState;
+    originalPrompt?: string;
   }) => Promise<boolean>;
 }) {
   const [taskId, setTaskId] = useState<string | undefined>();
@@ -129,6 +134,14 @@ export function GeneratePanel({
   const [builder, setBuilder] = useState<StudioState>(EMPTY_STUDIO);
   const [mode, setMode] = useState<Mode>('guided');
   const [submitting, setSubmitting] = useState(false);
+
+  // An accepted expansion replaces the prompt that is sent and keeps the one it
+  // came from, which is what the job records as the original.
+  const [enhanced, setEnhanced] = useState<{ original: string; text: string } | undefined>();
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestion, setSuggestion] = useState<PromptSuggestion | undefined>();
+  const [suggestBusy, setSuggestBusy] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | undefined>();
 
   const task = tasks.find((entry) => entry.id === taskId) ?? tasks[0];
   const packages = useMemo(() => (task ? packagesFor(catalog, task) : []), [catalog, task]);
@@ -153,8 +166,30 @@ export function GeneratePanel({
   const setValue = (name: string, value: string) =>
     setValues({ ...fieldValues, [name]: value });
 
-  const prompt = guided ? compilePrompt(builder) : (fieldValues.prompt ?? '').trim();
+  const written = guided ? compilePrompt(builder) : (fieldValues.prompt ?? '').trim();
+
+  // An expansion stops applying the moment the form it was made from changes,
+  // because a prompt written for a different set of chips is not an expansion
+  // of this one any more.
+  const stale = enhanced !== undefined && enhanced.original !== written;
+  const prompt = enhanced !== undefined && !stale ? enhanced.text : written;
   const instrumental = guided && !wantsLyrics(builder);
+
+  // The dialog opens on an answer, not on the request, so nobody is shown two
+  // empty boxes while a provider thinks about it. A failure before it opens has
+  // nowhere to go but the form itself.
+  const askForPrompt = async () => {
+    setSuggestBusy(true);
+    setSuggestError(undefined);
+    try {
+      setSuggestion(await api.enhancePrompt({ prompt: written, studio: guided ? builder : undefined }));
+      setSuggesting(true);
+    } catch (cause) {
+      setSuggestError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSuggestBusy(false);
+    }
+  };
 
   const plainFields = task.fields.filter(
     (field) => !field.advanced && !(guided && BUILT_BY_GUIDED.has(field.name)),
@@ -193,6 +228,7 @@ export function GeneratePanel({
       params,
       title: title.trim() === '' ? undefined : title.trim(),
       studio: guided ? builder : undefined,
+      originalPrompt: prompt === written ? undefined : written,
     });
     setSubmitting(false);
 
@@ -263,6 +299,9 @@ export function GeneratePanel({
             onBuilder={setBuilder}
             values={fieldValues}
             onValue={setValue}
+            onTitle={(next) => {
+              if (title.trim() === '') setTitle(next);
+            }}
           />
         ) : null}
 
@@ -274,6 +313,72 @@ export function GeneratePanel({
             onChange={(value) => setValue(field.name, value)}
           />
         ))}
+
+        {enhanced !== undefined && !stale ? (
+          <div className="flex flex-col gap-2 rounded-md border border-accent/40 bg-accent/5 px-3.5 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium text-ink">This is the prompt that will be sent</span>
+              <Button
+                type="button"
+                variant="ghost"
+                className="min-h-11"
+                onClick={() => setEnhanced(undefined)}
+              >
+                Use mine instead
+              </Button>
+            </div>
+            <p className="font-mono text-xs leading-relaxed text-ink-muted">{enhanced.text}</p>
+            <p className="text-sm text-ink-faint">
+              Your own prompt is kept with the take, so you can see the idea as well as the
+              expansion.
+            </p>
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            className="min-h-11"
+            busy={suggestBusy}
+            disabled={written === ''}
+            onClick={() => void askForPrompt()}
+          >
+            {suggestBusy ? 'Asking' : 'Make the prompt richer'}
+          </Button>
+
+          <SavedPrompts
+            kind="prompt"
+            body={prompt}
+            onLoad={(body) => {
+              // A saved prompt is a finished sentence, and guided mode would
+              // compile straight over it, so loading one moves to custom mode
+              // where it is the prompt.
+              setEnhanced(undefined);
+              setValues({ ...fieldValues, prompt: body });
+              setMode('custom');
+            }}
+          />
+        </div>
+
+        {suggestError !== undefined && !suggesting ? (
+          <p role="alert" className="rounded-md border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-ink">
+            {suggestError}
+          </p>
+        ) : null}
+
+        <PromptSuggestionDialog
+          open={suggesting}
+          suggestion={suggestion}
+          busy={suggestBusy}
+          error={suggesting ? suggestError : undefined}
+          onRetry={() => void askForPrompt()}
+          onAccept={(next) => setEnhanced({ original: written, text: next })}
+          onClose={() => {
+            setSuggesting(false);
+            setSuggestion(undefined);
+            setSuggestError(undefined);
+          }}
+        />
 
         {advancedFields.length > 0 ? (
           <Disclosure

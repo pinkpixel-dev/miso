@@ -5,11 +5,45 @@
  * of them, it belongs over there instead.
  */
 
+/**
+ * Which engine writes lyrics and expands prompts.
+ *
+ * Both speak the same protocol. llama.cpp's server exposes an OpenAI-compatible
+ * chat completions route, so "dual engine" is one client with two
+ * configurations, and the only real difference is that the local one needs no
+ * key. Both stay configured, and this says which one is used.
+ */
+export type LyricsEngine = 'external' | 'local';
+
 /** Settings the user can change, stored in the Miso database. */
 export interface Settings {
   /** Base URL of the audio.cpp server, no trailing slash. */
   backendUrl: string;
+  lyricsEngine: LyricsEngine;
+  /** An OpenAI-compatible base URL, including the version path. */
+  lyricsExternalUrl: string;
+  lyricsExternalModel: string;
+  /**
+   * Whether a key is stored, never the key itself. The key goes into the
+   * database and does not come back out to the browser: a settings screen that
+   * renders it puts it in a phone's memory, a screenshot, and a page source,
+   * for no benefit to anyone who already typed it once.
+   */
+  lyricsExternalKeySet: boolean;
+  /** A llama.cpp server, which needs no key. */
+  lyricsLocalUrl: string;
+  lyricsLocalModel: string;
 }
+
+/**
+ * What a settings update may carry.
+ *
+ * The key is write only. An empty string clears it, which is how a key is
+ * removed without a route of its own.
+ */
+export type SettingsPatch = Partial<Omit<Settings, 'lyricsExternalKeySet'>> & {
+  lyricsExternalKey?: string;
+};
 
 /**
  * What the Miso service knows about the audio.cpp server right now.
@@ -35,6 +69,42 @@ export interface BackendStatus {
   managementEnabled?: boolean;
   /** Human readable reason the check failed. Present only when unreachable. */
   error?: string;
+}
+
+export type SavedPromptKind = 'prompt' | 'lyrics';
+
+/**
+ * A prompt or a lyric sheet kept by name.
+ *
+ * Separate from job history, which records what was used. This records what
+ * somebody thought was worth using again, and it is not tied to a project.
+ */
+export interface SavedPrompt {
+  id: string;
+  kind: SavedPromptKind;
+  name: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A lyric sheet the assistant wrote, with the title it gave the song. */
+export interface LyricsDraft {
+  /** Absent when the model ignored the instruction to name the song. */
+  title?: string;
+  lyrics: string;
+}
+
+/**
+ * A richer prompt, offered rather than applied.
+ *
+ * `original` comes back with it so the browser can show what was sent against
+ * what came back, and so accepting one is a choice between two things on
+ * screen rather than a replacement that already happened.
+ */
+export interface PromptSuggestion {
+  original: string;
+  suggestion: string;
 }
 
 /** Shape of every error the Miso API returns. */
@@ -214,6 +284,13 @@ export interface Job {
   title?: string;
   /** Present when the guided builder wrote this job, absent when the form did. */
   studio?: StudioState;
+  /**
+   * What the person wrote, when the prompt that ran was an expansion of it.
+   *
+   * Absent on a job whose prompt was sent as written, which is how a take shows
+   * the idea as well as the paragraph the assistant made of it.
+   */
+  originalPrompt?: string;
   state: JobState;
   error?: string;
   attempts: number;
