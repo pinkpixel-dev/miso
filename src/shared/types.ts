@@ -259,10 +259,16 @@ export type JobState = 'queued' | 'staging' | 'running' | 'complete' | 'failed' 
  * answers.
  */
 export interface StudioState {
-  /** Genre chips, as chosen. Free text typed by hand goes in customStyle. */
-  genre: string[];
-  customStyle: string;
-  mood: string[];
+  /**
+   * Style words as typed: "synthwave, warm analogue tape".
+   *
+   * Until 2026-09-12 this was a list of genre chips with a separate free text
+   * box beside it. Both fold into this one field. Jobs written before then
+   * still open in the builder, because the service converts the old shape on
+   * the way in and again on the way back out.
+   */
+  style: string;
+  mood: string;
   vocalMode: VocalMode;
   /** Words for the voice itself: raspy, airy, soulful. */
   vocalStyle: string;
@@ -291,6 +297,15 @@ export interface Job {
    * the idea as well as the paragraph the assistant made of it.
    */
   originalPrompt?: string;
+  /**
+   * When the queue was last cleared past this job.
+   *
+   * The row survives either way. It is the only record of the prompt, the
+   * lyrics and the settings that made the take, and the take detail panel
+   * reads it back. Clearing hides finished work from the queue, it never
+   * deletes it.
+   */
+  dismissedAt?: string;
   state: JobState;
   error?: string;
   attempts: number;

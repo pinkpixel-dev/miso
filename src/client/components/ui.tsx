@@ -257,62 +257,6 @@ export function Pill({ tone, children }: { tone: 'good' | 'bad' | 'warn' | 'neut
 }
 
 /**
- * A row of choices that can each be on or off.
- *
- * Every chip is a real button with aria-pressed, so a screen reader says
- * "Synthwave, pressed" rather than reading a styled div, and the keyboard tabs
- * through them in order. They are 44 pixels tall because this app gets used on
- * a phone, where anything smaller is a game of chance.
- */
-export function ChipGroup({
-  label,
-  options,
-  selected,
-  onToggle,
-  hint,
-}: {
-  label: string;
-  options: string[];
-  selected: string[];
-  onToggle: (value: string) => void;
-  hint?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <span id={`chips-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} className="text-sm font-medium text-ink">
-        {label}
-      </span>
-      <div
-        role="group"
-        aria-labelledby={`chips-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
-        className="flex flex-wrap gap-2"
-      >
-        {options.map((option) => {
-          const on = selected.includes(option);
-          return (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onToggle(option)}
-              className={cx(
-                'inline-flex min-h-11 items-center rounded-full border px-4 text-sm transition-colors duration-150',
-                on
-                  ? 'border-accent bg-accent text-accent-ink hover:bg-accent/90 active:bg-accent/80'
-                  : 'border-line bg-raised text-ink-muted hover:border-line-strong hover:text-ink active:bg-raised/70',
-              )}
-            >
-              {option}
-            </button>
-          );
-        })}
-      </div>
-      {hint ? <p className="text-sm text-ink-faint">{hint}</p> : null}
-    </div>
-  );
-}
-
-/**
  * One choice out of a few, laid out as a row.
  *
  * These are real radio inputs with the box hidden, which is what makes the

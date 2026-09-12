@@ -24,9 +24,8 @@ describe('parseTitle', () => {
 
 describe('parseStudioState', () => {
   const good = {
-    genre: ['Synthwave'],
-    mood: ['Dreamy'],
-    customStyle: 'warm analogue tape',
+    style: 'synthwave, warm analogue tape',
+    mood: 'dreamy',
     vocalStyle: 'airy',
     vocalMode: 'female',
   };
@@ -40,17 +39,11 @@ describe('parseStudioState', () => {
     expect(parseStudioState(null)).toEqual({ ok: true, value: undefined });
   });
 
-  it('fills in the lists and the free text that were left out', () => {
-    const result = parseStudioState({ vocalMode: 'instrumental' });
-    expect(result).toEqual({
+  it('fills in the boxes that were left out', () => {
+    expect(parseStudioState({ vocalMode: 'instrumental' })).toEqual({
       ok: true,
-      value: { genre: [], mood: [], customStyle: '', vocalStyle: '', vocalMode: 'instrumental' },
+      value: { style: '', mood: '', vocalStyle: '', vocalMode: 'instrumental' },
     });
-  });
-
-  it('drops a chip picked twice', () => {
-    const result = parseStudioState({ ...good, genre: ['Pop', 'Pop', ' Pop '] });
-    expect(result.ok && result.value?.genre).toEqual(['Pop']);
   });
 
   it('refuses a vocal mode that is not one of the four', () => {
@@ -63,13 +56,59 @@ describe('parseStudioState', () => {
     expect(parseStudioState([good])).toMatchObject({ ok: false });
   });
 
-  it('bounds every string and every list', () => {
-    expect(parseStudioState({ ...good, genre: Array(25).fill('Pop') })).toMatchObject({ ok: false });
-    expect(parseStudioState({ ...good, genre: ['x'.repeat(61)] })).toMatchObject({ ok: false });
-    expect(parseStudioState({ ...good, customStyle: 'x'.repeat(401) })).toMatchObject({ ok: false });
+  it('bounds every box', () => {
+    expect(parseStudioState({ ...good, style: 'x'.repeat(601) })).toMatchObject({ ok: false });
+    expect(parseStudioState({ ...good, mood: 'x'.repeat(601) })).toMatchObject({ ok: false });
     expect(parseStudioState({ ...good, vocalStyle: 'x'.repeat(401) })).toMatchObject({ ok: false });
-    expect(parseStudioState({ ...good, genre: [7] })).toMatchObject({ ok: false });
-    expect(parseStudioState({ ...good, genre: 'Pop' })).toMatchObject({ ok: false });
+    expect(parseStudioState({ ...good, style: 7 })).toMatchObject({ ok: false });
+  });
+});
+
+/**
+ * The builder collected chips until 2026-09-12. Jobs it wrote are still in the
+ * database and are still opened by the builder and by the take detail panel, so
+ * the parser reads both shapes and answers in the current one.
+ */
+describe('parseStudioState on a row the chip builder wrote', () => {
+  const legacy = {
+    genre: ['Synthwave', 'Lo-Fi'],
+    mood: ['Dreamy', 'Melancholic'],
+    customStyle: 'warm analogue tape',
+    vocalStyle: 'airy',
+    vocalMode: 'female',
+  };
+
+  it('joins the chip lists into the boxes that replaced them', () => {
+    const result = parseStudioState(legacy);
+    expect(result).toMatchObject({ ok: true });
+    expect(result.ok && result.value).toEqual({
+      style: 'Synthwave, Lo-Fi, warm analogue tape',
+      mood: 'Dreamy, Melancholic',
+      vocalStyle: 'airy',
+      vocalMode: 'female',
+    });
+  });
+
+  it('folds the old free text box onto the end of the style', () => {
+    const result = parseStudioState({ genre: [], customStyle: 'brushed drums', vocalMode: 'male' });
+    expect(result.ok && result.value?.style).toBe('brushed drums');
+  });
+
+  it('drops a chip that was picked twice', () => {
+    const result = parseStudioState({ ...legacy, genre: ['Pop', 'Pop', ' Pop '] });
+    expect(result.ok && result.value?.style).toBe('Pop, warm analogue tape');
+  });
+
+  it('still refuses a list that is too long or holds something that is not text', () => {
+    expect(parseStudioState({ ...legacy, genre: Array(25).fill('Pop') })).toMatchObject({
+      ok: false,
+    });
+    expect(parseStudioState({ ...legacy, genre: [7] })).toMatchObject({ ok: false });
+  });
+
+  it('prefers the new box when a row somehow carries both', () => {
+    const result = parseStudioState({ ...legacy, style: 'house' });
+    expect(result.ok && result.value?.style).toBe('house, warm analogue tape');
   });
 });
 

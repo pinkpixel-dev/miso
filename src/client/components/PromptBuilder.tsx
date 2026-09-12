@@ -1,24 +1,31 @@
+import { Eraser, Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { LyricsDraft, StudioState, StudioTask, TaskField } from '../../shared/types.ts';
-import { GENRES, KEYS, MOODS, VOCAL_MODES, compilePrompt, wantsLyrics } from '../lib/studio.ts';
+import { KEYS, VOCAL_MODES, compilePrompt, wantsLyrics } from '../lib/studio.ts';
+import { BuilderCard } from './BuilderCard.tsx';
 import { LyricsAssistant } from './LyricsAssistant.tsx';
 import { LyricsEditor } from './LyricsEditor.tsx';
 import { SavedPrompts } from './SavedPrompts.tsx';
-import { Button, ChipGroup, Field, SegmentedControl, cx } from './ui.tsx';
+import { Button, Field, IconButton, SegmentedControl, cx } from './ui.tsx';
 
 /**
  * The guided prompt builder.
  *
- * Two kinds of control sit side by side here and they behave differently. The
- * chips and the vocal toggle feed the compiler, which writes the prompt; the
+ * Every descriptor is a box. It used to be rows of genre and mood chips, which
+ * looked helpful and quietly decided what kind of music existed: anything not
+ * on the list needed a second box underneath to say it in. One box says it all
+ * in the same place, and the compiler stopped lowercasing as a result, because
+ * there is no longer a title-case button label to undo.
+ *
+ * Two kinds of control still sit side by side and behave differently. The style
+ * boxes and the vocal toggle feed the compiler, which writes the prompt; the
  * tempo, the key, and the lyrics are task parameters and go straight through
  * under their own names. Which is which is decided by the compiler, not by this
  * file, so a parameter arriving in the registry later shows up in the advanced
  * drawer rather than silently going missing.
  *
- * The compiled prompt is shown, not hidden. A builder that generated a sentence
- * nobody could read would be a black box with chips on it, and the first thing
- * anyone wants to know is what was actually sent.
+ * The compiled prompt is shown, not hidden. The first thing anybody wants to
+ * know is what was actually sent.
  */
 
 /** Two seconds without a tap ends the measurement and starts a new one. */
@@ -156,6 +163,9 @@ export function PromptBuilder({
   values,
   onValue,
   onTitle,
+  onEnhance,
+  enhanceBusy,
+  canEnhance,
 }: {
   task: StudioTask;
   builder: StudioState;
@@ -164,144 +174,163 @@ export function PromptBuilder({
   onValue: (name: string, value: string) => void;
   /** Used only when the assistant named the song and the title box is empty. */
   onTitle: (title: string) => void;
+  onEnhance: () => void;
+  enhanceBusy: boolean;
+  canEnhance: boolean;
 }) {
   const [writing, setWriting] = useState(false);
   const field = (name: string) => task.fields.find((entry) => entry.name === name);
-
-  const toggle = (key: 'genre' | 'mood', option: string) => {
-    const current = builder[key];
-    onBuilder({
-      ...builder,
-      [key]: current.includes(option)
-        ? current.filter((entry) => entry !== option)
-        : [...current, option],
-    });
-  };
 
   const prompt = compilePrompt(builder);
   const lyricsField = field('lyrics');
   const bpmField = field('bpm');
   const keyField = field('keyscale');
   const instrumental = !wantsLyrics(builder);
+  const lyrics = lyricsField ? (values[lyricsField.name] ?? '') : '';
 
   return (
-    <div className="flex flex-col gap-6">
-      <ChipGroup
-        label="Style"
-        options={GENRES}
-        selected={builder.genre}
-        onToggle={(option) => toggle('genre', option)}
-      />
-
-      <Field
-        label="Anything else about the style"
-        placeholder="warm analogue tape, brushed drums"
-        hint="Typed exactly as you write it, added to the prompt after the chips."
-        value={builder.customStyle}
-        onChange={(event) => onBuilder({ ...builder, customStyle: event.target.value })}
-      />
-
-      <ChipGroup
-        label="Mood"
-        options={MOODS}
-        selected={builder.mood}
-        onToggle={(option) => toggle('mood', option)}
-      />
-
-      <SegmentedControl
-        label="Vocals"
-        name="vocal-mode"
-        options={VOCAL_MODES}
-        value={builder.vocalMode}
-        onChange={(value) => onBuilder({ ...builder, vocalMode: value })}
-      />
-
-      {instrumental ? null : (
-        <Field
-          label="Voice"
-          placeholder="raspy, airy, soulful"
-          hint="Words for the singer rather than the song."
-          value={builder.vocalStyle}
-          onChange={(event) => onBuilder({ ...builder, vocalStyle: event.target.value })}
-        />
-      )}
-
-      <div className="grid gap-6 sm:grid-cols-2">
-        {bpmField ? (
-          <TempoControl
-            field={bpmField}
-            value={values[bpmField.name] ?? ''}
-            onChange={(next) => onValue(bpmField.name, next)}
+    <>
+      <BuilderCard
+        id="style"
+        title="Style"
+        actions={
+          <IconButton
+            label={enhanceBusy ? 'Asking for a richer prompt' : 'Make the prompt richer'}
+            icon={Sparkles}
+            variant="primary"
+            disabled={!canEnhance || enhanceBusy}
+            onClick={onEnhance}
           />
-        ) : null}
-        {keyField ? (
-          <KeyControl
-            field={keyField}
-            value={values[keyField.name] ?? ''}
-            onChange={(next) => onValue(keyField.name, next)}
+        }
+      >
+        <div className="flex flex-col gap-5">
+          <Field
+            label="Style"
+            placeholder="synthwave, warm analogue tape, brushed drums"
+            hint="The kind of music and how it should sound, in your own words."
+            value={builder.style}
+            onChange={(event) => onBuilder({ ...builder, style: event.target.value })}
           />
-        ) : null}
-      </div>
+
+          <Field
+            label="Mood"
+            placeholder="melancholic, driving"
+            value={builder.mood}
+            onChange={(event) => onBuilder({ ...builder, mood: event.target.value })}
+          />
+
+          <SegmentedControl
+            label="Vocals"
+            name="vocal-mode"
+            options={VOCAL_MODES}
+            value={builder.vocalMode}
+            onChange={(value) => onBuilder({ ...builder, vocalMode: value })}
+          />
+
+          {instrumental ? null : (
+            <Field
+              label="Voice"
+              placeholder="raspy, airy, soulful"
+              hint="Words for the singer rather than the song."
+              value={builder.vocalStyle}
+              onChange={(event) => onBuilder({ ...builder, vocalStyle: event.target.value })}
+            />
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-ink">The prompt this builds</span>
+            <p
+              aria-live="polite"
+              className={cx(
+                'rounded-md border border-line bg-canvas px-3.5 py-3 font-mono text-xs leading-relaxed',
+                prompt === '' ? 'text-ink-faint' : 'text-ink-muted',
+              )}
+            >
+              {prompt === '' ? 'Describe a style or a mood and the prompt appears here.' : prompt}
+            </p>
+          </div>
+        </div>
+      </BuilderCard>
 
       {lyricsField ? (
-        <div className="flex flex-col gap-3">
-          <LyricsEditor
-            label={lyricsField.label}
-            hint={
-              instrumental
-                ? 'Not used while the vocals are set to instrumental. Nothing you have written is lost.'
-                : 'Section tags tell the model where the chorus is.'
-            }
-            disabled={instrumental}
-            value={values[lyricsField.name] ?? ''}
-            onChange={(next) => onValue(lyricsField.name, next)}
-          />
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              className="min-h-11"
+        <BuilderCard
+          id="lyrics"
+          title={lyricsField.label}
+          actions={
+            <>
+              <IconButton
+                label="Clear the lyrics"
+                icon={Eraser}
+                disabled={instrumental || lyrics === ''}
+                onClick={() => onValue(lyricsField.name, '')}
+              />
+              <IconButton
+                label="Write lyrics for me"
+                icon={Sparkles}
+                variant="primary"
+                disabled={instrumental}
+                onClick={() => setWriting(true)}
+              />
+            </>
+          }
+        >
+          <div className="flex flex-col gap-3">
+            <LyricsEditor
+              label={lyricsField.label}
+              hint={
+                instrumental
+                  ? 'Not used while the vocals are set to instrumental. Nothing you have written is lost.'
+                  : 'Section tags tell the model where the chorus is.'
+              }
               disabled={instrumental}
-              onClick={() => setWriting(true)}
-            >
-              Write lyrics for me
-            </Button>
+              value={lyrics}
+              onChange={(next) => onValue(lyricsField.name, next)}
+            />
+
             <SavedPrompts
               kind="lyrics"
-              body={values[lyricsField.name] ?? ''}
+              body={lyrics}
               disabled={instrumental}
               onLoad={(body) => onValue(lyricsField.name, body)}
             />
-          </div>
 
-          <LyricsAssistant
-            open={writing}
-            studio={builder}
-            hasLyrics={(values[lyricsField.name] ?? '').trim() !== ''}
-            onApply={(draft: LyricsDraft) => {
-              onValue(lyricsField.name, draft.lyrics);
-              // The title the assistant gave the song is only used when the
-              // box is empty. Overwriting a name somebody chose would be the
-              // assistant deciding what the song is called.
-              if (draft.title !== undefined) onTitle(draft.title);
-            }}
-            onClose={() => setWriting(false)}
-          />
-        </div>
+            <LyricsAssistant
+              open={writing}
+              studio={builder}
+              hasLyrics={lyrics.trim() !== ''}
+              onApply={(draft: LyricsDraft) => {
+                onValue(lyricsField.name, draft.lyrics);
+                // The title the assistant gave the song is only used when the
+                // box is empty. Overwriting a name somebody chose would be the
+                // assistant deciding what the song is called.
+                if (draft.title !== undefined) onTitle(draft.title);
+              }}
+              onClose={() => setWriting(false)}
+            />
+          </div>
+        </BuilderCard>
       ) : null}
 
-      <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ink">The prompt this builds</span>
-        <p
-          aria-live="polite"
-          className={cx(
-            'rounded-md border border-line bg-canvas px-3.5 py-3 font-mono text-xs leading-relaxed',
-            prompt === '' ? 'text-ink-faint' : 'text-ink-muted',
-          )}
-        >
-          {prompt === '' ? 'Pick a style or a mood and the prompt appears here.' : prompt}
-        </p>
-      </div>
-    </div>
+      {bpmField ?? keyField ? (
+        <BuilderCard id="more" title="More options" defaultOpen={false}>
+          <div className="grid gap-6 sm:grid-cols-2">
+            {bpmField ? (
+              <TempoControl
+                field={bpmField}
+                value={values[bpmField.name] ?? ''}
+                onChange={(next) => onValue(bpmField.name, next)}
+              />
+            ) : null}
+            {keyField ? (
+              <KeyControl
+                field={keyField}
+                value={values[keyField.name] ?? ''}
+                onChange={(next) => onValue(keyField.name, next)}
+              />
+            ) : null}
+          </div>
+        </BuilderCard>
+      ) : null}
+    </>
   );
 }

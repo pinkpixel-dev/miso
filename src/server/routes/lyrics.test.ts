@@ -100,7 +100,10 @@ describe('POST /api/lyrics/write', () => {
     const body = JSON.parse((mock.mock.calls[0]?.[1] as RequestInit).body as string) as {
       messages: { content: string }[];
     };
-    expect(body.messages[1]?.content).toContain('Genre: Synthwave');
+    // The body above is the shape the chip builder posted. It is still
+    // accepted, and it reaches the model as the one Style line that replaced
+    // the genre list and the style notes box.
+    expect(body.messages[1]?.content).toContain('Style: Synthwave');
     expect(body.messages[1]?.content).toContain('driving home');
   });
 

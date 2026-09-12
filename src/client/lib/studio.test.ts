@@ -9,28 +9,37 @@ function state(patch: Partial<StudioState>): StudioState {
 describe('compilePrompt', () => {
   it('reads as the kind of music, how it feels, then who is singing', () => {
     const prompt = compilePrompt(
-      state({ genre: ['Synthwave'], mood: ['Dreamy'], vocalStyle: 'airy', vocalMode: 'female' }),
+      state({ style: 'synthwave', mood: 'dreamy', vocalStyle: 'airy', vocalMode: 'female' }),
     );
 
     expect(prompt).toBe('synthwave, dreamy, airy female vocals');
   });
 
-  it('lowercases the chips and leaves typed words exactly as typed', () => {
+  it('leaves every word exactly as it was typed', () => {
+    // The chips were lowercased on the way out because they were title case for
+    // the buttons. Boxes have no such excuse, and flattening a proper noun
+    // would be rewriting somebody's words.
     const prompt = compilePrompt(
-      state({ genre: ['Lo-Fi'], customStyle: 'in the style of Chopin', vocalMode: 'instrumental' }),
+      state({ style: 'Lo-Fi, in the style of Chopin', vocalMode: 'instrumental' }),
     );
 
-    expect(prompt).toBe('lo-fi, in the style of Chopin, instrumental, no vocals');
+    expect(prompt).toBe('Lo-Fi, in the style of Chopin, instrumental, no vocals');
+  });
+
+  it('keeps the style box and the mood box in the order they appear', () => {
+    expect(compilePrompt(state({ style: 'house', mood: 'euphoric', vocalMode: 'male' }))).toBe(
+      'house, euphoric, male vocals',
+    );
   });
 
   it('says there are no vocals rather than saying nothing about them', () => {
-    expect(compilePrompt(state({ genre: ['Ambient'], vocalMode: 'instrumental' }))).toBe(
+    expect(compilePrompt(state({ style: 'ambient', vocalMode: 'instrumental' }))).toBe(
       'ambient, instrumental, no vocals',
     );
   });
 
   it('names both voices for a duet', () => {
-    expect(compilePrompt(state({ genre: ['Folk'], vocalMode: 'duet' }))).toBe(
+    expect(compilePrompt(state({ style: 'folk', vocalMode: 'duet' }))).toBe(
       'folk, male and female duet vocals',
     );
   });
@@ -42,10 +51,8 @@ describe('compilePrompt', () => {
     expect(compilePrompt(state({ vocalStyle: 'raspy' }))).toBe('');
   });
 
-  it('ignores a chip or a style that is only whitespace', () => {
-    expect(compilePrompt(state({ genre: ['Pop', '  '], customStyle: '   ' }))).toBe(
-      'pop, female vocals',
-    );
+  it('ignores a box holding only whitespace', () => {
+    expect(compilePrompt(state({ style: 'pop', mood: '   ' }))).toBe('pop, female vocals');
   });
 });
 

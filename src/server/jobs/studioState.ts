@@ -16,8 +16,10 @@ import type { StudioState, VocalMode } from '../../shared/types.ts';
  */
 
 const MAX_TITLE = 120;
-const MAX_CHIPS = 24;
-const MAX_CHIP = 60;
+/** One descriptor box holds what a row of chips plus a free text box used to. */
+const MAX_DESCRIPTOR = 600;
+/** Only reached by a job written before the boxes replaced the chips. */
+const MAX_LEGACY_CHIPS = 24;
 const MAX_FREE_TEXT = 400;
 const MAX_PROMPT = 4_000;
 
@@ -62,26 +64,45 @@ export function parseOriginalPrompt(
   return { ok: true, value: original };
 }
 
-function parseChips(raw: unknown, label: string): StudioResult<string[]> {
-  if (raw === undefined || raw === null) return { ok: true, value: [] };
-  if (!Array.isArray(raw)) return { ok: false, error: `${label} must be a list` };
-  if (raw.length > MAX_CHIPS) {
-    return { ok: false, error: `${label} cannot have more than ${MAX_CHIPS} entries` };
-  }
+/**
+ * One descriptor box, from either shape it can arrive in.
+ *
+ * The builder collected chips until 2026-09-12, so genre and mood were lists.
+ * They are text boxes now and arrive as strings. A list is joined rather than
+ * refused, because the rows it wrote are still in the database and still open
+ * in the builder. That is the only reason this function knows about arrays, and
+ * nothing writes one any more.
+ */
+function parseDescriptor(raw: unknown, label: string): StudioResult<string> {
+  if (raw === undefined || raw === null) return { ok: true, value: '' };
 
-  const chips: string[] = [];
-  for (const entry of raw) {
-    if (typeof entry !== 'string') return { ok: false, error: `Every ${label} entry must be text` };
-    const chip = entry.trim();
-    if (chip === '') continue;
-    if (chip.length > MAX_CHIP) {
-      return { ok: false, error: `A ${label} entry cannot be longer than ${MAX_CHIP} characters` };
+  let text: string;
+
+  if (Array.isArray(raw)) {
+    if (raw.length > MAX_LEGACY_CHIPS) {
+      return { ok: false, error: `${label} cannot have more than ${MAX_LEGACY_CHIPS} entries` };
     }
-    // Picking the same chip twice is a double click, not an instruction.
-    if (!chips.includes(chip)) chips.push(chip);
+
+    const parts: string[] = [];
+    for (const entry of raw) {
+      if (typeof entry !== 'string') {
+        return { ok: false, error: `Every ${label} entry must be text` };
+      }
+      const part = entry.trim();
+      // The same chip twice was a double click, not an instruction.
+      if (part !== '' && !parts.includes(part)) parts.push(part);
+    }
+    text = parts.join(', ');
+  } else if (typeof raw === 'string') {
+    text = raw.trim();
+  } else {
+    return { ok: false, error: `${label} must be text` };
   }
 
-  return { ok: true, value: chips };
+  if (text.length > MAX_DESCRIPTOR) {
+    return { ok: false, error: `${label} cannot be longer than ${MAX_DESCRIPTOR} characters` };
+  }
+  return { ok: true, value: text };
 }
 
 function parseFreeText(raw: unknown, label: string): StudioResult<string> {
@@ -96,10 +117,15 @@ function parseFreeText(raw: unknown, label: string): StudioResult<string> {
 }
 
 /**
- * Reads the builder state off a request body.
+ * Reads the builder state, both off a request body and back off a stored row.
  *
  * An absent state is not an error. It means the job was written from the plain
  * form, which is a supported way to work rather than a degraded one.
+ *
+ * Running on the read path as well is what lets the shape change without a data
+ * migration. A row written by the chip builder holds lists and a customStyle
+ * where the builder now wants one string, and `toJob` sends it through here so
+ * the rest of the app only ever sees the current shape.
  */
 export function parseStudioState(raw: unknown): StudioResult<StudioState | undefined> {
   if (raw === undefined || raw === null) return { ok: true, value: undefined };
@@ -109,14 +135,22 @@ export function parseStudioState(raw: unknown): StudioResult<StudioState | undef
 
   const input = raw as Record<string, unknown>;
 
-  const genre = parseChips(input.genre, 'genre');
-  if (!genre.ok) return genre;
+  // `style` is the box. `genre` is what the chip builder wrote and
+  // `customStyle` is the free text box that sat under it, so both fold into
+  // style in the order they appeared on screen.
+  const style = parseDescriptor(input.style ?? input.genre, 'The style');
+  if (!style.ok) return style;
 
-  const mood = parseChips(input.mood, 'mood');
+  const legacyCustom = parseDescriptor(input.customStyle, 'The custom style');
+  if (!legacyCustom.ok) return legacyCustom;
+
+  const combined = [style.value, legacyCustom.value].filter((part) => part !== '').join(', ');
+  if (combined.length > MAX_DESCRIPTOR) {
+    return { ok: false, error: `The style cannot be longer than ${MAX_DESCRIPTOR} characters` };
+  }
+
+  const mood = parseDescriptor(input.mood, 'The mood');
   if (!mood.ok) return mood;
-
-  const customStyle = parseFreeText(input.customStyle, 'The custom style');
-  if (!customStyle.ok) return customStyle;
 
   const vocalStyle = parseFreeText(input.vocalStyle, 'The vocal style');
   if (!vocalStyle.ok) return vocalStyle;
@@ -129,9 +163,8 @@ export function parseStudioState(raw: unknown): StudioResult<StudioState | undef
   return {
     ok: true,
     value: {
-      genre: genre.value,
+      style: combined,
       mood: mood.value,
-      customStyle: customStyle.value,
       vocalStyle: vocalStyle.value,
       vocalMode: mode as VocalMode,
     },

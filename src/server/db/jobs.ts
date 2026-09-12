@@ -1,5 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import type { Job, JobState, StudioState } from '../../shared/types.ts';
+import { parseStudioState } from '../jobs/studioState.ts';
 
 /**
  * Job rows, their lineage links, and the record of what Miso has staged to a
@@ -29,6 +30,7 @@ interface Record_ {
   updated_at: string;
   started_at: string | null;
   finished_at: string | null;
+  dismissed_at: string | null;
 }
 
 export interface NewJob {
@@ -63,10 +65,15 @@ function toJob(handle: Database, record: Record_): Job {
 
   // Same reasoning for the builder state, one step further: a job without it
   // simply opens in the plain form instead of the builder.
+  //
+  // It goes back through the parser rather than being cast, because a row the
+  // chip builder wrote holds lists where the builder now wants strings, and the
+  // take detail panel reads these rows straight back.
   let studio: StudioState | undefined;
   if (record.studio !== null) {
     try {
-      studio = JSON.parse(record.studio) as StudioState;
+      const parsed = parseStudioState(JSON.parse(record.studio));
+      studio = parsed.ok ? parsed.value : undefined;
     } catch {
       studio = undefined;
     }
@@ -88,6 +95,7 @@ function toJob(handle: Database, record: Record_): Job {
     updatedAt: record.updated_at,
     startedAt: record.started_at ?? undefined,
     finishedAt: record.finished_at ?? undefined,
+    dismissedAt: record.dismissed_at ?? undefined,
     outputAssetIds: outputs.map((row) => row.id),
   };
 }
@@ -102,6 +110,29 @@ export function listJobs(handle: Database, projectId: string): Job[] {
     .prepare('SELECT * FROM jobs WHERE project_id = ? ORDER BY created_at DESC, rowid DESC')
     .all(projectId) as Record_[];
   return records.map((record) => toJob(handle, record));
+}
+
+/**
+ * Hides every finished job in a project, and answers with how many moved.
+ *
+ * This is what clearing the queue does. Anything still queued, staging or
+ * running is left alone: hiding work that has not happened yet would take the
+ * only progress report off the screen.
+ *
+ * Nothing is deleted, deliberately. The row is the only record of the prompt,
+ * the lyrics and the settings behind a take, and the take detail panel reads it
+ * back. A row already hidden is not touched again, so the timestamp keeps
+ * saying when the queue was first cleared past it.
+ */
+export function dismissFinishedJobs(handle: Database, projectId: string): number {
+  const result = handle
+    .prepare(
+      `UPDATE jobs SET dismissed_at = datetime('now')
+       WHERE project_id = ? AND dismissed_at IS NULL
+         AND state IN ('complete','failed','cancelled')`,
+    )
+    .run(projectId);
+  return result.changes;
 }
 
 /** Every job still waiting or in flight, across all projects, oldest first. */

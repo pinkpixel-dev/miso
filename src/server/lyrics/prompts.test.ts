@@ -3,9 +3,8 @@ import type { StudioState } from '../../shared/types.ts';
 import { describeStudio, readLyrics, readPrompt } from './prompts.ts';
 
 const state: StudioState = {
-  genre: ['Synthwave'],
-  mood: ['Dreamy'],
-  customStyle: 'warm analogue tape',
+  style: 'synthwave, warm analogue tape',
+  mood: 'dreamy',
   vocalStyle: 'airy',
   vocalMode: 'female',
 };
@@ -61,9 +60,8 @@ describe('describeStudio', () => {
     const described = describeStudio(state, 'synthwave, dreamy, airy female vocals');
 
     expect(described).toContain('Current prompt: synthwave, dreamy, airy female vocals');
-    expect(described).toContain('Genre: Synthwave');
-    expect(described).toContain('Mood: Dreamy');
-    expect(described).toContain('Style notes: warm analogue tape');
+    expect(described).toContain('Style: synthwave, warm analogue tape');
+    expect(described).toContain('Mood: dreamy');
     expect(described).toContain('Vocals: female, airy');
   });
 

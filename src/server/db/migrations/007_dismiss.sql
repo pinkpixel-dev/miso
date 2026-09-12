@@ -1,0 +1,11 @@
+-- Clearing the queue hides finished jobs. It does not delete them.
+--
+-- A job row holds the prompt, the lyrics, the seed and every other setting that
+-- produced a take. It is the only record of how a track came to exist, and the
+-- take detail panel reads it back to answer "what made this" and to put that
+-- prompt into the builder again. Deleting rows to tidy a screen would throw
+-- that away permanently, so the queue clears by writing a timestamp here and
+-- the list filters on it.
+--
+-- Null means never cleared, which is every row that already exists.
+ALTER TABLE jobs ADD COLUMN dismissed_at TEXT;

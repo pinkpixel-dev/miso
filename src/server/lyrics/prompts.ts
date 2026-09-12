@@ -35,9 +35,12 @@ export function describeStudio(state: StudioState | undefined, prompt: string): 
   if (!state) return prompt;
 
   const lines: string[] = [`Current prompt: ${prompt}`];
-  if (state.genre.length > 0) lines.push(`Genre: ${state.genre.join(', ')}`);
-  if (state.mood.length > 0) lines.push(`Mood: ${state.mood.join(', ')}`);
-  if (state.customStyle !== '') lines.push(`Style notes: ${state.customStyle}`);
+  // One Style line rather than a Genre line and a Style notes line. The
+  // builder used to collect a chip list and a free text box separately; it is
+  // one box now, and splitting it back apart here would be inventing a
+  // distinction the person never made.
+  if (state.style !== '') lines.push(`Style: ${state.style}`);
+  if (state.mood !== '') lines.push(`Mood: ${state.mood}`);
   lines.push(
     state.vocalMode === 'instrumental'
       ? 'Vocals: none, this is an instrumental'

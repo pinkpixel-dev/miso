@@ -92,9 +92,8 @@ describe('POST /api/projects/:id/jobs', () => {
 
   it('keeps the song title and the builder state beside the job', async () => {
     const studio = {
-      genre: ['Synthwave'],
-      mood: ['Dreamy'],
-      customStyle: 'warm analogue tape',
+      style: 'synthwave, warm analogue tape',
+      mood: 'dreamy',
       vocalStyle: 'airy',
       vocalMode: 'female',
     };
@@ -114,6 +113,40 @@ describe('POST /api/projects/:id/jobs', () => {
     const listed = (await (await app().request(`/api/projects/${projectId}/jobs`)).json()) as Job[];
     expect(listed[0]?.title).toBe('Midnight Drive');
     expect(listed[0]?.studio).toEqual(studio);
+  });
+
+  it('accepts the builder state the chip builder wrote and answers in the new shape', async () => {
+    // The body the old builder posted, and the shape rows in existing
+    // databases still hold. Both have to keep working, which is what let the
+    // boxes replace the chips without a data migration.
+    const legacy = {
+      genre: ['Synthwave', 'Lo-Fi'],
+      mood: ['Dreamy'],
+      customStyle: 'warm analogue tape',
+      vocalStyle: 'airy',
+      vocalMode: 'female',
+    };
+
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({ ...good, studio: legacy }),
+    );
+    expect(response.status).toBe(201);
+
+    const expected = {
+      style: 'Synthwave, Lo-Fi, warm analogue tape',
+      mood: 'Dreamy',
+      vocalStyle: 'airy',
+      vocalMode: 'female',
+    };
+
+    const created = (await response.json()) as Job;
+    expect(created.studio).toEqual(expected);
+
+    // Read back off the row as well, because that is the path the take detail
+    // panel takes and it normalises separately from the write.
+    const listed = (await (await app().request(`/api/projects/${projectId}/jobs`)).json()) as Job[];
+    expect(listed[0]?.studio).toEqual(expected);
   });
 
   it('queues a job written from the plain form, with neither of them', async () => {

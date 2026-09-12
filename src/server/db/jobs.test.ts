@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { insertAsset } from './assets.ts';
 import {
   createJob,
+  dismissFinishedJobs,
   failInterruptedJobs,
   listJobInputs,
   listJobs,
@@ -42,6 +43,45 @@ describe('jobs', () => {
     expect(job.params).toEqual({ prompt: 'synth pop' });
     expect(job.attempts).toBe(0);
     expect(job.startedAt).toBeUndefined();
+  });
+
+  it('clears finished jobs by hiding them, and leaves live ones alone', () => {
+    queue('done');
+    queue('broke');
+    queue('waiting');
+    setJobState(handle, 'done', 'complete');
+    setJobState(handle, 'broke', 'failed');
+
+    expect(dismissFinishedJobs(handle, projectId)).toBe(2);
+
+    const byId = new Map(listJobs(handle, projectId).map((job) => [job.id, job]));
+    expect(byId.get('done')?.dismissedAt).toBeDefined();
+    expect(byId.get('broke')?.dismissedAt).toBeDefined();
+    // Hiding work that has not happened yet would take the only progress
+    // report off the screen.
+    expect(byId.get('waiting')?.dismissedAt).toBeUndefined();
+  });
+
+  it('keeps the row and its params when the queue is cleared', () => {
+    queue('done');
+    setJobState(handle, 'done', 'complete');
+    dismissFinishedJobs(handle, projectId);
+
+    // This is the whole reason clearing hides rather than deletes: the take can
+    // still say what made it.
+    const job = readJob(handle, 'done');
+    expect(job?.params).toEqual({ prompt: 'synth pop' });
+    expect(job?.state).toBe('complete');
+  });
+
+  it('does not restamp a job the queue was already cleared past', () => {
+    queue('done');
+    setJobState(handle, 'done', 'complete');
+    dismissFinishedJobs(handle, projectId);
+    const first = readJob(handle, 'done')?.dismissedAt;
+
+    expect(dismissFinishedJobs(handle, projectId)).toBe(0);
+    expect(readJob(handle, 'done')?.dismissedAt).toBe(first);
   });
 
   it('stamps started_at once and finished_at at the end', () => {

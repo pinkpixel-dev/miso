@@ -3,7 +3,8 @@ import type { StudioState, VocalMode } from '../../shared/types.ts';
 /**
  * The prompt compiler.
  *
- * The guided builder collects chips and toggles. The model wants a sentence.
+ * The guided builder collects a few boxes and a toggle. The model wants a
+ * sentence.
  * This is the only place that turns one into the other, and it runs in the
  * browser so the words can be shown before anything is queued: the builder puts
  * the compiled prompt on screen, and what is read there is exactly what the
@@ -21,32 +22,6 @@ import type { StudioState, VocalMode } from '../../shared/types.ts';
  * compiled because they do not need to be, and a value that travels as itself
  * can be read back as itself.
  */
-
-export const GENRES = [
-  'Pop',
-  'Rock',
-  'Synthwave',
-  'Hip-Hop',
-  'Indie',
-  'Metal',
-  'Ambient',
-  'Lo-Fi',
-  'Jazz',
-  'Folk',
-  'House',
-  'Drum and bass',
-];
-
-export const MOODS = [
-  'Energetic',
-  'Melancholic',
-  'Chill',
-  'Dark',
-  'Dreamy',
-  'Uplifting',
-  'Romantic',
-  'Aggressive',
-];
 
 /** Every major and minor key, in the wording ACE-Step's keyscale option takes. */
 export const KEYS = [
@@ -88,9 +63,8 @@ const VOCAL_PHRASES: Record<VocalMode, string> = {
 };
 
 export const EMPTY_STUDIO: StudioState = {
-  genre: [],
-  customStyle: '',
-  mood: [],
+  style: '',
+  mood: '',
   vocalMode: 'female',
   vocalStyle: '',
 };
@@ -111,19 +85,13 @@ export function supportsGuided(family: string): boolean {
  * as a missing prompt rather than a prompt for nothing.
  */
 export function compilePrompt(state: StudioState): string {
-  // Chips are lowercased because they are title case for the sake of the
-  // buttons, not because the prompt wants them that way. Anything typed by
-  // hand is left exactly as typed: a band name or a proper noun is capitalised
-  // on purpose, and quietly flattening it would be rewriting somebody's words.
-  const parts: string[] = [
-    ...state.genre.map((entry) => entry.toLowerCase()),
-    ...state.mood.map((entry) => entry.toLowerCase()),
-  ];
-
-  const custom = state.customStyle.trim();
-  if (custom !== '') parts.push(custom);
-
-  const described = parts.map((part) => part.trim()).filter((part) => part !== '');
+  // Nothing is lowercased any more. The chips were title case for the sake of
+  // the buttons and were flattened on the way out. A box has no such excuse: a
+  // band name or a proper noun is capitalised on purpose, and quietly
+  // flattening it would be rewriting somebody's words.
+  const described = [state.style, state.mood]
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
 
   // Nothing about the music itself means there is no prompt yet. The vocal mode
   // has a value from the moment the form opens, and "female vocals" on its own
