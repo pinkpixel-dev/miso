@@ -256,3 +256,110 @@ describe('the advanced flag', () => {
     expect(advanced).toEqual(new Set(['negativePrompt', 'steps', 'guidanceScale', 'seed']));
   });
 });
+
+describe('remix.repaint', () => {
+  const repaint = taskOf('remix.repaint');
+
+  /** Valid params, so each test can change one thing and say what it broke. */
+  function params(overrides: Record<string, unknown> = {}) {
+    return validateParams(repaint, {
+      prompt: 'a brighter chorus',
+      regionStart: 5,
+      regionEnd: 10,
+      ...overrides,
+    });
+  }
+
+  it('reads a source track, which no generation task does', () => {
+    expect(repaint.inputRoles).toEqual(['source']);
+    expect(taskOf('generate.text2music').inputRoles).toEqual([]);
+  });
+
+  it('runs on ACE-Step packages and refuses another family', () => {
+    expect(packageRunsTask(repaint, 'ace_step_turbo_q8_0')).toBe(true);
+    expect(packageRunsTask(repaint, 'minimax_music3_q8_0')).toBe(false);
+  });
+
+  /**
+   * These four names were measured against a live container, not read off the
+   * CLI manual. The route defaults anything it does not recognise, so a wrong
+   * name returns a good track that ignored the request. Changing any of them
+   * without re-running that check is how this silently stops repainting.
+   */
+  it('sends the request shape confirmed against the server', () => {
+    const staged = { source: '/tmp/audiocpp-ui-1/1-take.wav' };
+    const result = params();
+    const request = repaint.buildRequest(result.ok ? result.value : {}, staged);
+
+    expect(request).toMatchObject({
+      task_route: 'repaint',
+      text: 'a brighter chorus',
+      audio: '/tmp/audiocpp-ui-1/1-take.wav',
+      repaint_start: 5,
+      repaint_end: 10,
+      repaint_strength: 0.5,
+    });
+  });
+
+  it('asks for no duration, because repaint locks it to the source', () => {
+    const result = params();
+    const request = repaint.buildRequest(result.ok ? result.value : {}, { source: '/tmp/a.wav' });
+
+    expect('duration_seconds' in request).toBe(false);
+    expect(repaint.fields.some((field) => field.name === 'durationSeconds')).toBe(false);
+  });
+
+  it('leaves out the lyrics and the seed when they were not set', () => {
+    const result = params();
+    const request = repaint.buildRequest(result.ok ? result.value : {}, { source: '/tmp/a.wav' });
+
+    expect('lyrics' in request).toBe(false);
+    expect('seed' in request).toBe(false);
+  });
+
+  it('keeps strength on the form rather than behind the advanced drawer', () => {
+    // It decides whether the section is nudged or replaced, which is the
+    // second question everybody asks.
+    expect(repaint.fields.find((field) => field.name === 'strength')?.advanced).toBeUndefined();
+  });
+
+  it('needs both ends of the region', () => {
+    expect(validateParams(repaint, { prompt: 'x', regionStart: 5 })).toMatchObject({ ok: false });
+    expect(validateParams(repaint, { prompt: 'x', regionEnd: 10 })).toMatchObject({ ok: false });
+  });
+
+  it('refuses a region that ends before it starts', () => {
+    const result = params({ regionStart: 10, regionEnd: 5 });
+    expect(result).toMatchObject({ ok: false });
+    expect(result.ok === false && result.error).toMatch(/end after it starts/i);
+  });
+
+  it('refuses a region of no length', () => {
+    expect(params({ regionStart: 7, regionEnd: 7 })).toMatchObject({ ok: false });
+  });
+
+  it('accepts a region the right way round', () => {
+    expect(params({ regionStart: 0, regionEnd: 0.5 })).toMatchObject({ ok: true });
+  });
+});
+
+describe('cross-field validation', () => {
+  it('is left alone by every task that does not need it', () => {
+    for (const id of ['generate.text2music', 'generate.minimax', 'generate.stableaudio']) {
+      expect(taskOf(id).validate).toBeUndefined();
+    }
+  });
+
+  it('runs only after the per-field pass, so it never sees a bad value', () => {
+    // regionStart is below its minimum, so the field message wins and the
+    // cross-field check is never reached with a number it cannot trust.
+    const result = validateParams(taskOf('remix.repaint'), {
+      prompt: 'x',
+      regionStart: -5,
+      regionEnd: -10,
+    });
+
+    expect(result).toMatchObject({ ok: false });
+    expect(result.ok === false && result.error).toMatch(/cannot be below/i);
+  });
+});

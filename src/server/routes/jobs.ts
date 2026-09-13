@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { randomUUID } from 'node:crypto';
-import type { ApiError, Job, StudioTask } from '../../shared/types.ts';
+import type { ApiError, Asset, Job, StudioTask } from '../../shared/types.ts';
 import { findPackage } from '../catalog/registry.ts';
+import { readAsset } from '../db/assets.ts';
 import { db } from '../db/index.ts';
 import { createJob, dismissFinishedJobs, listJobs, readJob, setJobState } from '../db/jobs.ts';
 import { readProject } from '../db/projects.ts';
@@ -36,6 +37,7 @@ jobRoutes.get('/tasks', (c) =>
       family: task.family,
       vocals: task.vocals,
       packageIds: taskPackageIds(task),
+      inputRoles: task.inputRoles,
       fields: task.fields,
     })),
   ),
@@ -110,12 +112,53 @@ jobRoutes.post('/projects/:id/jobs', async (c) => {
   // the backend.
   const wanted = Array.isArray(inputs) ? inputs : [];
   const links: { assetId: string; role: string }[] = [];
+  const sources = new Map<string, Asset>();
   for (const entry of wanted) {
     const { assetId, role } = (entry ?? {}) as { assetId?: unknown; role?: unknown };
     if (typeof assetId !== 'string' || typeof role !== 'string') {
       return c.json<ApiError>({ error: 'Every input needs an assetId and a role' }, 400);
     }
+
+    const asset = readAsset(db(), assetId);
+    // One answer for a missing track and for one in somebody else's project.
+    // Telling them apart would confirm that an id they guessed exists.
+    if (!asset || asset.projectId !== projectId) {
+      return c.json<ApiError>({ error: `This project has no track with the id ${assetId}` }, 404);
+    }
+
     links.push({ assetId, role });
+    sources.set(role, asset);
+  }
+
+  // A task that reads audio needs the audio named now. Left to the worker this
+  // surfaces as a job that queues, reaches staging, and only then says it had
+  // nothing to work from.
+  for (const role of task.inputRoles) {
+    if (sources.has(role)) continue;
+    return c.json<ApiError>(
+      {
+        error: `${task.label} needs a ${role} track to work from`,
+        detail: 'Choose a take to work from and try again.',
+      },
+      400,
+    );
+  }
+
+  // The registry validates params without ever seeing an asset row, so this is
+  // the only place that knows how long the source actually runs. A region past
+  // the end would queue, load weights, and hold the GPU before failing.
+  const source = sources.get('source');
+  const regionEnd = validated.value.regionEnd;
+  if (source?.durationSeconds !== undefined && typeof regionEnd === 'number') {
+    if (regionEnd > source.durationSeconds) {
+      return c.json<ApiError>(
+        {
+          error: 'That region runs past the end of the track',
+          detail: `${source.label} is ${source.durationSeconds.toFixed(1)} seconds long.`,
+        },
+        400,
+      );
+    }
   }
 
   const job = createJob(db(), randomUUID(), {

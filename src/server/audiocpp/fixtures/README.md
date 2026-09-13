@@ -74,3 +74,48 @@ unloading `ace_step_turbo_q8_0` from `/app/models/ACE-Step1.5-GGUF/turbo`.
 - `/v1/tasks/run` validates only the `model` key. Every field inside `request` has a default,
   so a request object that is missing generates audio from defaults rather than erroring, and
   the route loads an unloaded model to do it. See `DOCS/ERRORS.md`.
+
+## ACE-Step repaint
+
+Confirmed against the running container on 2026-09-13, `ghcr.io/0xshug0/audio.cpp:full-cuda13`,
+model `miso:ace_step_turbo_q8_0`. Source was `samples/phase0-original.wav`, 20 seconds, 48 kHz
+stereo, with a window of 5 to 10 seconds.
+
+```json
+{
+  "model": "miso:ace_step_turbo_q8_0",
+  "request": {
+    "task_route": "repaint",
+    "text": "replace the middle with a bright solo piano melody",
+    "audio": "/tmp/audiocpp-ui-<id>/1-phase0-original.wav",
+    "repaint_start": 5.0,
+    "repaint_end": 10.0,
+    "repaint_strength": 0.5,
+    "seed": 12345
+  }
+}
+```
+
+- **The staged source path travels under `audio`.** This was a guess taken from the CLI's
+  `--audio` flag and it is now measured. The returned track was identical to the source
+  outside the window (largest per-second mean absolute difference 13.7, and 0.0 for every
+  second except the two touching the boundary) and completely different inside it (3222 to
+  5536). A server that had ignored the path would have replaced the whole track.
+- **`repaint_start` and `repaint_end` are seconds**, matching the CLI flags.
+- **`repaint_strength` is read.** With the seed held fixed, 0.1 and 0.9 differ by 348 inside
+  the window. That number only means something next to the noise floor, which is why it was
+  measured: see determinism below.
+- **A repaint is deterministic for a given seed.** The same request twice returned
+  byte-identical audio, a difference of exactly 0.0. This matters beyond repaint, because it
+  is what makes any future "did this field do anything" test on this family valid. Without it
+  a real effect and run-to-run variance look the same.
+- **An unknown field name is silently ignored and does not fail.** `repaint_strengthhh` was
+  accepted and the request ran at the default strength. This is the same trap that hid a
+  duration field for a whole phase, and it is why the check above compares audio rather than
+  status codes.
+- **The output keeps the source duration exactly.** 20.00 seconds in, 20.00 seconds out, at
+  the same rate and channel count. Repaint locks length to the source, so there is no
+  duration field to send.
+- Timing for this source was about 4.1 seconds wall for 20 seconds of audio, an rtf of 0.23.
+- Still unknown: whether repainting a vocal section needs the lyrics for that section. The
+  confirmed run sent no lyrics and the window was instrumental.

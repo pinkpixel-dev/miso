@@ -103,6 +103,19 @@ export interface TaskDefinition {
    */
   acceptsPackage?(packageId: string): boolean;
   fields: ParamField[];
+  /**
+   * A check across several params at once, for what a single field cannot say.
+   *
+   * Field validation sees one value at a time, so it can hold a region
+   * boundary inside a range but cannot see that the end lands before the
+   * start. An inverted region is not a cosmetic problem: the job queues, loads
+   * weights, holds the GPU for a minute, and then fails or returns something
+   * meaningless. The editor will not produce one, and the API is still the API.
+   *
+   * Called only after every field has passed. Returns the sentence to refuse
+   * with, or undefined when the combination is fine.
+   */
+  validate?(params: TaskParams): string | undefined;
   /** Turns validated params into the request body audio.cpp expects. */
   buildRequest(params: TaskParams, staged: Record<string, string>): Record<string, unknown>;
 }
@@ -632,8 +645,136 @@ const stableAudio: TaskDefinition = {
   },
 };
 
+/**
+ * ACE-Step 1.5, repaint.
+ *
+ * The first task that reads an existing asset. `inputRoles` names the source,
+ * the worker stages it to the backend before the run, and buildRequest receives
+ * the path the backend gave back.
+ *
+ * Every field name below was confirmed against a live container on 2026-09-13
+ * rather than taken from the CLI manual, because this route cannot be checked
+ * by its status code: /v1/tasks/run defaults every field it does not recognise,
+ * so a wrong name returns a perfectly good track that ignored you. The proof is
+ * that the returned audio was identical to the source outside the window and
+ * completely different inside it. See src/server/audiocpp/fixtures/README.md.
+ *
+ * There is no duration field. Repaint locks the length to the source, measured
+ * at 20.00 seconds in and 20.00 seconds out, so a box asking for a length would
+ * be a control the model ignores.
+ *
+ * repaint_mode stays out while repaint_strength covers the same idea. Three
+ * named presets beside a 0 to 1 dial are two controls for one question.
+ */
+const repaint: TaskDefinition = {
+  id: 'remix.repaint',
+  label: 'Repaint a section',
+  summary: 'Replaces the part of a take you select, and leaves the rest alone.',
+  family: 'ace_step',
+  serverTask: 'gen',
+  route: 'repaint',
+  vocals: 'both',
+  sessionOptions: () => ({ 'ace_step.mem_saver': 'true' }),
+  inputRoles: ['source'],
+  fields: [
+    {
+      name: 'prompt',
+      label: 'Prompt',
+      kind: 'text',
+      required: true,
+      help: 'What the new section should sound like, for example a brighter chorus.',
+    },
+    {
+      name: 'regionStart',
+      label: 'Region start in seconds',
+      kind: 'number',
+      required: true,
+      min: 0,
+      max: 3600,
+      step: 0.1,
+      help: 'Set by dragging on the waveform, or typed here.',
+    },
+    {
+      name: 'regionEnd',
+      label: 'Region end in seconds',
+      kind: 'number',
+      required: true,
+      min: 0,
+      max: 3600,
+      step: 0.1,
+      help: 'Has to land after the start, and inside the track.',
+    },
+    {
+      name: 'lyrics',
+      label: 'Lyrics',
+      kind: 'lyrics',
+      required: false,
+      help: 'Words for the section being replaced, if it has any.',
+    },
+    {
+      name: 'strength',
+      label: 'Strength',
+      kind: 'number',
+      required: false,
+      min: 0,
+      max: 1,
+      step: 0.05,
+      default: 0.5,
+      help: 'Low nudges what is already there. High replaces it.',
+    },
+    {
+      name: 'steps',
+      label: 'Steps',
+      kind: 'number',
+      required: false,
+      min: 1,
+      max: 100,
+      step: 1,
+      default: 8,
+      advanced: true,
+      help: 'More steps take longer and change the result more than they improve it.',
+    },
+    {
+      name: 'seed',
+      label: 'Seed',
+      kind: 'number',
+      required: false,
+      min: 0,
+      max: 2_147_483_647,
+      step: 1,
+      advanced: true,
+      help: 'A repaint repeats exactly for the same seed, so this is how a good one is kept.',
+    },
+  ],
+  validate(params) {
+    const { regionStart: start, regionEnd: end } = params;
+    // Both are required fields, so anything other than two numbers here has
+    // already been refused and the per-field message is the better one.
+    if (typeof start !== 'number' || typeof end !== 'number') return undefined;
+    if (end <= start) return 'The region has to end after it starts.';
+    return undefined;
+  },
+  buildRequest(params, staged) {
+    const request: Record<string, unknown> = {
+      task_route: 'repaint',
+      text: params.prompt,
+      // The staged path the worker uploaded, under the one name that works.
+      audio: staged.source,
+      repaint_start: params.regionStart,
+      repaint_end: params.regionEnd,
+    };
+
+    if (params.lyrics !== undefined && params.lyrics !== '') request.lyrics = params.lyrics;
+    if (params.strength !== undefined) request.repaint_strength = params.strength;
+    if (params.steps !== undefined) request.num_inference_steps = params.steps;
+    if (params.seed !== undefined) request.seed = params.seed;
+
+    return request;
+  },
+};
+
 const tasks = new Map<string, TaskDefinition>(
-  [text2music, minimax, heartmula, stableAudio].map((task) => [task.id, task]),
+  [text2music, minimax, heartmula, stableAudio, repaint].map((task) => [task.id, task]),
 );
 
 export function listTasks(): TaskDefinition[] {
@@ -692,6 +833,11 @@ export function validateParams(task: TaskDefinition, raw: unknown): ParamResult 
     }
     value[field.name] = given;
   }
+
+  // Only once every field is known good, so a cross-field message never talks
+  // about a value that was never valid on its own.
+  const across = task.validate?.(value);
+  if (across !== undefined) return { ok: false, error: across };
 
   return { ok: true, value };
 }

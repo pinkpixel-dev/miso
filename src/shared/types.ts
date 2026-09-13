@@ -371,5 +371,15 @@ export interface StudioTask {
    * Which of these are installed still comes from the catalog endpoint.
    */
   packageIds: string[];
+  /**
+   * Source audio this task reads, by role. Empty means it generates from
+   * nothing.
+   *
+   * This is what separates the Create form from the remix tools. Both draw
+   * their fields the same way and both run on the same families, so without it
+   * the create column offers every remix route as though it were another model
+   * to generate with.
+   */
+  inputRoles: string[];
   fields: TaskField[];
 }

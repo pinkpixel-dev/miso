@@ -201,14 +201,19 @@ export function GeneratePanel({
   const [suggestBusy, setSuggestBusy] = useState(false);
   const [suggestError, setSuggestError] = useState<string | undefined>();
 
-  const choices = useMemo(() => modelChoices(catalog, tasks), [catalog, tasks]);
+  // Only the tasks that write a track from nothing. A remix route runs on the
+  // same families and draws its fields the same way, so without this filter
+  // every one of them turns up in the model list as though it were another
+  // model to generate with. The remix tools have their own page.
+  const generators = useMemo(() => tasks.filter((task) => task.inputRoles.length === 0), [tasks]);
+  const choices = useMemo(() => modelChoices(catalog, generators), [catalog, generators]);
 
   // The chosen model decides the task, rather than the task deciding which
   // models are on offer. With nothing installed the form falls back to the
   // first task, so it still has fields to draw and somewhere to put the message
   // saying to go and install something.
   const chosen = choices.find((entry) => entry.pkg.id === modelId) ?? choices[0];
-  const task = chosen?.task ?? tasks[0];
+  const task = chosen?.task ?? generators[0];
   const chosenModel = chosen?.pkg.id;
   const fieldValues = Object.keys(values).length > 0 || !task ? values : initialValues(task);
 
@@ -435,7 +440,7 @@ export function GeneratePanel({
             {choices.length === 0 ? (
               <option value="">No model installed</option>
             ) : (
-              tasks.map((entry) => {
+              generators.map((entry) => {
                 const group = choices.filter((choice) => choice.task.id === entry.id);
                 if (group.length === 0) return null;
 

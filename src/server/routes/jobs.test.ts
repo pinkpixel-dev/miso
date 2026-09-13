@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
+import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiError, Job, StudioTask } from '../../shared/types.ts';
+import { insertAsset } from '../db/assets.ts';
 import { db } from '../db/index.ts';
 import { setJobState } from '../db/jobs.ts';
 import { createProject } from '../db/projects.ts';
@@ -41,6 +43,20 @@ describe('GET /api/tasks', () => {
     const generate = tasks.find((task) => task.id === 'generate.text2music');
     expect(generate?.family).toBe('ace_step');
     expect(generate?.fields.find((field) => field.name === 'prompt')?.required).toBe(true);
+  });
+
+  /**
+   * The create column tells a generation task from a remix one by this field
+   * alone. Without it on the wire, every remix route shows up in the model
+   * list as another model to generate with, because they share a family and
+   * draw their fields the same way.
+   */
+  it('says which tasks read a source track', async () => {
+    const response = await app().request('/api/tasks');
+    const tasks = (await response.json()) as StudioTask[];
+
+    expect(tasks.find((task) => task.id === 'generate.text2music')?.inputRoles).toEqual([]);
+    expect(tasks.find((task) => task.id === 'remix.repaint')?.inputRoles).toEqual(['source']);
   });
 });
 
@@ -88,6 +104,14 @@ describe('POST /api/projects/:id/jobs', () => {
       json({ ...good, inputs: [{ assetId: 'a' }] }),
     );
     expect(response.status).toBe(400);
+  });
+
+  it('refuses an input asset that does not exist', async () => {
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({ ...good, inputs: [{ assetId: randomUUID(), role: 'source' }] }),
+    );
+    expect(response.status).toBe(404);
   });
 
   it('keeps the song title and the builder state beside the job', async () => {
@@ -172,6 +196,98 @@ describe('POST /api/projects/:id/jobs', () => {
       json({ ...good, title: 'x'.repeat(200) }),
     );
     expect(response.status).toBe(400);
+  });
+});
+
+describe('a job that reads a source track', () => {
+  /** A take in a project, long enough to have a middle worth repainting. */
+  function take(owner: string, seconds = 20) {
+    return insertAsset(db(), {
+      id: randomUUID(),
+      projectId: owner,
+      kind: 'generated',
+      label: 'Take 1',
+      filename: 'take-1.wav',
+      format: 'wav',
+      bytes: 1000,
+      checksum: 'abc123',
+      durationSeconds: seconds,
+    });
+  }
+
+  const repaint = {
+    taskId: 'remix.repaint',
+    modelId: 'ace_step_turbo_q8_0',
+    params: { prompt: 'a brighter chorus', regionStart: 5, regionEnd: 10 },
+  };
+
+  it('queues a repaint and records what it reads', async () => {
+    const source = take(projectId);
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({ ...repaint, inputs: [{ assetId: source.id, role: 'source' }] }),
+    );
+
+    expect(response.status).toBe(201);
+    const job = (await response.json()) as Job;
+    expect(job.state).toBe('queued');
+    expect(job.params).toMatchObject({ regionStart: 5, regionEnd: 10, strength: 0.5 });
+  });
+
+  /**
+   * The check that matters most here. Without it a job could name a track from
+   * somebody else's project and have the worker stage it to the backend.
+   */
+  it('refuses a track belonging to another project', async () => {
+    const other = createProject(db(), 'Someone else').id;
+    const borrowed = take(other);
+
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({ ...repaint, inputs: [{ assetId: borrowed.id, role: 'source' }] }),
+    );
+
+    expect(response.status).toBe(404);
+    // Same answer as a track that does not exist, so a guessed id is not
+    // confirmed to be real.
+    expect(((await response.json()) as ApiError).error).toMatch(/no track with the id/i);
+  });
+
+  it('refuses a repaint with no source named', async () => {
+    const response = await app().request(`/api/projects/${projectId}/jobs`, json(repaint));
+
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as ApiError).error).toMatch(/needs a source track/i);
+  });
+
+  it('refuses a region that runs past the end of the source', async () => {
+    const source = take(projectId, 12);
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({
+        ...repaint,
+        params: { ...repaint.params, regionStart: 8, regionEnd: 30 },
+        inputs: [{ assetId: source.id, role: 'source' }],
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as ApiError).error).toMatch(/past the end/i);
+  });
+
+  it('refuses an inverted region before it reaches the queue', async () => {
+    const source = take(projectId);
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({
+        ...repaint,
+        params: { ...repaint.params, regionStart: 10, regionEnd: 5 },
+        inputs: [{ assetId: source.id, role: 'source' }],
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as ApiError).error).toMatch(/end after it starts/i);
   });
 });
 
