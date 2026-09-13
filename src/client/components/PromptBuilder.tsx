@@ -203,6 +203,75 @@ export function PromptBuilder({
 
   return (
     <>
+      {/*
+        Lyrics come first, directly under the song title. Writing the words is
+        where a song usually starts, and the style boxes below describe how the
+        words should sound.
+
+        One consequence worth knowing. The vocal toggle that greys this card out
+        lives in the Style card underneath it, so the control is below the thing
+        it disables. The hint inside the editor says why it is off, which is the
+        part somebody actually needs when they find it disabled.
+      */}
+      {lyricsField ? (
+        <BuilderCard
+          id="lyrics"
+          title={lyricsField.label}
+          actions={
+            <>
+              <IconButton
+                label="Clear the lyrics"
+                icon={Eraser}
+                disabled={instrumental || lyrics === ''}
+                onClick={() => onValue(lyricsField.name, '')}
+              />
+              <IconButton
+                label="Write lyrics for me"
+                icon={Sparkles}
+                variant="primary"
+                disabled={instrumental}
+                onClick={() => setWriting(true)}
+              />
+            </>
+          }
+        >
+          <div className="flex flex-col gap-3">
+            <LyricsEditor
+              label={lyricsField.label}
+              hint={
+                instrumental
+                  ? 'Not used while the vocals are set to instrumental. Nothing you have written is lost.'
+                  : 'Section tags tell the model where the chorus is.'
+              }
+              disabled={instrumental}
+              value={lyrics}
+              onChange={(next) => onValue(lyricsField.name, next)}
+            />
+
+            <SavedPrompts
+              kind="lyrics"
+              body={lyrics}
+              disabled={instrumental}
+              onLoad={(body) => onValue(lyricsField.name, body)}
+            />
+
+            <LyricsAssistant
+              open={writing}
+              studio={builder}
+              hasLyrics={lyrics.trim() !== ''}
+              onApply={(draft: LyricsDraft) => {
+                onValue(lyricsField.name, draft.lyrics);
+                // The title the assistant gave the song is only used when the
+                // box is empty. Overwriting a name somebody chose would be the
+                // assistant deciding what the song is called.
+                if (draft.title !== undefined) onTitle(draft.title);
+              }}
+              onClose={() => setWriting(false)}
+            />
+          </div>
+        </BuilderCard>
+      ) : null}
+
       <BuilderCard
         id="style"
         title="Style"
@@ -266,65 +335,6 @@ export function PromptBuilder({
           </div>
         </div>
       </BuilderCard>
-
-      {lyricsField ? (
-        <BuilderCard
-          id="lyrics"
-          title={lyricsField.label}
-          actions={
-            <>
-              <IconButton
-                label="Clear the lyrics"
-                icon={Eraser}
-                disabled={instrumental || lyrics === ''}
-                onClick={() => onValue(lyricsField.name, '')}
-              />
-              <IconButton
-                label="Write lyrics for me"
-                icon={Sparkles}
-                variant="primary"
-                disabled={instrumental}
-                onClick={() => setWriting(true)}
-              />
-            </>
-          }
-        >
-          <div className="flex flex-col gap-3">
-            <LyricsEditor
-              label={lyricsField.label}
-              hint={
-                instrumental
-                  ? 'Not used while the vocals are set to instrumental. Nothing you have written is lost.'
-                  : 'Section tags tell the model where the chorus is.'
-              }
-              disabled={instrumental}
-              value={lyrics}
-              onChange={(next) => onValue(lyricsField.name, next)}
-            />
-
-            <SavedPrompts
-              kind="lyrics"
-              body={lyrics}
-              disabled={instrumental}
-              onLoad={(body) => onValue(lyricsField.name, body)}
-            />
-
-            <LyricsAssistant
-              open={writing}
-              studio={builder}
-              hasLyrics={lyrics.trim() !== ''}
-              onApply={(draft: LyricsDraft) => {
-                onValue(lyricsField.name, draft.lyrics);
-                // The title the assistant gave the song is only used when the
-                // box is empty. Overwriting a name somebody chose would be the
-                // assistant deciding what the song is called.
-                if (draft.title !== undefined) onTitle(draft.title);
-              }}
-              onClose={() => setWriting(false)}
-            />
-          </div>
-        </BuilderCard>
-      ) : null}
 
       {bpmField ?? keyField ? (
         <BuilderCard id="more" title="More options" defaultOpen={false}>

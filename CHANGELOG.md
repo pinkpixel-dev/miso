@@ -14,6 +14,8 @@ this file, so the earlier history lives in the git log.
   re-picking it for every track would have swapped one annoyance for another.
 - A form holding anything asks before it clears, the same way replacing written lyrics
   already does. An empty form clears without the question.
+- The lyrics card sits directly under the song title now, above Style. Writing the words is
+  where a song usually starts.
 
 ## 0.10.0 - September 12, 2026
 
