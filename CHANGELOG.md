@@ -3,6 +3,47 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.10.0 - September 12, 2026
+
+### 🎛️ Generation
+
+- MiniMax Music 3, HeartMuLa, and Stable Audio generate alongside ACE-Step. Create is still
+  one form, with a single Model list holding every model you have downloaded, grouped by
+  model name. Picking one also picks the family it belongs to.
+- Each model gets the prompt it actually reads. ACE-Step takes a run of descriptors, MiniMax
+  takes a production caption, HeartMuLa takes a short summary with the detail in its tags,
+  and Stable Audio takes the instruments and the texture. The compiled prompt is still shown
+  in full before anything is queued.
+- HeartMuLa's tags are written by the guided builder out of the same words the other models
+  put in the prompt, so nothing is typed twice. Custom mode still asks for them.
+
+### 🎤 Vocals
+
+- A model that cannot sing says so. Stable Audio locks the Vocals control to Instrumental and
+  explains why, rather than offering a setting it would ignore.
+- Whether a model sings is declared by Miso rather than read from the vendored model spec,
+  which claims Stable Audio handles lyrics and has nothing behind that claim.
+
+### 🐛 Fixes
+
+- MiniMax Music 3 generates instead of failing with a 500. It loads its language model, depth
+  decoder, and flow transformer as three separate files, and Miso now names the ones the
+  package you installed actually ships. The backend's own defaults name a set that no package
+  carries in full, so the load failed before the model was ever registered.
+- An expanded prompt survives a model switch. It used to be dropped as soon as the compiled
+  prompt changed, which meant another call to the provider to get it back. It now lasts until
+  you change the style, mood, or voice it was written from, and the prompt box keeps what it
+  was holding.
+- Stable Audio's sound-effect packages no longer appear in the Model list. They looked like
+  another build of the music model and would have produced a sound effect instead of a
+  track.
+- A compiled prompt now reads "an ambient song" rather than "A ambient song", and still reads
+  "a euphoric song" where the word only begins with a vowel.
+
+### 🏷️ Versioning
+
+- Bumped the app version to 0.10.0.
+
 ## 0.9.0 - September 12, 2026
 
 ### ✨ Projects

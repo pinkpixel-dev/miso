@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { findTask, listTasks, packageRunsTask, validateParams } from './registry.ts';
+import { findPackage } from '../catalog/registry.ts';
+import {
+  findTask,
+  listTasks,
+  packageRunsTask,
+  taskPackageIds,
+  validateParams,
+} from './registry.ts';
+
+/** A vendored package, or a failure naming the one that went missing. */
+function packageOf(id: string) {
+  const found = findPackage(id);
+  if (!found) throw new Error(`${id} is missing from the vendored specs`);
+  return found.pkg;
+}
+
+/** A task, or a failure naming the one that went missing. */
+function taskOf(id: string) {
+  const found = findTask(id);
+  if (!found) throw new Error(`${id} is missing from the registry`);
+  return found;
+}
 
 const text2music = findTask('generate.text2music');
 if (!text2music) throw new Error('generate.text2music is missing from the registry');
@@ -19,6 +40,88 @@ describe('the registry', () => {
     expect(packageRunsTask(text2music, 'ace_step_turbo_q8_0')).toBe(true);
     expect(packageRunsTask(text2music, 'htdemucs_q8_0')).toBe(false);
     expect(packageRunsTask(text2music, 'nothing_like_this')).toBe(false);
+  });
+
+  it('offers every generation family on its own task', () => {
+    const families = listTasks().map((task) => task.family);
+
+    expect(families).toEqual(
+      expect.arrayContaining(['ace_step', 'minimax_music3', 'heartmula', 'stable_audio']),
+    );
+  });
+
+  it('knows which families can sing', () => {
+    // Declared here rather than read from the vendored spec, which claims
+    // Stable Audio does lyrics and is wrong. See DOCS/MEMORY.md.
+    expect(findTask('generate.stableaudio')?.vocals).toBe('never');
+    expect(findTask('generate.text2music')?.vocals).toBe('both');
+  });
+
+  it('keeps Stable Audio SFX packages off the music task', () => {
+    const stableAudio = findTask('generate.stableaudio');
+    if (!stableAudio) throw new Error('generate.stableaudio is missing from the registry');
+
+    expect(packageRunsTask(stableAudio, 'stable_audio_3_small_music_q8_0')).toBe(true);
+    expect(packageRunsTask(stableAudio, 'stable_audio_3_medium_q8_0')).toBe(true);
+    expect(packageRunsTask(stableAudio, 'stable_audio_3_small_sfx_q8_0')).toBe(false);
+
+    const offered = taskPackageIds(stableAudio);
+    expect(offered).toContain('stable_audio_3_small_music_q8_0');
+    expect(offered.some((id) => id.includes('_sfx_'))).toBe(false);
+  });
+
+  it('offers every package of a family that has only precisions', () => {
+    expect(taskPackageIds(text2music)).toContain('ace_step_turbo_q8_0');
+    expect(taskPackageIds(text2music).length).toBeGreaterThan(1);
+  });
+});
+
+describe('session options', () => {
+  /**
+   * The regression these cover is a real HTTP 500. MiniMax Music 3 loads its
+   * language model, depth decoder and flow transformer as separate files, and
+   * the backend's defaults name one fixed set (language_model_q4_0,
+   * rvq_depth_decoder_bf16, transformer_q4_0) that no package ships in full.
+   * Sending nothing meant the loader opened a file that was not on disk.
+   */
+  it('names the component GGUFs a MiniMax package actually ships', () => {
+    const minimax = taskOf('generate.minimax');
+
+    expect(minimax.sessionOptions?.(packageOf('minimax_music3_q8_0'))).toEqual({
+      'minimax_music3.language_model_gguf': 'language_model_q8_0.gguf',
+      'minimax_music3.rvq_depth_decoder_gguf': 'rvq_depth_decoder_q8_0.gguf',
+      'minimax_music3.flow_transformer_gguf': 'transformer_q8_0.gguf',
+    });
+  });
+
+  it('follows the package rather than assuming one precision throughout', () => {
+    const minimax = taskOf('generate.minimax');
+
+    // The q4_0 package ships a q8_0 depth decoder beside its q4_0 language
+    // model, which is exactly the mismatch the backend default gets wrong.
+    expect(minimax.sessionOptions?.(packageOf('minimax_music3_q4_0'))).toMatchObject({
+      'minimax_music3.language_model_gguf': 'language_model_q4_0.gguf',
+      'minimax_music3.rvq_depth_decoder_gguf': 'rvq_depth_decoder_q8_0.gguf',
+      'minimax_music3.flow_transformer_gguf': 'transformer_q4_0.gguf',
+    });
+
+    expect(minimax.sessionOptions?.(packageOf('minimax_music3_bf16'))).toMatchObject({
+      'minimax_music3.language_model_gguf': 'language_model_bf16.gguf',
+      'minimax_music3.flow_transformer_gguf': 'transformer_bf16.gguf',
+    });
+  });
+
+  it('keeps mem_saver on for ACE-Step, which a 16 GB card needs', () => {
+    // Not an option. A second request after a generation failed to allocate
+    // until mem_saver brought the resident figure down. See DOCS/ERRORS.md.
+    expect(text2music.sessionOptions?.(packageOf('ace_step_turbo_q8_0'))).toEqual({
+      'ace_step.mem_saver': 'true',
+    });
+  });
+
+  it('sends none at all for a family that needs none', () => {
+    expect(taskOf('generate.heartmula').sessionOptions).toBeUndefined();
+    expect(taskOf('generate.stableaudio').sessionOptions).toBeUndefined();
   });
 });
 

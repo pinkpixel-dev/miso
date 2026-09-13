@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { StudioState } from '../../shared/types.ts';
-import { EMPTY_STUDIO, compilePrompt, supportsGuided, wantsLyrics } from './studio.ts';
+import {
+  EMPTY_STUDIO,
+  compile,
+  compilePrompt,
+  effectiveVocalMode,
+  supportsGuided,
+  wantsLyrics,
+} from './studio.ts';
 
 function state(patch: Partial<StudioState>): StudioState {
   return { ...EMPTY_STUDIO, ...patch };
@@ -67,8 +74,94 @@ describe('wantsLyrics', () => {
 });
 
 describe('supportsGuided', () => {
-  it('covers the one family with compilation rules so far', () => {
+  it('covers every generation family, and nothing else', () => {
     expect(supportsGuided('ace_step')).toBe(true);
-    expect(supportsGuided('stable_audio')).toBe(false);
+    expect(supportsGuided('minimax_music3')).toBe(true);
+    expect(supportsGuided('heartmula')).toBe(true);
+    expect(supportsGuided('stable_audio')).toBe(true);
+    expect(supportsGuided('htdemucs')).toBe(false);
+  });
+});
+
+describe('effectiveVocalMode', () => {
+  it('forces an instrumental on a family that cannot sing', () => {
+    expect(effectiveVocalMode(state({ vocalMode: 'female' }), 'never')).toBe('instrumental');
+  });
+
+  it('forces a voice on a family that cannot do an instrumental', () => {
+    expect(effectiveVocalMode(state({ vocalMode: 'instrumental' }), 'required')).toBe('female');
+    // A voice that was already chosen is left alone rather than reset.
+    expect(effectiveVocalMode(state({ vocalMode: 'male' }), 'required')).toBe('male');
+  });
+
+  it('leaves the choice alone when the family does both', () => {
+    expect(effectiveVocalMode(state({ vocalMode: 'instrumental' }), 'both')).toBe('instrumental');
+  });
+});
+
+describe('compile, per family', () => {
+  const song = state({ style: 'synthwave', mood: 'dreamy', vocalStyle: 'airy', vocalMode: 'female' });
+
+  it('writes ACE-Step a run of descriptors', () => {
+    expect(compile(song, 'ace_step').prompt).toBe('synthwave, dreamy, airy female vocals');
+  });
+
+  it('writes MiniMax a production caption', () => {
+    expect(compile(song, 'minimax_music3').prompt).toBe(
+      'A dreamy synthwave song featuring airy female vocals, recorded with polished studio production.',
+    );
+  });
+
+  it('writes HeartMuLa a short summary and puts the detail in its tags', () => {
+    const compiled = compile(song, 'heartmula');
+
+    expect(compiled.prompt).toBe('a dreamy synthwave song');
+    expect(compiled.params.tags).toBe('synthwave, dreamy, airy female vocals');
+  });
+
+  it('never writes a voice into a Stable Audio prompt', () => {
+    // The family cannot sing, so the vocal mode has nothing to add however the
+    // builder was left. See DOCS/MEMORY.md.
+    expect(compile(song, 'stable_audio', 'never').prompt).toBe(
+      'synthwave, dreamy, instrumental, no vocals',
+    );
+  });
+
+  it('says there are no vocals rather than saying nothing, in every family', () => {
+    const quiet = state({ style: 'ambient', vocalMode: 'instrumental' });
+
+    expect(compile(quiet, 'ace_step').prompt).toBe('ambient, instrumental, no vocals');
+    expect(compile(quiet, 'minimax_music3').prompt).toBe(
+      'An ambient song, instrumental with no vocals, recorded with polished studio production.',
+    );
+    expect(compile(quiet, 'heartmula').params.tags).toBe('ambient, instrumental');
+  });
+
+  it('agrees the article with the word that follows it', () => {
+    // "A ambient song" reads as broken in a prompt shown back to the person who
+    // wrote it, and both sentence families open with an article.
+    const vowel = state({ style: 'guitars', mood: 'ambient', vocalMode: 'instrumental' });
+
+    expect(compile(vowel, 'minimax_music3').prompt).toBe(
+      'An ambient guitars song, instrumental with no vocals, recorded with polished studio production.',
+    );
+    expect(compile(vowel, 'heartmula').prompt).toBe('an ambient guitars song');
+  });
+
+  it('goes by the sound rather than the letter', () => {
+    // "Euphoric" and "unique" open on a "you", so they take "a". "Upbeat" does
+    // not, so it keeps "an".
+    const euphoric = state({ style: 'house', mood: 'euphoric' });
+    const upbeat = state({ style: 'house', mood: 'upbeat' });
+
+    expect(compile(euphoric, 'heartmula').prompt).toBe('a euphoric house song');
+    expect(compile(upbeat, 'heartmula').prompt).toBe('an upbeat house song');
+  });
+
+  it('compiles nothing from a builder nobody has touched, whatever the family', () => {
+    for (const family of ['ace_step', 'minimax_music3', 'heartmula', 'stable_audio']) {
+      expect(compile(EMPTY_STUDIO, family).prompt).toBe('');
+      expect(compile(EMPTY_STUDIO, family).params).toEqual({});
+    }
   });
 });

@@ -1,4 +1,5 @@
-import { findPackage } from '../catalog/registry.ts';
+import { findPackage, loadSpecs } from '../catalog/registry.ts';
+import type { SpecPackage } from '../catalog/parse.ts';
 
 /**
  * What Miso can ask audio.cpp to do.
@@ -52,16 +53,55 @@ export interface TaskDefinition {
   family: string;
   /** Runtime task kind for /v1/models/load, never the spec's task word. */
   serverTask: 'gen';
-  /** The audio.cpp route inside that task kind. */
-  route: string;
-  /** Session options the model needs when it is loaded for this task. */
-  sessionOptions: Record<string, string>;
+  /**
+   * The audio.cpp route inside that task kind, for a family that has routes.
+   *
+   * ACE-Step is the only generation family that does. MiniMax Music 3,
+   * HeartMuLa and Stable Audio are each reached as `--task gen --family X` with
+   * no route at all, so they leave this out. Nothing reads this field. The
+   * route that actually travels is written into the request by buildRequest.
+   */
+  route?: string;
+  /**
+   * Whether this family can sing.
+   *
+   * Declared here rather than read from the vendored spec, because the spec is
+   * wrong about it. `stable_audio.json` tags `lyrics` under
+   * `capabilities.music` with nothing behind it: no lyrics request option, and
+   * no mention of lyrics, vocals or singing anywhere in its manual, while
+   * ACE-Step's identical tag is backed by a documented `--lyrics` flag. See
+   * DOCS/MEMORY.md.
+   *
+   * `required` means the family cannot do an instrumental, `never` means it
+   * cannot do a vocal, and `both` means the choice is the person's.
+   */
+  vocals: 'both' | 'required' | 'never';
+  /**
+   * Session options the package needs when it is loaded for this task.
+   *
+   * A method taking the package rather than a flat record, because the answer
+   * is not the same for every package of a family. ACE-Step wants one fixed
+   * switch whatever the precision, while MiniMax Music 3 has to be told which
+   * component GGUFs the installed package actually ships. Left out entirely by
+   * a family that needs none, which sends no session_options at all.
+   */
+  sessionOptions?(pkg: SpecPackage): Record<string, string>;
   /**
    * Source audio this task reads, by role. Every role listed here is uploaded
    * to the backend before the task runs, and buildRequest receives the paths
    * the backend gave back. Empty for a task that generates from nothing.
    */
   inputRoles: string[];
+  /**
+   * Whether a package of this family can run this task, past the family match.
+   *
+   * Only Stable Audio needs one. Its family ships music packages and SFX
+   * packages side by side, and an SFX package asked for music answers with the
+   * wrong weights rather than failing, so it has to be kept off the list. Every
+   * other family's packages are precisions of the same model, and leaving this
+   * out accepts all of them.
+   */
+  acceptsPackage?(packageId: string): boolean;
   fields: ParamField[];
   /** Turns validated params into the request body audio.cpp expects. */
   buildRequest(params: TaskParams, staged: Record<string, string>): Record<string, unknown>;
@@ -77,12 +117,13 @@ export interface TaskDefinition {
  */
 const text2music: TaskDefinition = {
   id: 'generate.text2music',
-  label: 'Generate a track',
+  label: 'ACE-Step 1.5',
   summary: 'Writes a new track from a prompt, with optional lyrics.',
   family: 'ace_step',
   serverTask: 'gen',
   route: 'text2music',
-  sessionOptions: { 'ace_step.mem_saver': 'true' },
+  vocals: 'both',
+  sessionOptions: () => ({ 'ace_step.mem_saver': 'true' }),
   inputRoles: [],
   fields: [
     {
@@ -200,7 +241,390 @@ const text2music: TaskDefinition = {
   },
 };
 
-const tasks = new Map<string, TaskDefinition>([[text2music.id, text2music]]);
+/**
+ * MiniMax Music 3, a production caption plus lyrics.
+ *
+ * No task_route, because the family has no routes. The request is the caption
+ * and its options, which is true of every generation family except ACE-Step.
+ *
+ * `duration_sec` is an autoregressive frame budget rather than a final length,
+ * and raising it raises VRAM. Its help text says budget for that reason.
+ *
+ * `vocals` is 'both' pending a real generation. The vendored spec marks lyrics
+ * required, which would make this family vocals only, but /v1/tasks/run fills a
+ * default for every field left out, so whether sending no lyrics actually
+ * produces an instrumental is unproven. See phase 4.5 in DOCS/ROADMAP.md.
+ */
+const minimax: TaskDefinition = {
+  id: 'generate.minimax',
+  label: 'MiniMax Music 3',
+  summary: 'Writes a track from a production caption and tagged lyrics.',
+  family: 'minimax_music3',
+  serverTask: 'gen',
+  vocals: 'both',
+  /**
+   * Which component GGUFs to load, read off the package that is installed.
+   *
+   * This family ships its language model, depth decoder and flow transformer as
+   * separate files, and their precisions differ per package. The backend's own
+   * defaults name one fixed set (language_model_q4_0, rvq_depth_decoder_bf16,
+   * transformer_q4_0) that no package ships in full: q4_0 carries a q8_0 depth
+   * decoder, and q8_0 and bf16 carry none of the three. Loading without these
+   * therefore named a file that was not on disk and answered HTTP 500 before
+   * the registration was ever created. See DOCS/ERRORS.md.
+   *
+   * Reading the filenames from the spec rather than writing them here means a
+   * package added upstream loads without another edit to this file.
+   */
+  sessionOptions(pkg) {
+    const component = (prefix: string): string | undefined =>
+      pkg.files
+        .map((file) => file.slice(file.lastIndexOf('/') + 1))
+        .find((name) => name.startsWith(prefix) && name.endsWith('.gguf'));
+
+    const components: [prefix: string, option: string][] = [
+      ['language_model_', 'minimax_music3.language_model_gguf'],
+      ['rvq_depth_decoder_', 'minimax_music3.rvq_depth_decoder_gguf'],
+      ['transformer_', 'minimax_music3.flow_transformer_gguf'],
+    ];
+
+    const options: Record<string, string> = {};
+    for (const [prefix, option] of components) {
+      const file = component(prefix);
+      // A component this package does not ship is left to the backend's default
+      // rather than sent empty, which it would try to open as a filename.
+      if (file !== undefined) options[option] = file;
+    }
+
+    return options;
+  },
+  inputRoles: [],
+  fields: [
+    {
+      name: 'prompt',
+      label: 'Prompt',
+      kind: 'text',
+      required: true,
+      help: 'A production caption: the genre, the instruments, the voice, and how it was recorded.',
+    },
+    {
+      name: 'lyrics',
+      label: 'Lyrics',
+      kind: 'lyrics',
+      required: false,
+      help: 'Section tags such as [verse] and [chorus] are read by this model.',
+    },
+    {
+      name: 'durationSeconds',
+      label: 'Length in seconds',
+      kind: 'number',
+      required: false,
+      min: 5,
+      max: 300,
+      step: 5,
+      default: 120,
+      help: 'A budget rather than an exact length. Raising it also raises video memory use.',
+    },
+    {
+      name: 'steps',
+      label: 'Steps',
+      kind: 'number',
+      required: false,
+      min: 1,
+      max: 100,
+      step: 1,
+      default: 30,
+      advanced: true,
+      help: 'Flow matching steps per chunk.',
+    },
+    {
+      name: 'guidanceScale',
+      label: 'Guidance',
+      kind: 'number',
+      required: false,
+      min: 0,
+      max: 20,
+      step: 0.1,
+      default: 1.7,
+      advanced: true,
+      help: 'How closely the flow transformer follows the caption.',
+    },
+    {
+      name: 'arGuidanceScale',
+      label: 'Semantic guidance',
+      kind: 'number',
+      required: false,
+      min: 0,
+      max: 20,
+      step: 0.1,
+      default: 1.5,
+      advanced: true,
+      help: 'Guidance for the autoregressive stage, which decides the structure.',
+    },
+    {
+      name: 'topK',
+      label: 'Top K',
+      kind: 'number',
+      required: false,
+      min: 1,
+      max: 1000,
+      step: 1,
+      advanced: true,
+      help: 'How many candidates each sampled token chooses between.',
+    },
+    {
+      name: 'seed',
+      label: 'Seed',
+      kind: 'number',
+      required: false,
+      min: 0,
+      max: 2_147_483_647,
+      step: 1,
+      advanced: true,
+      help: 'Leave this empty for a different result every time.',
+    },
+  ],
+  buildRequest(params) {
+    const request: Record<string, unknown> = { text: params.prompt };
+
+    if (params.lyrics !== undefined && params.lyrics !== '') request.lyrics = params.lyrics;
+    // duration_sec, not duration_seconds. The families without routes take the
+    // shorter name, and sending the wrong one is silently ignored because every
+    // field has a default.
+    if (params.durationSeconds !== undefined) request.duration_sec = params.durationSeconds;
+    if (params.steps !== undefined) request.num_inference_steps = params.steps;
+    if (params.guidanceScale !== undefined) request.guidance_scale = params.guidanceScale;
+    if (params.arGuidanceScale !== undefined) request.ar_guidance_scale = params.arGuidanceScale;
+    if (params.topK !== undefined) request.top_k = params.topK;
+    if (params.seed !== undefined) request.seed = params.seed;
+
+    return request;
+  },
+};
+
+/**
+ * HeartMuLa, lyrics and tags to music.
+ *
+ * `tags` is required by the CLI manual and carries what the other families put
+ * in the prompt: genre, mood, tempo, and the kind of voice. The guided builder
+ * compiles it, so it is only typed by hand in custom mode.
+ *
+ * infinite_mode is deliberately absent. It is a boolean, ParamField has no
+ * boolean kind, and adding one for a single option on a single family is more
+ * machinery than the option is worth until something else needs it.
+ */
+const heartmula: TaskDefinition = {
+  id: 'generate.heartmula',
+  label: 'HeartMuLa',
+  summary: 'Writes a track from lyrics and a list of style tags.',
+  family: 'heartmula',
+  serverTask: 'gen',
+  vocals: 'both',
+  inputRoles: [],
+  fields: [
+    {
+      name: 'prompt',
+      label: 'Prompt',
+      kind: 'text',
+      required: true,
+      help: 'A short description of the song. The detail goes in the tags below.',
+    },
+    {
+      name: 'tags',
+      label: 'Tags',
+      kind: 'text',
+      required: true,
+      help: 'Comma separated: genre, mood, instruments, tempo, and the voice. For example pop, bright, drums, female vocal.',
+    },
+    {
+      name: 'lyrics',
+      label: 'Lyrics',
+      kind: 'lyrics',
+      required: false,
+      help: 'Leave this empty for an instrumental.',
+    },
+    {
+      name: 'durationSeconds',
+      label: 'Length in seconds',
+      kind: 'number',
+      required: false,
+      min: 5,
+      max: 300,
+      step: 5,
+      default: 120,
+      help: 'The longest the track will run. Generation time scales with it.',
+    },
+    {
+      name: 'steps',
+      label: 'Steps',
+      kind: 'number',
+      required: false,
+      min: 1,
+      max: 100,
+      step: 1,
+      default: 10,
+      advanced: true,
+      help: 'Solver steps for the codec that turns tokens back into audio.',
+    },
+    {
+      name: 'guidanceScale',
+      label: 'Guidance',
+      kind: 'number',
+      required: false,
+      min: 0,
+      max: 20,
+      step: 0.1,
+      default: 1.5,
+      advanced: true,
+      help: 'How closely the model follows the prompt and the tags.',
+    },
+    {
+      name: 'temperature',
+      label: 'Temperature',
+      kind: 'number',
+      required: false,
+      min: 0.1,
+      max: 4,
+      step: 0.1,
+      default: 1,
+      advanced: true,
+      help: 'Higher wanders further from the obvious choice.',
+    },
+    {
+      name: 'topK',
+      label: 'Top K',
+      kind: 'number',
+      required: false,
+      min: 1,
+      max: 1000,
+      step: 1,
+      default: 50,
+      advanced: true,
+      help: 'How many candidates each sampled token chooses between.',
+    },
+    {
+      name: 'seed',
+      label: 'Seed',
+      kind: 'number',
+      required: false,
+      min: 0,
+      max: 2_147_483_647,
+      step: 1,
+      advanced: true,
+      help: 'Leave this empty for a different result every time.',
+    },
+  ],
+  buildRequest(params) {
+    const request: Record<string, unknown> = { text: params.prompt };
+
+    if (params.tags !== undefined && params.tags !== '') request.tags = params.tags;
+    if (params.lyrics !== undefined && params.lyrics !== '') request.lyrics = params.lyrics;
+    if (params.durationSeconds !== undefined) request.duration_sec = params.durationSeconds;
+    if (params.steps !== undefined) request.num_inference_steps = params.steps;
+    if (params.guidanceScale !== undefined) request.guidance_scale = params.guidanceScale;
+    if (params.temperature !== undefined) request.temperature = params.temperature;
+    if (params.topK !== undefined) request.top_k = params.topK;
+    if (params.seed !== undefined) request.seed = params.seed;
+
+    return request;
+  },
+};
+
+/**
+ * Stable Audio 3, text to music.
+ *
+ * There is no lyrics field, because this family does not sing. Its manual never
+ * mentions lyrics, vocals or singing, and it has no lyrics option, despite its
+ * vendored spec tagging `lyrics` under capabilities. That contradiction is why
+ * `vocals` is declared here rather than read from the spec. See DOCS/MEMORY.md.
+ *
+ * Init-audio and inpainting are the same family reached with source audio, and
+ * they belong to the remix phase rather than to this entry.
+ */
+const stableAudio: TaskDefinition = {
+  id: 'generate.stableaudio',
+  label: 'Stable Audio 3',
+  summary: 'Writes an instrumental track from a description of the sound.',
+  family: 'stable_audio',
+  serverTask: 'gen',
+  vocals: 'never',
+  inputRoles: [],
+  // The SFX packages belong to generate.sfx in phase 7. Offered here they would
+  // look like another precision of the music model and quietly produce a sound
+  // effect instead of a track.
+  acceptsPackage: (packageId) => !packageId.includes('_sfx_'),
+  fields: [
+    {
+      name: 'prompt',
+      label: 'Prompt',
+      kind: 'text',
+      required: true,
+      help: 'Describe the instruments, the genre, and the texture of the recording.',
+    },
+    {
+      name: 'durationSeconds',
+      label: 'Length in seconds',
+      kind: 'number',
+      required: false,
+      min: 5,
+      max: 300,
+      step: 5,
+      default: 120,
+      help: 'Generation time scales with this.',
+    },
+    {
+      name: 'steps',
+      label: 'Steps',
+      kind: 'number',
+      required: false,
+      min: 1,
+      max: 100,
+      step: 1,
+      default: 8,
+      advanced: true,
+      help: 'More steps take longer and change the result more than they improve it.',
+    },
+    {
+      name: 'guidanceScale',
+      label: 'Guidance',
+      kind: 'number',
+      required: false,
+      min: 0,
+      max: 20,
+      step: 0.1,
+      default: 1,
+      advanced: true,
+      help: 'How closely the model follows the prompt.',
+    },
+    {
+      name: 'seed',
+      label: 'Seed',
+      kind: 'number',
+      required: false,
+      min: 0,
+      max: 2_147_483_647,
+      step: 1,
+      advanced: true,
+      help: 'Leave this empty for a different result every time.',
+    },
+  ],
+  buildRequest(params) {
+    // duration_seconds here, because Stable Audio takes it as a real flag
+    // rather than a request option the way MiniMax and HeartMuLa do.
+    const request: Record<string, unknown> = { text: params.prompt };
+
+    if (params.durationSeconds !== undefined) request.duration_seconds = params.durationSeconds;
+    if (params.steps !== undefined) request.num_inference_steps = params.steps;
+    if (params.guidanceScale !== undefined) request.guidance_scale = params.guidanceScale;
+    if (params.seed !== undefined) request.seed = params.seed;
+
+    return request;
+  },
+};
+
+const tasks = new Map<string, TaskDefinition>(
+  [text2music, minimax, heartmula, stableAudio].map((task) => [task.id, task]),
+);
 
 export function listTasks(): TaskDefinition[] {
   return [...tasks.values()];
@@ -262,7 +686,23 @@ export function validateParams(task: TaskDefinition, raw: unknown): ParamResult 
   return { ok: true, value };
 }
 
-/** Whether a catalog package can run this task, which is a family match. */
+/** Whether a catalog package can run this task: a family match, then the task's own say. */
 export function packageRunsTask(task: TaskDefinition, packageId: string): boolean {
-  return findPackage(packageId)?.spec.family === task.family;
+  if (findPackage(packageId)?.spec.family !== task.family) return false;
+  return task.acceptsPackage?.(packageId) ?? true;
+}
+
+/**
+ * Every package this task can run on, by id.
+ *
+ * Sent to the browser so the studio's precision list holds the same packages
+ * the service would accept, rather than the whole family and a rejection after
+ * the fact.
+ */
+export function taskPackageIds(task: TaskDefinition): string[] {
+  return loadSpecs()
+    .filter((spec) => spec.family === task.family)
+    .flatMap((spec) => spec.packages)
+    .map((pkg) => pkg.id)
+    .filter((id) => task.acceptsPackage?.(id) ?? true);
 }

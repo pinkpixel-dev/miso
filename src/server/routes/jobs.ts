@@ -9,7 +9,13 @@ import { readSettings } from '../db/settings.ts';
 import { unloadAll } from '../jobs/residency.ts';
 import { parseOriginalPrompt, parseStudioState, parseTitle } from '../jobs/studioState.ts';
 import { wake } from '../jobs/worker.ts';
-import { findTask, listTasks, packageRunsTask, validateParams } from '../tasks/registry.ts';
+import {
+  findTask,
+  listTasks,
+  packageRunsTask,
+  taskPackageIds,
+  validateParams,
+} from '../tasks/registry.ts';
 
 /**
  * Tasks and jobs.
@@ -28,6 +34,8 @@ jobRoutes.get('/tasks', (c) =>
       label: task.label,
       summary: task.summary,
       family: task.family,
+      vocals: task.vocals,
+      packageIds: taskPackageIds(task),
       fields: task.fields,
     })),
   ),

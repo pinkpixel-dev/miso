@@ -106,7 +106,7 @@ export async function ensureLoaded(
     family: found.spec.family,
     path,
     task: task.serverTask,
-    sessionOptions: task.sessionOptions,
+    sessionOptions: task.sessionOptions?.(found.pkg),
   });
 
   return loaded.ok ? { ok: true } : failed(loaded);

@@ -1,7 +1,7 @@
 import { Eraser, Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { LyricsDraft, StudioState, StudioTask, TaskField } from '../../shared/types.ts';
-import { KEYS, VOCAL_MODES, compilePrompt, wantsLyrics } from '../lib/studio.ts';
+import { KEYS, VOCAL_MODES, compilePrompt, effectiveVocalMode, wantsLyrics } from '../lib/studio.ts';
 import { BuilderCard } from './BuilderCard.tsx';
 import { LyricsAssistant } from './LyricsAssistant.tsx';
 import { LyricsEditor } from './LyricsEditor.tsx';
@@ -181,12 +181,25 @@ export function PromptBuilder({
   const [writing, setWriting] = useState(false);
   const field = (name: string) => task.fields.find((entry) => entry.name === name);
 
-  const prompt = compilePrompt(builder);
+  const prompt = compilePrompt(builder, task.family, task.vocals);
   const lyricsField = field('lyrics');
   const bpmField = field('bpm');
   const keyField = field('keyscale');
-  const instrumental = !wantsLyrics(builder);
+  const instrumental = !wantsLyrics(builder, task.vocals);
   const lyrics = lyricsField ? (values[lyricsField.name] ?? '') : '';
+
+  // What the model can do wins over what the toggle says. The control stays on
+  // screen and locks rather than disappearing, because a section that vanishes
+  // when the model changes moves the rest of the form and answers nobody's
+  // question about where the vocals went. See DOCS/MEMORY.md.
+  const vocalsLocked = task.vocals !== 'both';
+  const vocalMode = effectiveVocalMode(builder, task.vocals);
+  const vocalsHint =
+    task.vocals === 'never'
+      ? `${task.label} does not generate vocals, so every take from it is instrumental.`
+      : task.vocals === 'required'
+        ? `${task.label} always sings, so it has no instrumental setting.`
+        : undefined;
 
   return (
     <>
@@ -223,7 +236,9 @@ export function PromptBuilder({
             label="Vocals"
             name="vocal-mode"
             options={VOCAL_MODES}
-            value={builder.vocalMode}
+            value={vocalMode}
+            disabled={vocalsLocked}
+            hint={vocalsHint}
             onChange={(value) => onBuilder({ ...builder, vocalMode: value })}
           />
 

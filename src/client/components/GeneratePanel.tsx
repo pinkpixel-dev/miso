@@ -11,7 +11,7 @@ import type {
   TaskField,
 } from '../../shared/types.ts';
 import { api } from '../lib/api.ts';
-import { EMPTY_STUDIO, compilePrompt, supportsGuided, wantsLyrics } from '../lib/studio.ts';
+import { EMPTY_STUDIO, compile, supportsGuided, wantsLyrics } from '../lib/studio.ts';
 import { estimateSeconds } from '../lib/useJobs.ts';
 import { BuilderCard } from './BuilderCard.tsx';
 import { LyricsEditor } from './LyricsEditor.tsx';
@@ -46,8 +46,14 @@ const MODES: { value: Mode; label: string }[] = [
   { value: 'custom', label: 'Custom' },
 ];
 
-/** Fields guided mode draws itself, so the plain renderer must not draw them again. */
-const BUILT_BY_GUIDED = new Set(['prompt', 'lyrics', 'bpm', 'keyscale']);
+/**
+ * Fields guided mode draws itself, so the plain renderer must not draw them again.
+ *
+ * `tags` is here because the builder compiles it for HeartMuLa out of the same
+ * words the other families put in the prompt. Custom mode still asks for it,
+ * which is where the box comes back.
+ */
+const BUILT_BY_GUIDED = new Set(['prompt', 'lyrics', 'bpm', 'keyscale', 'tags']);
 
 function initialValues(task: StudioTask): Values {
   const values: Values = {};
@@ -57,11 +63,53 @@ function initialValues(task: StudioTask): Values {
   return values;
 }
 
-/** Installed packages of this task's family, recommended first. */
-function packagesFor(catalog: Catalog | undefined, task: StudioTask): CatalogPackage[] {
-  const family = catalog?.families.find((entry) => entry.family === task.family);
-  if (!family) return [];
-  return [...family.packages].sort((a, b) => Number(b.recommended) - Number(a.recommended));
+/** One installed model the studio can generate with, and the task that runs it. */
+interface ModelChoice {
+  task: StudioTask;
+  pkg: CatalogPackage;
+}
+
+/**
+ * Every installed model this build can generate with, in family order.
+ *
+ * One list, rather than a family control and a build control beside it. What
+ * you download is a model you can run, and its name already says which family
+ * it belongs to, so asking for the family first put the same question on screen
+ * twice.
+ *
+ * A task is only offered the packages it declares. Stable Audio ships SFX
+ * packages beside its music ones, and those belong to a task this form does not
+ * run, so they are left out here and the service would refuse them anyway.
+ */
+function modelChoices(catalog: Catalog | undefined, tasks: StudioTask[]): ModelChoice[] {
+  const choices: ModelChoice[] = [];
+
+  for (const task of tasks) {
+    const family = catalog?.families.find((entry) => entry.family === task.family);
+    if (!family) continue;
+
+    const packages = family.packages
+      .filter((pkg) => pkg.installed && task.packageIds.includes(pkg.id))
+      .sort((a, b) => Number(b.recommended) - Number(a.recommended));
+
+    for (const pkg of packages) choices.push({ task, pkg });
+  }
+
+  return choices;
+}
+
+/**
+ * A package label with the model name taken off the front.
+ *
+ * Every option sits under a heading naming its model, so the full catalog name
+ * repeats that heading and pushes the part that actually differs off the end of
+ * the box. Falls back to the whole label when it does not start with the model
+ * name, which is better than showing a fragment of one.
+ */
+function buildLabel(pkg: CatalogPackage, modelLabel: string): string {
+  if (!pkg.label.startsWith(modelLabel)) return pkg.label;
+  const rest = pkg.label.slice(modelLabel.length).trim();
+  return rest === '' ? pkg.label : rest;
 }
 
 function describeEstimate(seconds: number | undefined): string {
@@ -132,7 +180,6 @@ export function GeneratePanel({
     originalPrompt?: string;
   }) => Promise<boolean>;
 }) {
-  const [taskId, setTaskId] = useState<string | undefined>();
   const [modelId, setModelId] = useState<string | undefined>();
   const [values, setValues] = useState<Values>({});
   const [title, setTitle] = useState('');
@@ -141,18 +188,26 @@ export function GeneratePanel({
   const [submitting, setSubmitting] = useState(false);
 
   // An accepted expansion replaces the prompt that is sent and keeps the one it
-  // came from, which is what the job records as the original.
-  const [enhanced, setEnhanced] = useState<{ original: string; text: string } | undefined>();
+  // came from, which is what the job records as the original. `origin` is what
+  // it was made from rather than what that compiled to, which is what lets it
+  // survive a model switch.
+  const [enhanced, setEnhanced] = useState<
+    { origin: string; original: string; text: string } | undefined
+  >();
   const [suggesting, setSuggesting] = useState(false);
   const [suggestion, setSuggestion] = useState<PromptSuggestion | undefined>();
   const [suggestBusy, setSuggestBusy] = useState(false);
   const [suggestError, setSuggestError] = useState<string | undefined>();
 
-  const task = tasks.find((entry) => entry.id === taskId) ?? tasks[0];
-  const packages = useMemo(() => (task ? packagesFor(catalog, task) : []), [catalog, task]);
-  const installed = packages.filter((entry) => entry.installed);
+  const choices = useMemo(() => modelChoices(catalog, tasks), [catalog, tasks]);
 
-  const chosenModel = modelId ?? installed[0]?.id;
+  // The chosen model decides the task, rather than the task deciding which
+  // models are on offer. With nothing installed the form falls back to the
+  // first task, so it still has fields to draw and somewhere to put the message
+  // saying to go and install something.
+  const chosen = choices.find((entry) => entry.pkg.id === modelId) ?? choices[0];
+  const task = chosen?.task ?? tasks[0];
+  const chosenModel = chosen?.pkg.id;
   const fieldValues = Object.keys(values).length > 0 || !task ? values : initialValues(task);
 
   if (!task) {
@@ -170,14 +225,27 @@ export function GeneratePanel({
 
   const setValue = (name: string, value: string) => setValues({ ...fieldValues, [name]: value });
 
-  const written = guided ? compilePrompt(builder) : (fieldValues.prompt ?? '').trim();
+  // Compiled once per render. The prompt is shown in full before anything is
+  // queued, and the params are whatever else this family asks the builder to
+  // write, which today is HeartMuLa's tags and nothing else.
+  const compiled = guided ? compile(builder, task.family, task.vocals) : undefined;
+  const written = compiled ? compiled.prompt : (fieldValues.prompt ?? '').trim();
+
+  // What the expansion was made from, which is not the same as what it compiled
+  // to. Every family writes the compiled prompt differently, so anchoring
+  // staleness to that text threw a perfectly good expansion away on a model
+  // switch and charged another call to the provider for it. Anchored to the
+  // builder instead, an expansion lasts until the words behind it change.
+  const enhanceOrigin = guided
+    ? JSON.stringify([builder.style, builder.mood, builder.vocalMode, builder.vocalStyle])
+    : written;
 
   // An expansion stops applying the moment the form it was made from changes,
   // because a prompt written for a different style is not an expansion of this
   // one any more.
-  const stale = enhanced !== undefined && enhanced.original !== written;
+  const stale = enhanced !== undefined && enhanced.origin !== enhanceOrigin;
   const prompt = enhanced !== undefined && !stale ? enhanced.text : written;
-  const instrumental = guided && !wantsLyrics(builder);
+  const instrumental = guided && !wantsLyrics(builder, task.vocals);
 
   // The dialog opens on an answer, not on the request, so nobody is shown two
   // empty boxes while a provider thinks about it. A failure before it opens has
@@ -205,6 +273,10 @@ export function GeneratePanel({
   const missing = task.fields.some((field) => {
     if (!field.required) return false;
     if (guided && field.name === 'prompt') return prompt === '';
+    // A required field the builder writes is satisfied by what it wrote, not by
+    // a box that guided mode never put on screen.
+    const built = compiled?.params[field.name];
+    if (built !== undefined) return built === '';
     return (fieldValues[field.name] ?? '').trim() === '';
   });
 
@@ -223,6 +295,15 @@ export function GeneratePanel({
       }
       if (instrumental && field.kind === 'lyrics') continue;
 
+      // Fields the builder writes for this family. The box is not on screen in
+      // guided mode, so the value comes from the compiler rather than from
+      // whatever custom mode was last left holding.
+      const built = compiled?.params[field.name];
+      if (built !== undefined) {
+        if (built !== '') params[field.name] = built;
+        continue;
+      }
+
       const raw = (fieldValues[field.name] ?? '').trim();
       if (raw === '') continue;
       params[field.name] = field.kind === 'number' ? Number(raw) : raw;
@@ -234,7 +315,10 @@ export function GeneratePanel({
       params,
       title: title.trim() === '' ? undefined : title.trim(),
       studio: guided ? builder : undefined,
-      originalPrompt: prompt === written ? undefined : written,
+      // The prompt as it was written before the assistant expanded it, which
+      // the expansion carries with it rather than being recompiled from the
+      // family that happens to be selected now.
+      originalPrompt: enhanced !== undefined && !stale ? enhanced.original : undefined,
     });
     setSubmitting(false);
 
@@ -271,23 +355,53 @@ export function GeneratePanel({
           />
         ) : null}
 
+        {/*
+          One list of what is downloaded. Picking a model picks its family too,
+          because a package belongs to exactly one, which is why there is no
+          separate family control beside this. The headings name the model and
+          the options under them name the build, so neither repeats the other.
+        */}
         <label className="flex min-w-0 flex-1 items-center justify-end gap-2">
           <span className="shrink-0 text-xs font-medium text-ink-faint">Model</span>
           <select
             value={chosenModel ?? ''}
-            disabled={installed.length === 0}
-            onChange={(event) => setModelId(event.target.value)}
+            disabled={choices.length === 0}
+            onChange={(event) => {
+              const next = choices.find((entry) => entry.pkg.id === event.target.value);
+              setModelId(event.target.value);
+              // A different family draws different fields, so what was typed
+              // into the last one is let go rather than carried into a form it
+              // does not belong to. Moving between builds of one model keeps it.
+              if (next && next.task.id !== task.id) {
+                // The prompt is kept, and everything else is let go. It is the
+                // one field every generation task has, and the one that may
+                // have cost a call to the provider, so carrying it across is
+                // worth more than the tidiness of a blank form. The expansion
+                // made from it survives with it.
+                const carried = (fieldValues.prompt ?? '').trim();
+                setValues(carried === '' ? {} : { prompt: fieldValues.prompt ?? '' });
+              }
+            }}
             className="min-h-9 min-w-0 max-w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink transition-colors duration-150 hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {installed.length === 0 ? (
+            {choices.length === 0 ? (
               <option value="">No model installed</option>
             ) : (
-              installed.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.label}
-                  {entry.recommended ? ' (recommended)' : ''}
-                </option>
-              ))
+              tasks.map((entry) => {
+                const group = choices.filter((choice) => choice.task.id === entry.id);
+                if (group.length === 0) return null;
+
+                return (
+                  <optgroup key={entry.id} label={entry.label}>
+                    {group.map(({ pkg }) => (
+                      <option key={pkg.id} value={pkg.id}>
+                        {buildLabel(pkg, entry.label)}
+                        {pkg.recommended ? ' (recommended)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })
             )}
           </select>
         </label>
@@ -296,27 +410,6 @@ export function GeneratePanel({
       <p className="-mt-2 text-xs text-ink-faint">
         {describeEstimate(chosenModel ? estimateSeconds(jobs, task.id, chosenModel) : undefined)}
       </p>
-
-      {tasks.length > 1 ? (
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-ink">Task</span>
-          <select
-            value={task.id}
-            onChange={(event) => {
-              setTaskId(event.target.value);
-              setValues({});
-              setModelId(undefined);
-            }}
-            className="min-h-11 w-full rounded-md border border-line bg-canvas px-3 py-2 text-sm text-ink hover:border-line-strong"
-          >
-            {tasks.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {entry.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
 
       {/*
         The title is the name of the thing being made, so it reads as one:
@@ -435,7 +528,7 @@ export function GeneratePanel({
         busy={suggestBusy}
         error={suggesting ? suggestError : undefined}
         onRetry={() => void askForPrompt()}
-        onAccept={(next) => setEnhanced({ original: written, text: next })}
+        onAccept={(next) => setEnhanced({ origin: enhanceOrigin, original: written, text: next })}
         onClose={() => {
           setSuggesting(false);
           setSuggestion(undefined);
@@ -466,9 +559,9 @@ export function GeneratePanel({
         </BuilderCard>
       ) : null}
 
-      {installed.length === 0 && !catalogLoading ? (
+      {choices.length === 0 && !catalogLoading ? (
         <p className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-ink">
-          {task.label} needs a {task.family.replace('_', ' ')} model, and none is installed.{' '}
+          No generation model is installed.{' '}
           <Link to="/models" className="text-accent underline underline-offset-4 hover:no-underline">
             Install one on the Models screen
           </Link>

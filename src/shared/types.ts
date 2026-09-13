@@ -352,5 +352,24 @@ export interface StudioTask {
   label: string;
   summary: string;
   family: string;
+  /**
+   * Whether this family can sing.
+   *
+   * `required` means it cannot produce an instrumental, `never` means it cannot
+   * produce a vocal, and `both` means the choice is the person's. The builder
+   * locks its vocal control to match, rather than offering a setting the model
+   * will ignore. Declared by the task registry, not by the vendored spec, for
+   * the reason recorded in DOCS/MEMORY.md.
+   */
+  vocals: 'both' | 'required' | 'never';
+  /**
+   * The catalog packages this task can run on, by id.
+   *
+   * Usually every package of the family, because they are precisions of one
+   * model. Stable Audio is the exception: its SFX packages belong to a
+   * different task, so they are not in here and the studio does not offer them.
+   * Which of these are installed still comes from the catalog endpoint.
+   */
+  packageIds: string[];
   fields: TaskField[];
 }

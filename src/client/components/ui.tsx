@@ -287,6 +287,7 @@ export function SegmentedControl<T extends string>({
   hint,
   size = 'md',
   labelHidden = false,
+  disabled = false,
 }: {
   label: string;
   name: string;
@@ -294,6 +295,13 @@ export function SegmentedControl<T extends string>({
   value: T;
   onChange: (value: T) => void;
   hint?: string;
+  /**
+   * Locks the choice without taking it off the screen.
+   *
+   * Used where the answer is forced by something else the person picked, so the
+   * control still shows what is in force and the hint still says why.
+   */
+  disabled?: boolean;
   /**
    * Small is the toolbar version: one pill holding both halves, sized to sit in
    * a row of controls rather than in the flow of a form.
@@ -323,14 +331,26 @@ export function SegmentedControl<T extends string>({
             <label
               key={option.value}
               className={cx(
-                'inline-flex cursor-pointer items-center justify-center rounded-md border transition-colors duration-150',
+                'inline-flex items-center justify-center rounded-md border transition-colors duration-150',
                 'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent',
                 small ? 'min-h-8 px-3 text-xs' : 'min-h-11 px-4 text-sm',
+                disabled ? 'cursor-not-allowed' : 'cursor-pointer',
                 on
                   ? 'border-accent bg-accent text-accent-ink'
                   : small
-                    ? 'border-transparent text-ink-muted hover:text-ink active:bg-raised'
-                    : 'border-line bg-raised text-ink-muted hover:border-line-strong hover:text-ink active:bg-raised/70',
+                    ? 'border-transparent text-ink-muted'
+                    : 'border-line bg-raised text-ink-muted',
+                // A locked control keeps the chosen option legible and stops
+                // the others inviting a click they will not accept.
+                disabled
+                  ? on
+                    ? 'opacity-70'
+                    : 'opacity-40'
+                  : on
+                    ? ''
+                    : small
+                      ? 'hover:text-ink active:bg-raised'
+                      : 'hover:border-line-strong hover:text-ink active:bg-raised/70',
               )}
             >
               <input
@@ -338,6 +358,7 @@ export function SegmentedControl<T extends string>({
                 name={name}
                 value={option.value}
                 checked={on}
+                disabled={disabled}
                 onChange={() => onChange(option.value)}
                 className="sr-only"
               />

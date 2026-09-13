@@ -27,6 +27,18 @@ export interface SpecPackage {
    * list, so it is derived here rather than guessed at the call site.
    */
   directory: string;
+  /**
+   * Every file this package installs, as the spec lists them.
+   *
+   * Kept because a component-GGUF family cannot be loaded without them. MiniMax
+   * Music 3 ships its language model, depth decoder and flow transformer as
+   * separate files whose precisions vary per package, and the backend's own
+   * defaults name one fixed set that no package actually ships in full. The
+   * task registry reads the shipped filenames off this list and names them as
+   * session options. Server-side only: buildCatalog does not copy it into the
+   * browser's CatalogPackage.
+   */
+  files: string[];
 }
 
 export interface ModelSpec {
@@ -70,9 +82,13 @@ function asStringArray(value: unknown): string[] {
  * directory. Both end up as target_directory plus whatever directory the first
  * file sits in.
  */
+function packageFiles(pkg: Record<string, unknown>): string[] {
+  return Array.isArray(pkg.files) ? pkg.files.filter((f): f is string => typeof f === 'string') : [];
+}
+
 function packageDirectory(pkg: Record<string, unknown>, filename: string, index: number): string {
   const target = asString(pkg.target_directory, filename, `packages[${index}].target_directory`);
-  const files = Array.isArray(pkg.files) ? pkg.files.filter((f): f is string => typeof f === 'string') : [];
+  const files = packageFiles(pkg);
   const first = files[0];
   if (first === undefined) fail(filename, `packages[${index}].files must list at least one file`);
 
@@ -88,7 +104,13 @@ function parsePackage(value: unknown, filename: string, index: number): SpecPack
   const id = asString(pkg.id, filename, `packages[${index}].id`);
   const precision = asString(pkg.precision, filename, `packages[${index}].precision`);
   const label = typeof pkg.display_name === 'string' && pkg.display_name.trim() !== '' ? pkg.display_name : id;
-  return { id, label, precision, directory: packageDirectory(pkg, filename, index) };
+  return {
+    id,
+    label,
+    precision,
+    directory: packageDirectory(pkg, filename, index),
+    files: packageFiles(pkg),
+  };
 }
 
 export function parseSpec(raw: unknown, filename: string): ModelSpec {
