@@ -250,10 +250,15 @@ const text2music: TaskDefinition = {
  * `duration_sec` is an autoregressive frame budget rather than a final length,
  * and raising it raises VRAM. Its help text says budget for that reason.
  *
- * `vocals` is 'both' pending a real generation. The vendored spec marks lyrics
- * required, which would make this family vocals only, but /v1/tasks/run fills a
- * default for every field left out, so whether sending no lyrics actually
- * produces an instrumental is unproven. See phase 4.5 in DOCS/ROADMAP.md.
+ * `vocals` is 'required', which the server settled rather than the spec. The
+ * vendored spec marks lyrics required, but every field left out of
+ * /v1/tasks/run gets a default, so an instrumental might still have worked. It
+ * does not: a job sent without lyrics came back refused, in those words.
+ *
+ *     MiniMax Music 3 requires lyrics
+ *
+ * 'required' locks the studio's vocal control off Instrumental and says why,
+ * which is the same machinery Stable Audio uses to lock the other way.
  */
 const minimax: TaskDefinition = {
   id: 'generate.minimax',
@@ -261,7 +266,7 @@ const minimax: TaskDefinition = {
   summary: 'Writes a track from a production caption and tagged lyrics.',
   family: 'minimax_music3',
   serverTask: 'gen',
-  vocals: 'both',
+  vocals: 'required',
   /**
    * Which component GGUFs to load, read off the package that is installed.
    *
@@ -388,10 +393,12 @@ const minimax: TaskDefinition = {
     const request: Record<string, unknown> = { text: params.prompt };
 
     if (params.lyrics !== undefined && params.lyrics !== '') request.lyrics = params.lyrics;
-    // duration_sec, not duration_seconds. The families without routes take the
-    // shorter name, and sending the wrong one is silently ignored because every
-    // field has a default.
-    if (params.durationSeconds !== undefined) request.duration_sec = params.durationSeconds;
+    // duration_seconds, the same name every other family takes. `duration_sec`
+    // is the spelling the CLI's --request-option uses, and it is not the field
+    // the HTTP request object reads: sending it left this model on its own 20
+    // second default while the length asked for was ignored. Confirmed against
+    // a live server, 45 seconds asked and 44.93 delivered. See DOCS/ERRORS.md.
+    if (params.durationSeconds !== undefined) request.duration_seconds = params.durationSeconds;
     if (params.steps !== undefined) request.num_inference_steps = params.steps;
     if (params.guidanceScale !== undefined) request.guidance_scale = params.guidanceScale;
     if (params.arGuidanceScale !== undefined) request.ar_guidance_scale = params.arGuidanceScale;
@@ -519,7 +526,10 @@ const heartmula: TaskDefinition = {
 
     if (params.tags !== undefined && params.tags !== '') request.tags = params.tags;
     if (params.lyrics !== undefined && params.lyrics !== '') request.lyrics = params.lyrics;
-    if (params.durationSeconds !== undefined) request.duration_sec = params.durationSeconds;
+    // duration_seconds rather than the CLI's duration_sec, for the reason
+    // written against MiniMax above. This family was sending the same wrong
+    // name and would have been capped the same way.
+    if (params.durationSeconds !== undefined) request.duration_seconds = params.durationSeconds;
     if (params.steps !== undefined) request.num_inference_steps = params.steps;
     if (params.guidanceScale !== undefined) request.guidance_scale = params.guidanceScale;
     if (params.temperature !== undefined) request.temperature = params.temperature;

@@ -26,6 +26,14 @@ this file, so the earlier history lives in the git log.
 
 ### 🐛 Fixes
 
+- MiniMax Music 3 and HeartMuLa now make a track as long as you asked for. Both were sent
+  `duration_sec`, which is the name the command line takes rather than the one the server
+  reads, so MiniMax quietly capped every take at its own 20 second default however long the
+  form said. A 37 line lyric sheet came back cut off mid-song.
+- MiniMax Music 3 says up front that it cannot do an instrumental. The server refuses a
+  generation with no lyrics, so the Vocals control locks off Instrumental and explains why,
+  the same way Stable Audio locks on to it. The job is refused in the form instead of failing
+  after it queues.
 - MiniMax Music 3 generates instead of failing with a 500. It loads its language model, depth
   decoder, and flow transformer as three separate files, and Miso now names the ones the
   package you installed actually ships. The backend's own defaults name a set that no package

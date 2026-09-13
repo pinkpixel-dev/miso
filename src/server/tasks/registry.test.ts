@@ -215,6 +215,38 @@ describe('buildRequest', () => {
   });
 });
 
+describe('the duration field', () => {
+  /**
+   * `duration_sec` is the spelling the CLI's `--request-option` takes. The HTTP
+   * request object does not read it, so MiniMax ignored the length asked for
+   * and stayed on its own 20 second default. Every family takes
+   * `duration_seconds` over HTTP, confirmed live at 45 asked and 44.93
+   * delivered. See DOCS/ERRORS.md.
+   */
+  it('asks for the length under the one name the server reads', () => {
+    const ids = [
+      'generate.text2music',
+      'generate.minimax',
+      'generate.heartmula',
+      'generate.stableaudio',
+    ];
+
+    for (const id of ids) {
+      const task = taskOf(id);
+      const params = validateParams(task, {
+        prompt: 'synth pop',
+        tags: 'pop, bright',
+        lyrics: 'we rise',
+        durationSeconds: 45,
+      });
+      const request = task.buildRequest(params.ok ? params.value : {}, {});
+
+      expect(request, `${id} sends duration_seconds`).toMatchObject({ duration_seconds: 45 });
+      expect(`duration_sec` in request, `${id} does not send duration_sec`).toBe(false);
+    }
+  });
+});
+
 describe('the advanced flag', () => {
   it('keeps the prompt and the length on the form, and the sampler behind the drawer', () => {
     const advanced = new Set(
