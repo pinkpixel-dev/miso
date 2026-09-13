@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type {
@@ -14,6 +14,7 @@ import { api } from '../lib/api.ts';
 import { EMPTY_STUDIO, compile, supportsGuided, wantsLyrics } from '../lib/studio.ts';
 import { estimateSeconds } from '../lib/useJobs.ts';
 import { BuilderCard } from './BuilderCard.tsx';
+import { ConfirmDialog } from './Dialog.tsx';
 import { LyricsEditor } from './LyricsEditor.tsx';
 import { PromptBuilder } from './PromptBuilder.tsx';
 import { PromptSuggestionDialog } from './PromptSuggestionDialog.tsx';
@@ -186,6 +187,7 @@ export function GeneratePanel({
   const [builder, setBuilder] = useState<StudioState>(EMPTY_STUDIO);
   const [mode, setMode] = useState<Mode>('guided');
   const [submitting, setSubmitting] = useState(false);
+  const [confirmingNew, setConfirmingNew] = useState(false);
 
   // An accepted expansion replaces the prompt that is sent and keeps the one it
   // came from, which is what the job records as the original. `origin` is what
@@ -280,6 +282,35 @@ export function GeneratePanel({
     return (fieldValues[field.name] ?? '').trim() === '';
   });
 
+  // Whether starting again would lose anything. Boxes are compared against the
+  // task's own defaults rather than against empty, because a length that still
+  // reads 180 is not something anybody typed.
+  const defaults = initialValues(task);
+  const dirty =
+    title.trim() !== '' ||
+    enhanced !== undefined ||
+    builder.style.trim() !== '' ||
+    builder.mood.trim() !== '' ||
+    builder.vocalStyle.trim() !== '' ||
+    builder.vocalMode !== EMPTY_STUDIO.vocalMode ||
+    (Object.keys(values).length > 0 &&
+      task.fields.some((field) => (values[field.name] ?? '') !== (defaults[field.name] ?? '')));
+
+  // Everything describing the song goes, and the model stays. Clearing values
+  // back to an empty object is what restores the task's declared defaults,
+  // because fieldValues falls back to them while nothing has been typed.
+  const reset = () => {
+    setValues({});
+    setTitle('');
+    setBuilder(EMPTY_STUDIO);
+    setMode('guided');
+    setEnhanced(undefined);
+    setSuggestion(undefined);
+    setSuggestError(undefined);
+    setSuggesting(false);
+    setConfirmingNew(false);
+  };
+
   const submit = async () => {
     if (!chosenModel) return;
     setSubmitting(true);
@@ -335,25 +366,42 @@ export function GeneratePanel({
         above the cards at a size that does not compete with them.
       */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {guidedAvailable ? (
-          <SegmentedControl
-            label="Prompt"
-            labelHidden
-            size="sm"
-            name="prompt-mode"
-            options={MODES}
-            value={mode}
-            onChange={(next) => {
-              // Custom mode opens on whatever guided mode had built, so the
-              // switch is a handover rather than a blank page. What is already
-              // in the box wins, because that was typed.
-              if (next === 'custom' && (fieldValues.prompt ?? '').trim() === '' && prompt !== '') {
-                setValues({ ...fieldValues, prompt });
-              }
-              setMode(next);
-            }}
-          />
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {guidedAvailable ? (
+            <SegmentedControl
+              label="Prompt"
+              labelHidden
+              size="sm"
+              name="prompt-mode"
+              options={MODES}
+              value={mode}
+              onChange={(next) => {
+                // Custom mode opens on whatever guided mode had built, so the
+                // switch is a handover rather than a blank page. What is already
+                // in the box wins, because that was typed.
+                if (next === 'custom' && (fieldValues.prompt ?? '').trim() === '' && prompt !== '') {
+                  setValues({ ...fieldValues, prompt });
+                }
+                setMode(next);
+              }}
+            />
+          ) : null}
+
+          {/*
+            Clearing the form used to mean reloading the page. The model is
+            left alone on purpose: it is a machine setting rather than part of
+            the song, and re-picking it for every track would be a worse
+            annoyance than the one this fixes.
+          */}
+          <Button
+            variant="ghost"
+            className="min-h-9 px-2.5 py-1.5 text-xs"
+            onClick={() => (dirty ? setConfirmingNew(true) : reset())}
+          >
+            <Plus aria-hidden="true" className="h-4 w-4 shrink-0" />
+            New song
+          </Button>
+        </div>
 
         {/*
           One list of what is downloaded. Picking a model picks its family too,
@@ -534,6 +582,20 @@ export function GeneratePanel({
           setSuggestion(undefined);
           setSuggestError(undefined);
         }}
+      />
+
+      {/*
+        Asked rather than done, because lyrics are typed by hand and a prompt
+        may have cost a call to a provider. An empty form clears without this,
+        since a confirmation over nothing is just another click.
+      */}
+      <ConfirmDialog
+        open={confirmingNew}
+        title="Start a new song?"
+        body="The title, prompt, lyrics and builder settings on this form are cleared. Takes you have already generated are not touched."
+        confirmLabel="Clear the form"
+        onConfirm={reset}
+        onCancel={() => setConfirmingNew(false)}
       />
 
       {advancedFields.length > 0 ? (

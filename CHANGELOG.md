@@ -3,6 +3,18 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.11.0 - September 13, 2026
+
+### ✨ Create
+
+- A New song button clears the form so the next track starts from a blank one. The title,
+  the prompt, the lyrics, and every builder setting go. Until now this meant reloading the
+  page.
+- The model stays selected. It is a machine setting rather than part of the song, and
+  re-picking it for every track would have swapped one annoyance for another.
+- A form holding anything asks before it clears, the same way replacing written lyrics
+  already does. An empty form clears without the question.
+
 ## 0.10.0 - September 12, 2026
 
 ### 🎛️ Generation
