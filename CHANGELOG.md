@@ -3,6 +3,48 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.12.0 - September 14, 2026
+
+### 🎛️ Remix
+
+- A region editor at `/projects/:id/remix/:assetId`. Pick a take, select part of it on a tall
+  waveform, and repaint just that span. Everything outside your selection comes back
+  untouched.
+- The region can be dragged on the waveform or typed as two numbers in seconds. Arrow keys
+  move a boundary by a tenth of a second, and by a whole second with shift held. The numbers
+  are the real control rather than a fallback, so the editor works without a mouse.
+- Play just the selected region before you replace it. The dock pauses so the two players do
+  not talk over each other.
+- Two ways in: a Repaint action inside a take's detail panel, which opens the editor with
+  that take already loaded, and a Remix a take link in the takes column for when you have not
+  opened one.
+- The remix page takes the full width and carries its own source picker and queue. Playback
+  keeps going across the move, the same as every other route change.
+
+### 🔍 What repaint actually does
+
+- The prompt is optional, and the form says it nudges the result rather than instructing it.
+  This route does not follow a caption: measured against a live server on two different
+  ACE-Step builds, opposite styles came out 4 to 13 apart on a brightness measure where plain
+  generation put the same two prompts 1098 apart. The planner that turns text into content is
+  bypassed for repaint upstream.
+- Lyrics lead the form, as the only content control that does anything here. They are
+  followed on some runs and not others, the help says so, and it points at the seed, which is
+  the thing that actually changes a take you did not like.
+- A repaint repeats exactly for the same seed, so a take you liked can be got back.
+
+### 🐛 Fixes
+
+- Input assets are now checked against the project before a job is queued. A job naming a
+  track from another project was previously accepted and staged to the backend, which no task
+  could reach until this release added one that reads audio.
+- A region that is inverted, empty, or past the end of the source is refused when the job is
+  posted instead of failing a minute later with the GPU already busy.
+- Opening a project, moving to a tool route and reloading no longer leaves the studio with no
+  project. The route patterns now match nested paths.
+- The playback queue is kept by the studio provider rather than the takes column, so a take
+  that finishes while that column is off screen still reaches the dock's skip buttons.
+
 ## 0.11.0 - September 13, 2026
 
 ### ✨ Create
