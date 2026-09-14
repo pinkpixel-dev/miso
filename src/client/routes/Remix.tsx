@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { JobList } from '../components/JobList.tsx';
 import { RegionControls } from '../components/remix/RegionControls.tsx';
@@ -65,6 +65,16 @@ export function RemixRoute() {
     setRegion(defaultRegion(length));
   }, [asset?.id, asset?.durationSeconds]);
 
+  // Arriving here follows a link, and a client side route change leaves focus
+  // on whatever was clicked, which is a panel that has since closed. Moving it
+  // to the heading means a keyboard or screen reader lands at the top of the
+  // page it just opened rather than back at the document body.
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    heading.current?.focus();
+  }, [assetId]);
+
   const backTo = `/projects/${encodeURIComponent(routeProjectId ?? projectId ?? '')}`;
 
   if (!project && loading) {
@@ -75,7 +85,16 @@ export function RemixRoute() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate font-display text-lg font-semibold text-ink">
+          {/*
+            tabIndex -1 so it can be focused on arrival without joining the tab
+            order. Programmatic focus does not raise a focus ring, so this is
+            silent for a mouse and useful for everyone else.
+          */}
+          <h1
+            ref={heading}
+            tabIndex={-1}
+            className="truncate font-display text-lg font-semibold text-ink outline-none"
+          >
             Repaint a section
           </h1>
           <p className="mt-0.5 text-sm text-ink-faint">

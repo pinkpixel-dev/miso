@@ -1,7 +1,9 @@
-import { X } from 'lucide-react';
+import { Scissors, X } from 'lucide-react';
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
+import { Link } from 'react-router-dom';
 import type { Asset, Job } from '../../../shared/types.ts';
+import { remixPath } from '../../lib/routes.ts';
 import { stringJobParam } from '../../lib/takeDetails.ts';
 import { Tooltip, cx } from '../ui.tsx';
 
@@ -108,6 +110,26 @@ export function TakeDetailPanel({
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+              {/*
+                The fast way into the editor, with this take already the source.
+                A link rather than a button because it goes somewhere, so the
+                address ends up saying what is being edited and the back button
+                comes back here.
+              */}
+              <Link
+                to={remixPath(asset.projectId, asset.id)}
+                onClick={onClose}
+                className={cx(
+                  'mb-5 inline-flex min-h-11 items-center gap-2 rounded-md border border-line bg-raised px-3.5 py-2',
+                  'text-sm font-medium text-ink transition-colors duration-150',
+                  'hover:border-line-strong hover:bg-raised/70 active:bg-raised',
+                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+                )}
+              >
+                <Scissors aria-hidden="true" className="h-4 w-4 shrink-0" />
+                Repaint a section
+              </Link>
+
               {!job ? (
                 <section>
                   <h3 className="text-sm font-medium text-ink">

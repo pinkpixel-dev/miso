@@ -1,6 +1,8 @@
 import { Pencil } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Asset } from '../../../shared/types.ts';
+import { remixPath } from '../../lib/routes.ts';
 import { findProducingJob } from '../../lib/takeDetails.ts';
 import { usePlayer } from '../../lib/usePlayer.ts';
 import { useStudio } from '../../lib/useStudio.ts';
@@ -132,13 +134,29 @@ export function Workspace() {
             <IconButton label={`Rename ${project.name}`} icon={Pencil} onClick={beginRename} />
           ) : null}
         </div>
-        <p className="mt-0.5 text-xs text-ink-faint">
-          {projectId === undefined
-            ? 'Choose one on the left, or make a new one.'
-            : loading
-              ? 'Loading.'
-              : countLabel(assets.length)}
-        </p>
+        <div className="mt-0.5 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-ink-faint">
+            {projectId === undefined
+              ? 'Choose one on the left, or make a new one.'
+              : loading
+                ? 'Loading.'
+                : countLabel(assets.length)}
+          </p>
+
+          {/*
+            The discoverable way into the editor, for somebody who has not
+            opened a take yet. The fast way is the action inside a take's
+            detail panel, which arrives with that take already chosen.
+          */}
+          {projectId !== undefined && assets.length > 0 ? (
+            <Link
+              to={remixPath(projectId)}
+              className="shrink-0 rounded-sm text-xs text-accent underline underline-offset-4 hover:no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              Remix a take
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {projectId === undefined ? null : (
