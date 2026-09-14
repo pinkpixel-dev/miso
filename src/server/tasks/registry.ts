@@ -666,19 +666,21 @@ const stableAudio: TaskDefinition = {
  * What this route does and does not listen to was measured, and it is not what
  * the field names suggest:
  *
- *   - `lyrics` steers it. A repainted section sings what they say.
+ *   - `lyrics` are the only content control here that does anything, and even
+ *     they are unreliable. Across several runs a repainted section followed
+ *     them some of the time and went its own way the rest, so the field
+ *     promises nothing and tells people to try a few seeds.
  *
- *     Without them the singing does not reliably stop, it loses the words. One
- *     run came back with no vocal at all, another sang invented syllables in
- *     place of the line that was there. What both share, and what the form
- *     therefore says, is that the original words are not carried over. Repaint
- *     a sung passage without supplying its lyrics and the words are gone
- *     whichever way it lands.
+ *     Leaving them out does not reliably silence the vocal, it loses the words.
+ *     One run came back with no singing at all, another sang invented syllables
+ *     in place of the line that was there. What both share, and what the form
+ *     therefore says, is that the original words are never carried over.
  *   - `repaint_strength` and `seed` steer it. The same seed repeats exactly.
  *   - `text` does not steer it. It perturbs the result without directing it.
  *     It is still mandatory: omitting the key answers HTTP 500 "ACE-Step
  *     requires text_input", while an empty string is accepted. So the field is
- *     optional on the form and the request always carries it.
+ *     optional on the form and the request always carries it. Repeated runs
+ *     with the prompt left blank have all succeeded.
  *   - `audio_cover_strength` does nothing here. Every value from 1.0 down to
  *     0.0 returned byte-identical audio, so despite the upstream tutorial
  *     describing it as the freedom dial for this kind of edit, audio.cpp
@@ -734,7 +736,7 @@ const repaint: TaskDefinition = {
       label: 'Lyrics',
       kind: 'lyrics',
       required: false,
-      help: 'The words this section should sing. The model follows them. Without them it does not keep the words that were there, so give it the lyrics for the part you are replacing.',
+      help: 'The words this section should sing. It follows them on some runs and not others, and without them it does not keep the words that were there. Give it the lyrics for the part you are replacing, and expect to try a few seeds.',
     },
     // Optional, and honest about why. Requiring it would make people type
     // something meaningless before the button would unlock.

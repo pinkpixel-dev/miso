@@ -365,9 +365,10 @@ describe('remix.repaint', () => {
   });
 
   /**
-   * Observed twice, landing differently each time: once no vocal at all, once
-   * invented syllables where the line had been. The shared fact is that the
-   * original words are not carried over, which is what the field has to say.
+   * Observed across several runs, landing differently each time: once no vocal
+   * at all, once invented syllables where the line had been, and lyrics that
+   * were followed on some attempts and not others. The shared fact is that the
+   * original words are never carried over, which is what the field has to say.
    * Losing the words of a sung passage without being warned is the failure.
    */
   it('tells people the original words are not kept unless they supply them', () => {

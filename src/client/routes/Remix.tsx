@@ -151,7 +151,7 @@ export function RemixRoute() {
       ) : (
         <Panel
           title={asset.label}
-          description="Select the part to replace. Miso rebuilds it in the style of the track around it, singing any lyrics you give."
+          description="Select the part to replace. Miso rebuilds it in the style of the track around it. Lyrics steer what it sings, though not on every run."
         >
           <div className="flex flex-col gap-5">
             {asset.peaks === undefined ? (
