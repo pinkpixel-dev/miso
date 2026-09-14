@@ -3,6 +3,34 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.13.0 - September 14, 2026
+
+### 📁 The project page
+
+- Opening a project now shows the project. `/projects/:id` is a full width page holding
+  everything in it, and the create form moved to `/projects/:id/create`.
+- Takes are grouped by how they were made: generated songs first, then a section per remix
+  tool, then imported audio, then stems. Each section says how many takes are in it.
+- The page carries the project name with inline rename, the total size, links into the tools,
+  the import zone, the queue, and the take detail panel.
+- Arriving on the page moves focus to its heading, so a keyboard or screen reader lands at
+  the top of the page rather than back at the document body.
+
+### 🎛️ Create
+
+- The takes column beside the create form now shows only what that form generated. Imports
+  and anything made out of another take live on the project page.
+- A shorter list says so rather than dropping rows quietly. The count follows the filtered
+  list, and a line underneath links to the rest on the project page.
+- The create page gained a back link to the project it sits under.
+
+### 🧹 Maintenance
+
+- Grouping rules live in one tested module, `takeGroups.ts`, shared by both pages so they
+  cannot disagree about what counts as a generated take.
+- `projectPath` joins `createPath` and `remixPath` in `routes.ts`, and the remix page's back
+  link builds its path through it.
+
 ## 0.12.0 - September 14, 2026
 
 ### 🎛️ Remix
