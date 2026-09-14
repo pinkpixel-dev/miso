@@ -8,18 +8,18 @@ import type {
   PromptSuggestion,
   StudioState,
   StudioTask,
-  TaskField,
 } from '../../shared/types.ts';
 import { api } from '../lib/api.ts';
+import { buildLabel, installedPackages } from '../lib/models.ts';
 import { EMPTY_STUDIO, compile, supportsGuided, wantsLyrics } from '../lib/studio.ts';
 import { estimateSeconds } from '../lib/useJobs.ts';
 import { BuilderCard } from './BuilderCard.tsx';
 import { ConfirmDialog } from './Dialog.tsx';
-import { LyricsEditor } from './LyricsEditor.tsx';
 import { PromptBuilder } from './PromptBuilder.tsx';
 import { PromptSuggestionDialog } from './PromptSuggestionDialog.tsx';
 import { SavedPrompts } from './SavedPrompts.tsx';
-import { Button, Field, IconButton, Panel, SegmentedControl, TextArea } from './ui.tsx';
+import { PlainField } from './TaskFields.tsx';
+import { Button, IconButton, Panel, SegmentedControl } from './ui.tsx';
 
 /**
  * The create column.
@@ -86,79 +86,16 @@ function modelChoices(catalog: Catalog | undefined, tasks: StudioTask[]): ModelC
   const choices: ModelChoice[] = [];
 
   for (const task of tasks) {
-    const family = catalog?.families.find((entry) => entry.family === task.family);
-    if (!family) continue;
-
-    const packages = family.packages
-      .filter((pkg) => pkg.installed && task.packageIds.includes(pkg.id))
-      .sort((a, b) => Number(b.recommended) - Number(a.recommended));
-
-    for (const pkg of packages) choices.push({ task, pkg });
+    for (const pkg of installedPackages(catalog, task)) choices.push({ task, pkg });
   }
 
   return choices;
-}
-
-/**
- * A package label with the model name taken off the front.
- *
- * Every option sits under a heading naming its model, so the full catalog name
- * repeats that heading and pushes the part that actually differs off the end of
- * the box. Falls back to the whole label when it does not start with the model
- * name, which is better than showing a fragment of one.
- */
-function buildLabel(pkg: CatalogPackage, modelLabel: string): string {
-  if (!pkg.label.startsWith(modelLabel)) return pkg.label;
-  const rest = pkg.label.slice(modelLabel.length).trim();
-  return rest === '' ? pkg.label : rest;
 }
 
 function describeEstimate(seconds: number | undefined): string {
   if (seconds === undefined) return 'The first run also loads the model, so it takes longer.';
   if (seconds < 90) return `Past runs took about ${seconds} seconds.`;
   return `Past runs took about ${Math.round(seconds / 60)} minutes.`;
-}
-
-/** One task field, drawn the way its kind asks to be drawn. */
-function PlainField({
-  field,
-  value,
-  onChange,
-}: {
-  field: TaskField;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  if (field.kind === 'number') {
-    return (
-      <Field
-        label={field.label}
-        type="number"
-        inputMode="decimal"
-        min={field.min}
-        max={field.max}
-        step={field.step}
-        hint={field.help}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    );
-  }
-
-  if (field.kind === 'lyrics') {
-    return <LyricsEditor label={field.label} hint={field.help} value={value} onChange={onChange} />;
-  }
-
-  return (
-    <TextArea
-      label={field.label}
-      rows={3}
-      hint={field.help}
-      placeholder="cinematic synth pop with clear vocals"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  );
 }
 
 export function GeneratePanel({

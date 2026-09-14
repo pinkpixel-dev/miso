@@ -1,8 +1,10 @@
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { JobList } from '../components/JobList.tsx';
 import { RegionControls } from '../components/remix/RegionControls.tsx';
 import { RegionEditor } from '../components/remix/RegionEditor.tsx';
+import { RemixForm } from '../components/remix/RemixForm.tsx';
 import { SourcePicker } from '../components/remix/SourcePicker.tsx';
 import { Button, Panel } from '../components/ui.tsx';
 import { defaultRegion, type Region } from '../lib/region.ts';
@@ -21,12 +23,33 @@ import { useStudio } from '../lib/useStudio.ts';
  * and this page carries its own source list, so showing both would be one list
  * twice. The shell drops the column for this route.
  */
+/** The registry task this page drives. */
+const REMIX_TASK_ID = 'remix.repaint';
+
 export function RemixRoute() {
   const { id: routeProjectId, assetId } = useParams();
-  const { project, projectId, assets, loading, computePeaksFor } = useStudio();
+  const {
+    project,
+    projectId,
+    assets,
+    tasks,
+    catalog,
+    jobs,
+    loading,
+    error,
+    submit,
+    cancelJob,
+    dismissJobs,
+    dismissedCount,
+    computePeaksFor,
+  } = useStudio();
   const { nowPlaying, playing, toggle } = usePlayer();
 
   const asset = assets.find((entry) => entry.id === assetId);
+  // This page is the repaint editor specifically, so it asks for that task by
+  // name rather than offering whichever remix routes happen to exist. The other
+  // ACE-Step routes get their own pages when they arrive.
+  const task = tasks.find((entry) => entry.id === REMIX_TASK_ID);
 
   // The asset row's own figure until wavesurfer has decoded enough to disagree.
   // Starting from it means the region opens in the right place rather than
@@ -70,6 +93,15 @@ export function RemixRoute() {
           {project ? `Back to ${project.name}` : 'Back to the project'}
         </Link>
       </div>
+
+      {error ? (
+        <p
+          role="alert"
+          className="rounded-md border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-ink"
+        >
+          {error}
+        </p>
+      ) : null}
 
       {assetId === undefined ? (
         <Panel title="Pick a source">
@@ -129,8 +161,39 @@ export function RemixRoute() {
             />
 
             <RegionControls region={region} duration={duration} onRegion={setRegion} />
+
+            {task === undefined ? (
+              <p className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-ink">
+                This build of Miso has no repaint task, so nothing can be queued from here.
+              </p>
+            ) : (
+              <div className="border-t border-line pt-5">
+                <RemixForm
+                  task={task}
+                  asset={asset}
+                  region={region}
+                  catalog={catalog}
+                  jobs={jobs}
+                  onSubmit={submit}
+                />
+              </div>
+            )}
           </div>
         </Panel>
+      )}
+
+      {/*
+        The queue lives on this page because the takes column that normally
+        carries it is not on screen here. Without it a repaint would be queued
+        into silence.
+      */}
+      {assetId === undefined ? null : (
+        <JobList
+          jobs={jobs}
+          hiddenCount={dismissedCount}
+          onCancel={cancelJob}
+          onClear={dismissJobs}
+        />
       )}
     </div>
   );

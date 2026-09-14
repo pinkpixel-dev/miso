@@ -36,6 +36,8 @@ export interface StudioValue {
     title?: string;
     studio?: StudioState;
     originalPrompt?: string;
+    /** Assets the task reads, by the role it gives them. Empty for generation. */
+    inputs?: { assetId: string; role: string }[];
   }) => Promise<boolean>;
   cancelJob: (jobId: string) => void;
   /** Hides finished jobs. The rows stay, so a take can still show what made it. */

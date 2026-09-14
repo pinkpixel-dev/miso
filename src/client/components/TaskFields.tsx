@@ -1,0 +1,55 @@
+import type { TaskField } from '../../shared/types.ts';
+import { LyricsEditor } from './LyricsEditor.tsx';
+import { Field, TextArea } from './ui.tsx';
+
+/**
+ * One task field, drawn the way its kind asks to be drawn.
+ *
+ * Shared by the create column and the remix page. Both render whatever fields
+ * the service says a task takes, which is the point of the task registry: a new
+ * task arrives as data and gets a working form without a new screen. Two copies
+ * of these rules would eventually disagree about how a lyrics box looks.
+ */
+export function PlainField({
+  field,
+  value,
+  onChange,
+  placeholder = 'cinematic synth pop with clear vocals',
+}: {
+  field: TaskField;
+  value: string;
+  onChange: (value: string) => void;
+  /** The example shown in an empty text box, which differs by what is being written. */
+  placeholder?: string;
+}) {
+  if (field.kind === 'number') {
+    return (
+      <Field
+        label={field.label}
+        type="number"
+        inputMode="decimal"
+        min={field.min}
+        max={field.max}
+        step={field.step}
+        hint={field.help}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  }
+
+  if (field.kind === 'lyrics') {
+    return <LyricsEditor label={field.label} hint={field.help} value={value} onChange={onChange} />;
+  }
+
+  return (
+    <TextArea
+      label={field.label}
+      rows={3}
+      hint={field.help}
+      placeholder={placeholder}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  );
+}
