@@ -663,6 +663,35 @@ const stableAudio: TaskDefinition = {
  * at 20.00 seconds in and 20.00 seconds out, so a box asking for a length would
  * be a control the model ignores.
  *
+ * What this route does and does not listen to was measured, and it is not what
+ * the field names suggest:
+ *
+ *   - `lyrics` steers it. A repainted section sings what they say.
+ *
+ *     Without them the singing does not reliably stop, it loses the words. One
+ *     run came back with no vocal at all, another sang invented syllables in
+ *     place of the line that was there. What both share, and what the form
+ *     therefore says, is that the original words are not carried over. Repaint
+ *     a sung passage without supplying its lyrics and the words are gone
+ *     whichever way it lands.
+ *   - `repaint_strength` and `seed` steer it. The same seed repeats exactly.
+ *   - `text` does not steer it. It perturbs the result without directing it.
+ *     It is still mandatory: omitting the key answers HTTP 500 "ACE-Step
+ *     requires text_input", while an empty string is accepted. So the field is
+ *     optional on the form and the request always carries it.
+ *   - `audio_cover_strength` does nothing here. Every value from 1.0 down to
+ *     0.0 returned byte-identical audio, so despite the upstream tutorial
+ *     describing it as the freedom dial for this kind of edit, audio.cpp
+ *     appears to wire it only into the cover routes.
+ *
+ * The prompt is therefore optional and says so on the form. Opposite prompts,
+ * "solo piano" against "distorted metal guitar", produced audio 4 to 13 apart
+ * on a brightness measure, while the same two prompts through text2music on the
+ * same package came out 1098 apart. Confirmed on ACE-Step Turbo and again on
+ * Base, so it is a property of the route rather than of guidance distillation:
+ * the manual lists the planner as unused here, and the planner is what turns
+ * text into the semantic tokens that decide content. See DOCS/ERRORS.md.
+ *
  * repaint_mode stays out while repaint_strength covers the same idea. Three
  * named presets beside a 0 to 1 dial are two controls for one question.
  */
@@ -677,13 +706,6 @@ const repaint: TaskDefinition = {
   sessionOptions: () => ({ 'ace_step.mem_saver': 'true' }),
   inputRoles: ['source'],
   fields: [
-    {
-      name: 'prompt',
-      label: 'Prompt',
-      kind: 'text',
-      required: true,
-      help: 'What the new section should sound like, for example a brighter chorus.',
-    },
     {
       name: 'regionStart',
       label: 'Region start in seconds',
@@ -704,12 +726,24 @@ const repaint: TaskDefinition = {
       step: 0.1,
       help: 'Has to land after the start, and inside the track.',
     },
+    // Lyrics lead the form because they are the one content control that
+    // works on this route. They reach the model down a different path from the
+    // text prompt, and a repainted vocal section sings what they say.
     {
       name: 'lyrics',
       label: 'Lyrics',
       kind: 'lyrics',
       required: false,
-      help: 'Words for the section being replaced, if it has any.',
+      help: 'The words this section should sing. The model follows them. Without them it does not keep the words that were there, so give it the lyrics for the part you are replacing.',
+    },
+    // Optional, and honest about why. Requiring it would make people type
+    // something meaningless before the button would unlock.
+    {
+      name: 'prompt',
+      label: 'Prompt',
+      kind: 'text',
+      required: false,
+      help: 'A nudge rather than an instruction. This route rebuilds the section from the music around it, so the prompt changes the result without deciding what you get.',
     },
     {
       name: 'strength',
@@ -757,13 +791,17 @@ const repaint: TaskDefinition = {
   buildRequest(params, staged) {
     const request: Record<string, unknown> = {
       task_route: 'repaint',
-      text: params.prompt,
       // The staged path the worker uploaded, under the one name that works.
       audio: staged.source,
       repaint_start: params.regionStart,
       repaint_end: params.regionEnd,
     };
 
+    // Always sent, even when empty. This is the one field on the route with no
+    // server-side default: leaving the key out answers HTTP 500 "ACE-Step
+    // requires text_input". An empty string is accepted, and that is what lets
+    // the form leave the prompt optional.
+    request.text = params.prompt ?? '';
     if (params.lyrics !== undefined && params.lyrics !== '') request.lyrics = params.lyrics;
     if (params.strength !== undefined) request.repaint_strength = params.strength;
     if (params.steps !== undefined) request.num_inference_steps = params.steps;

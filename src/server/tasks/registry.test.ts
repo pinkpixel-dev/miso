@@ -309,6 +309,21 @@ describe('remix.repaint', () => {
     expect(repaint.fields.some((field) => field.name === 'durationSeconds')).toBe(false);
   });
 
+  /**
+   * Measured, after an earlier version of this test asserted the opposite and
+   * was wrong. Unlike every other field on this route, `text` has no
+   * server-side default: leaving the key out answers HTTP 500 "ACE-Step
+   * requires text_input". An empty string is accepted, which is the only reason
+   * the form can offer the prompt as optional.
+   */
+  it('always sends text, empty when nobody typed a prompt', () => {
+    const result = validateParams(repaint, { regionStart: 5, regionEnd: 10 });
+    const request = repaint.buildRequest(result.ok ? result.value : {}, { source: '/tmp/a.wav' });
+
+    expect(request.text).toBe('');
+    expect(request).toMatchObject({ task_route: 'repaint', repaint_start: 5, repaint_end: 10 });
+  });
+
   it('leaves out the lyrics and the seed when they were not set', () => {
     const result = params();
     const request = repaint.buildRequest(result.ok ? result.value : {}, { source: '/tmp/a.wav' });
@@ -321,6 +336,44 @@ describe('remix.repaint', () => {
     // It decides whether the section is nudged or replaced, which is the
     // second question everybody asks.
     expect(repaint.fields.find((field) => field.name === 'strength')?.advanced).toBeUndefined();
+  });
+
+  /**
+   * Measured against a live server, not assumed. Opposite prompts through this
+   * route came out 4 to 13 apart on a brightness measure, while the same two
+   * through text2music on the same package came out 1098 apart. The route lists
+   * the planner as unused, and the planner is what turns text into the tokens
+   * that decide content. Requiring a prompt would make people type something
+   * meaningless to unlock the button.
+   */
+  it('does not require a prompt, because the route does not follow one', () => {
+    expect(repaint.fields.find((field) => field.name === 'prompt')?.required).toBe(false);
+    expect(validateParams(repaint, { regionStart: 5, regionEnd: 10 })).toMatchObject({ ok: true });
+  });
+
+  /**
+   * Lyrics are the one content control that works here, and an empty box means
+   * the section comes back with no singing at all. That makes them the first
+   * thing on the form rather than a box below the prompt.
+   */
+  it('puts lyrics ahead of the prompt on the form', () => {
+    const shown = repaint.fields
+      .filter((field) => !field.advanced && field.name !== 'regionStart' && field.name !== 'regionEnd')
+      .map((field) => field.name);
+
+    expect(shown.indexOf('lyrics')).toBeLessThan(shown.indexOf('prompt'));
+  });
+
+  /**
+   * Observed twice, landing differently each time: once no vocal at all, once
+   * invented syllables where the line had been. The shared fact is that the
+   * original words are not carried over, which is what the field has to say.
+   * Losing the words of a sung passage without being warned is the failure.
+   */
+  it('tells people the original words are not kept unless they supply them', () => {
+    const lyrics = repaint.fields.find((field) => field.name === 'lyrics');
+    expect(lyrics?.help).toMatch(/sing/i);
+    expect(lyrics?.help).toMatch(/does not keep the words|not carried over/i);
   });
 
   it('needs both ends of the region', () => {
