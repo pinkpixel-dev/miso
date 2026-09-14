@@ -8,6 +8,7 @@ import { RemixForm } from '../components/remix/RemixForm.tsx';
 import { SourcePicker } from '../components/remix/SourcePicker.tsx';
 import { Button, Panel } from '../components/ui.tsx';
 import { defaultRegion, type Region } from '../lib/region.ts';
+import { projectPath } from '../lib/routes.ts';
 import { usePlayer } from '../lib/usePlayer.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
@@ -75,7 +76,10 @@ export function RemixRoute() {
     heading.current?.focus();
   }, [assetId]);
 
-  const backTo = `/projects/${encodeURIComponent(routeProjectId ?? projectId ?? '')}`;
+  // The project page, which is where this take lives. Built through the shared
+  // helper so this page cannot disagree with the rest of the studio about
+  // where a project is.
+  const backTo = projectPath(routeProjectId ?? projectId ?? '');
 
   if (!project && loading) {
     return <p className="text-sm text-ink-muted">Loading this project.</p>;

@@ -1,6 +1,8 @@
+import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { GeneratePanel } from '../components/GeneratePanel.tsx';
 import { Panel } from '../components/ui.tsx';
+import { projectPath } from '../lib/routes.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
 /**
@@ -44,6 +46,18 @@ export function CreateRoute() {
         part of a studio. The heading stays for anything reading the structure.
       */}
       <h1 className="sr-only">{project.name}</h1>
+
+      {/*
+        The way back, since this page sits under the project now. The rail can
+        also get there, but a page you navigated into should say how to leave.
+      */}
+      <Link
+        to={projectPath(project.id)}
+        className="inline-flex min-h-11 items-center gap-2 self-start rounded-md px-3 py-2 text-sm text-ink-muted transition-colors duration-150 hover:bg-raised hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        <ArrowLeft aria-hidden="true" className="h-4 w-4 shrink-0" />
+        Back to {project.name}
+      </Link>
 
       {error ? (
         <p

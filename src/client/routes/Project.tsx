@@ -72,6 +72,7 @@ export function ProjectRoute() {
   const [pendingRemoval, setPendingRemoval] = useState<Asset | undefined>();
   const detailTriggerRef = useRef<HTMLButtonElement | null>(null);
   const detailCloseRef = useRef<HTMLButtonElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
 
   const sections = useMemo(() => groupTakes(assets, allJobs, tasks), [assets, allJobs, tasks]);
 
@@ -98,6 +99,14 @@ export function ProjectRoute() {
     setEditingName(false);
     setSelectedAssetId(undefined);
     detailTriggerRef.current = null;
+  }, [projectId]);
+
+  // Arriving here follows a link, and a client side route change leaves focus
+  // on whatever was clicked, which is often a control that is no longer on
+  // screen. Moving it to the heading lands a keyboard or screen reader at the
+  // top of the page they just opened rather than back at the document body.
+  useEffect(() => {
+    heading.current?.focus();
   }, [projectId]);
 
   if (loading && !project) {
@@ -163,7 +172,16 @@ export function ProjectRoute() {
               </form>
             ) : (
               <div className="flex min-w-0 items-center gap-1">
-                <h1 className="truncate font-display text-lg font-semibold text-ink">
+                {/*
+                  tabIndex -1 so it can be focused on arrival without joining
+                  the tab order. Programmatic focus raises no focus ring, so
+                  this is silent for a mouse and useful for everyone else.
+                */}
+                <h1
+                  ref={heading}
+                  tabIndex={-1}
+                  className="truncate font-display text-lg font-semibold text-ink outline-none"
+                >
                   {project.name}
                 </h1>
                 <IconButton
