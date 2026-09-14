@@ -1,9 +1,10 @@
 import { Pencil } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Asset } from '../../../shared/types.ts';
-import { remixPath } from '../../lib/routes.ts';
+import { projectPath, remixPath } from '../../lib/routes.ts';
 import { findProducingJob } from '../../lib/takeDetails.ts';
+import { generatedTakes } from '../../lib/takeGroups.ts';
 import { usePlayer } from '../../lib/usePlayer.ts';
 import { useStudio } from '../../lib/useStudio.ts';
 import { ConfirmDialog } from '../Dialog.tsx';
@@ -14,11 +15,16 @@ import { TakeDetailPanel } from './TakeDetailPanel.tsx';
 import { TakeRow } from './TakeRow.tsx';
 
 /**
- * The takes in the active project, and the queue that adds to them.
+ * What the create form has generated, and the queue that adds to it.
  *
- * This lives in the shell rather than the project route so it survives a move
+ * This lives in the shell rather than the create route so it survives a move
  * to the models or settings screen. What you are working on should not vanish
  * because you went to install a model.
+ *
+ * It holds generated takes only. Imports and anything made out of another take
+ * are on the project page, so the list beside the form is what the form put
+ * there rather than everything in the project. The rule itself is in
+ * `takeGroups.ts`, shared with that page so the two cannot disagree.
  *
  * There is no search, filter or sort bar. The reference layout has one, and a
  * project with four takes has nothing to filter. It is worth adding when a real
@@ -36,6 +42,7 @@ export function Workspace() {
     assets,
     allJobs,
     jobs,
+    tasks,
     loading,
     importing,
     importFile,
@@ -60,6 +67,9 @@ export function Workspace() {
     detailTriggerRef.current = null;
     trigger?.focus();
   }, []);
+
+  const shown = useMemo(() => generatedTakes(assets, allJobs, tasks), [assets, allJobs, tasks]);
+  const heldBack = assets.length - shown.length;
 
   const selectedAsset = assets.find((asset) => asset.id === selectedAssetId);
   const selectedJob = selectedAsset
@@ -140,7 +150,7 @@ export function Workspace() {
               ? 'Choose one on the left, or make a new one.'
               : loading
                 ? 'Loading.'
-                : countLabel(assets.length)}
+                : countLabel(shown.length)}
           </p>
 
           {/*
@@ -165,26 +175,58 @@ export function Workspace() {
 
           <div className="flex min-h-0 flex-1 flex-col gap-5 lg:grid lg:grid-rows-[minmax(0,11fr)_minmax(0,9fr)]">
             <div className="min-h-0 lg:overflow-y-auto lg:pr-1">
-              {assets.length === 0 && !loading ? (
+              {shown.length === 0 && !loading ? (
                 <p className="text-sm text-ink-muted">
-                  Nothing here yet. Generate something, or choose an audio file above.
+                  {assets.length === 0 ? (
+                    'Nothing here yet. Generate something, or choose an audio file above.'
+                  ) : (
+                    <>
+                      Nothing generated here yet.{' '}
+                      <Link
+                        to={projectPath(projectId)}
+                        className="text-accent underline underline-offset-4 hover:no-underline"
+                      >
+                        {countLabel(assets.length)} on the project page
+                      </Link>
+                      .
+                    </>
+                  )}
                 </p>
               ) : (
-                <ul className="flex flex-col gap-2">
-                  {assets.map((asset) => (
-                    <TakeRow
-                      key={asset.id}
-                      asset={asset}
-                      detailsOpen={selectedAssetId === asset.id}
-                      onOpenDetails={(trigger) => {
-                        detailTriggerRef.current = trigger;
-                        setSelectedAssetId(asset.id);
-                      }}
-                      onRename={(label) => renameAsset(asset.id, label)}
-                      onRemove={() => setPendingRemoval(asset)}
-                    />
-                  ))}
-                </ul>
+                <>
+                  <ul className="flex flex-col gap-2">
+                    {shown.map((asset) => (
+                      <TakeRow
+                        key={asset.id}
+                        asset={asset}
+                        detailsOpen={selectedAssetId === asset.id}
+                        onOpenDetails={(trigger) => {
+                          detailTriggerRef.current = trigger;
+                          setSelectedAssetId(asset.id);
+                        }}
+                        onRename={(label) => renameAsset(asset.id, label)}
+                        onRemove={() => setPendingRemoval(asset)}
+                      />
+                    ))}
+                  </ul>
+
+                  {/*
+                    A shorter list than the project holds is said out loud. A
+                    list that silently drops rows reads as takes going missing.
+                  */}
+                  {heldBack > 0 ? (
+                    <p className="mt-3 text-xs text-ink-faint">
+                      <Link
+                        to={projectPath(projectId)}
+                        className="text-accent underline underline-offset-4 hover:no-underline"
+                      >
+                        {heldBack === 1 ? '1 more take' : `${heldBack} more takes`} on the project
+                        page
+                      </Link>
+                      , imported or made from another take.
+                    </p>
+                  ) : null}
+                </>
               )}
             </div>
 

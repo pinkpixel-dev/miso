@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPath, projectIdFrom, remixPath, wantsFullWidth } from './routes.ts';
+import { createPath, projectIdFrom, projectPath, remixPath, wantsFullWidth } from './routes.ts';
 
 describe('projectIdFrom', () => {
   it('reads the project off its own route', () => {
@@ -52,6 +52,14 @@ describe('wantsFullWidth', () => {
 
   it('is not fooled by a project whose id begins with remix', () => {
     expect(wantsFullWidth('/projects/remixes/create')).toBe(false);
+  });
+});
+
+describe('projectPath', () => {
+  it('addresses the project page and round trips through the readers', () => {
+    expect(projectPath('abc')).toBe('/projects/abc');
+    expect(projectIdFrom(projectPath('abc'))).toBe('abc');
+    expect(wantsFullWidth(projectPath('abc'))).toBe(true);
   });
 });
 

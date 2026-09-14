@@ -48,6 +48,11 @@ export function wantsFullWidth(pathname: string): boolean {
   return matchPath({ path: PROJECT_PATH, end: true }, pathname) !== null;
 }
 
+/** The project itself. */
+export function projectPath(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}`;
+}
+
 /** The create form for a project. */
 export function createPath(projectId: string): string {
   return `/projects/${encodeURIComponent(projectId)}/create`;
