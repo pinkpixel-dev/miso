@@ -1,0 +1,199 @@
+import { describe, expect, it } from 'vitest';
+import type { Asset, Job, StudioTask } from '../../shared/types.ts';
+import { generatedTakes, groupTakes } from './takeGroups.ts';
+
+function asset(id: string, createdAt: string, extra: Partial<Asset> = {}): Asset {
+  return {
+    id,
+    projectId: 'p1',
+    kind: 'generated',
+    label: id,
+    filename: `${id}.wav`,
+    format: 'wav',
+    bytes: 1000,
+    checksum: 'abc',
+    createdAt,
+    ...extra,
+  };
+}
+
+function job(id: string, taskId: string, outputAssetIds: string[]): Job {
+  return {
+    id,
+    projectId: 'p1',
+    taskId,
+    modelId: 'ace_step_turbo_q8_0',
+    params: {},
+    state: 'complete',
+    attempts: 1,
+    createdAt: '2026-09-14T00:00:00Z',
+    updatedAt: '2026-09-14T00:00:00Z',
+    outputAssetIds,
+  };
+}
+
+function task(id: string, label: string, inputRoles: string[]): StudioTask {
+  return {
+    id,
+    label,
+    summary: '',
+    family: 'ace_step',
+    vocals: 'both',
+    packageIds: [],
+    inputRoles,
+    fields: [],
+  };
+}
+
+const TASKS: StudioTask[] = [
+  task('generate.text2music', 'ACE-Step 1.5', []),
+  task('generate.stableaudio', 'Stable Audio 3', []),
+  task('remix.repaint', 'Repaint a section', ['source']),
+];
+
+describe('groupTakes', () => {
+  it('puts a generated take under the generated heading', () => {
+    const takes = [asset('a1', '2026-09-14T10:00:00Z')];
+    const jobs = [job('j1', 'generate.text2music', ['a1'])];
+
+    expect(groupTakes(takes, jobs, TASKS)).toEqual([
+      { key: 'generated', label: 'Generated songs', takes },
+    ]);
+  });
+
+  it('gives a derived take its own section, named after the task', () => {
+    const generated = asset('a1', '2026-09-14T10:00:00Z');
+    const repainted = asset('a2', '2026-09-14T11:00:00Z');
+    const jobs = [
+      job('j1', 'generate.text2music', ['a1']),
+      job('j2', 'remix.repaint', ['a2']),
+    ];
+
+    const sections = groupTakes([generated, repainted], jobs, TASKS);
+
+    expect(sections.map((section) => section.label)).toEqual([
+      'Generated songs',
+      'Repaint a section',
+    ]);
+    expect(sections[1]?.takes).toEqual([repainted]);
+  });
+
+  /** Four generation families are four ways to write a song, not four lists. */
+  it('collapses every generating task into one section', () => {
+    const jobs = [
+      job('j1', 'generate.text2music', ['a1']),
+      job('j2', 'generate.stableaudio', ['a2']),
+    ];
+
+    const sections = groupTakes(
+      [asset('a1', '2026-09-14T10:00:00Z'), asset('a2', '2026-09-14T11:00:00Z')],
+      jobs,
+      TASKS,
+    );
+
+    expect(sections).toHaveLength(1);
+    expect(sections[0]?.takes).toHaveLength(2);
+  });
+
+  it('treats a take with no producing job as an import', () => {
+    const imported = asset('a1', '2026-09-14T10:00:00Z', { kind: 'source' });
+
+    expect(groupTakes([imported], [], TASKS)).toEqual([
+      { key: 'imported', label: 'Imported audio', takes: [imported] },
+    ]);
+  });
+
+  /** A separator's outputs stay together rather than splitting by tool. */
+  it('groups stems by kind, whatever job produced them', () => {
+    const stem = asset('a1', '2026-09-14T10:00:00Z', { kind: 'stem' });
+    const jobs = [job('j1', 'remix.repaint', ['a1'])];
+
+    expect(groupTakes([stem], jobs, TASKS)).toEqual([
+      { key: 'stems', label: 'Stems', takes: [stem] },
+    ]);
+  });
+
+  /**
+   * The registry is code and a project is data, so a take can outlive the task
+   * that made it. It still belongs on the page.
+   */
+  it('keeps a take whose task this build no longer has', () => {
+    const orphan = asset('a1', '2026-09-14T10:00:00Z');
+    const jobs = [job('j1', 'remix.retired', ['a1'])];
+
+    expect(groupTakes([orphan], jobs, TASKS)).toEqual([
+      { key: 'unknown', label: 'Other takes', takes: [orphan] },
+    ]);
+  });
+
+  it('orders sections generated, derived, imported, stems, then unknown', () => {
+    const takes = [
+      asset('stem', '2026-09-14T10:00:00Z', { kind: 'stem' }),
+      asset('orphan', '2026-09-14T10:00:00Z'),
+      asset('import', '2026-09-14T10:00:00Z', { kind: 'source' }),
+      asset('repaint', '2026-09-14T10:00:00Z'),
+      asset('song', '2026-09-14T10:00:00Z'),
+    ];
+    const jobs = [
+      job('j1', 'generate.text2music', ['song']),
+      job('j2', 'remix.repaint', ['repaint']),
+      job('j3', 'remix.retired', ['orphan']),
+      job('j4', 'stems.separate', ['stem']),
+    ];
+
+    expect(groupTakes(takes, jobs, TASKS).map((section) => section.key)).toEqual([
+      'generated',
+      'remix.repaint',
+      'imported',
+      'stems',
+      'unknown',
+    ]);
+  });
+
+  it('orders takes newest first inside a section', () => {
+    const older = asset('a1', '2026-09-14T10:00:00Z');
+    const newer = asset('a2', '2026-09-14T12:00:00Z');
+    const jobs = [job('j1', 'generate.text2music', ['a1', 'a2'])];
+
+    expect(groupTakes([older, newer], jobs, TASKS)[0]?.takes).toEqual([newer, older]);
+  });
+
+  it('returns no sections for a project with nothing in it', () => {
+    expect(groupTakes([], [], TASKS)).toEqual([]);
+  });
+
+  /** Clearing the queue hides jobs from the queue, it does not delete them. */
+  it('still groups a take whose job was cleared from the queue', () => {
+    const take = asset('a1', '2026-09-14T10:00:00Z');
+    const cleared: Job = { ...job('j1', 'remix.repaint', ['a1']), dismissedAt: '2026-09-14T13:00:00Z' };
+
+    expect(groupTakes([take], [cleared], TASKS)[0]?.key).toBe('remix.repaint');
+  });
+});
+
+describe('generatedTakes', () => {
+  it('keeps generated songs and drops everything else', () => {
+    const song = asset('song', '2026-09-14T10:00:00Z');
+    const repaint = asset('repaint', '2026-09-14T11:00:00Z');
+    const imported = asset('import', '2026-09-14T12:00:00Z', { kind: 'source' });
+    const jobs = [
+      job('j1', 'generate.text2music', ['song']),
+      job('j2', 'remix.repaint', ['repaint']),
+    ];
+
+    expect(generatedTakes([song, repaint, imported], jobs, TASKS)).toEqual([song]);
+  });
+
+  it('keeps the order it was given, since the caller already sorted', () => {
+    const first = asset('a1', '2026-09-14T12:00:00Z');
+    const second = asset('a2', '2026-09-14T10:00:00Z');
+    const jobs = [job('j1', 'generate.text2music', ['a1', 'a2'])];
+
+    expect(generatedTakes([first, second], jobs, TASKS)).toEqual([first, second]);
+  });
+
+  it('is empty for a project of nothing but imports', () => {
+    const imported = asset('a1', '2026-09-14T10:00:00Z', { kind: 'source' });
+    expect(generatedTakes([imported], [], TASKS)).toEqual([]);
+  });
+});
