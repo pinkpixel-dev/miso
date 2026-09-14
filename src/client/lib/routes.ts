@@ -12,6 +12,9 @@ import { matchPath } from 'react-router-dom';
 /** The open project. */
 export const PROJECT_PATH = '/projects/:id';
 
+/** The create form, which used to be the project route itself. */
+export const CREATE_PATH = '/projects/:id/create';
+
 /** The region editor, with or without a source chosen. */
 export const REMIX_PATH = '/projects/:id/remix';
 
@@ -29,13 +32,25 @@ export function projectIdFrom(pathname: string): string | undefined {
 }
 
 /**
- * Whether this path is a tool that takes the whole width.
+ * Whether this path takes the whole width.
  *
- * The takes column is per project and sits beside the create form. A remix page
- * carries its own source list, so showing both would be the same list twice.
+ * The takes column is per project and sits beside the create form. Both pages
+ * that drop it carry their own list of takes, so keeping the column would put
+ * the same list on screen twice.
+ *
+ * The project page is matched with `end: true` and the remix page is not, and
+ * that difference is load bearing. A prefix match on the project would make
+ * every nested page full width, which would take the takes column away from
+ * the create form sitting one segment further down.
  */
 export function wantsFullWidth(pathname: string): boolean {
-  return matchPath({ path: REMIX_PATH, end: false }, pathname) !== null;
+  if (matchPath({ path: REMIX_PATH, end: false }, pathname) !== null) return true;
+  return matchPath({ path: PROJECT_PATH, end: true }, pathname) !== null;
+}
+
+/** The create form for a project. */
+export function createPath(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}/create`;
 }
 
 /** The remix route for a take, or for picking one. */

@@ -1,5 +1,6 @@
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { StudioShell } from './components/shell/StudioShell.tsx';
+import { CreateRoute } from './routes/Create.tsx';
 import { Models } from './routes/Models.tsx';
 import { ProjectRoute } from './routes/Project.tsx';
 import { RemixRoute } from './routes/Remix.tsx';
@@ -12,7 +13,13 @@ export function App() {
       <Routes>
         <Route element={<StudioShell />}>
           <Route index element={<StartRoute />} />
+          {/*
+            The project itself, and the form that writes into it. Opening a
+            project shows the project, so the create form is a page under it
+            rather than the thing you land on.
+          */}
           <Route path="projects/:id" element={<ProjectRoute />} />
+          <Route path="projects/:id/create" element={<CreateRoute />} />
           {/*
             Two paths, one component. The source is in the address so a take can
             be linked to directly, and the picker is what the page shows when

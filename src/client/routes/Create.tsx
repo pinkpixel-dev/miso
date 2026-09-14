@@ -4,14 +4,18 @@ import { Panel } from '../components/ui.tsx';
 import { useStudio } from '../lib/useStudio.ts';
 
 /**
- * The create column.
+ * The create column, at /projects/:id/create.
  *
  * This used to be the whole screen: the form, the queue, the import zone, the
  * player and the track list stacked down one page. All of that except the form
  * now lives in the shell, where it survives a route change. What is left here
  * is the thing that is actually about the route, which is writing a job.
+ *
+ * It used to be the project route itself. Opening a project now shows the
+ * project, and this is a page under it, so the takes column beside this form
+ * is the list this form writes into rather than everything in the project.
  */
-export function ProjectRoute() {
+export function CreateRoute() {
   const { project, loading, error, tasks, jobs, catalog, catalogLoading, submit } = useStudio();
 
   if (loading && !project) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { projectIdFrom, remixPath, wantsFullWidth } from './routes.ts';
+import { createPath, projectIdFrom, remixPath, wantsFullWidth } from './routes.ts';
 
 describe('projectIdFrom', () => {
   it('reads the project off its own route', () => {
@@ -13,6 +13,7 @@ describe('projectIdFrom', () => {
    * no project at all.
    */
   it('still reads the project from a nested tool path', () => {
+    expect(projectIdFrom('/projects/abc/create')).toBe('abc');
     expect(projectIdFrom('/projects/abc/remix')).toBe('abc');
     expect(projectIdFrom('/projects/abc/remix/xyz')).toBe('abc');
   });
@@ -30,15 +31,35 @@ describe('wantsFullWidth', () => {
     expect(wantsFullWidth('/projects/abc/remix/xyz')).toBe(true);
   });
 
-  it('is false everywhere the takes column belongs', () => {
-    expect(wantsFullWidth('/projects/abc')).toBe(false);
+  it('is true on the project page, which carries its own list of takes', () => {
+    expect(wantsFullWidth('/projects/abc')).toBe(true);
+  });
+
+  /**
+   * The reason the project is matched to the end. A prefix match here would
+   * take the takes column away from the create form one segment further down,
+   * which is the column that form writes into.
+   */
+  it('is false on the create page, where the takes column belongs', () => {
+    expect(wantsFullWidth('/projects/abc/create')).toBe(false);
+  });
+
+  it('is false away from a project entirely', () => {
     expect(wantsFullWidth('/')).toBe(false);
     expect(wantsFullWidth('/models')).toBe(false);
     expect(wantsFullWidth('/settings')).toBe(false);
   });
 
   it('is not fooled by a project whose id begins with remix', () => {
-    expect(wantsFullWidth('/projects/remixes')).toBe(false);
+    expect(wantsFullWidth('/projects/remixes/create')).toBe(false);
+  });
+});
+
+describe('createPath', () => {
+  it('addresses the create form and round trips through the readers', () => {
+    expect(createPath('abc')).toBe('/projects/abc/create');
+    expect(projectIdFrom(createPath('abc'))).toBe('abc');
+    expect(wantsFullWidth(createPath('abc'))).toBe(false);
   });
 });
 
