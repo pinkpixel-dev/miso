@@ -44,7 +44,7 @@ export function Workspace() {
     dismissJobs,
     dismissedCount,
   } = useStudio();
-  const { clear, setQueue } = usePlayer();
+  const { clear } = usePlayer();
   const [pendingRemoval, setPendingRemoval] = useState<Asset | undefined>();
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -76,14 +76,6 @@ export function Workspace() {
     if (next !== '' && next !== project.name) renameProject(next);
     setEditingName(false);
   }
-
-  // The dock's skip buttons move through this list. It is handed over from here
-  // because the player sits above the studio data on purpose, so it cannot read
-  // the open project itself. Order matches what is on screen, so Next means the
-  // row below rather than some private ordering of its own.
-  useEffect(() => {
-    setQueue(assets);
-  }, [assets, setQueue]);
 
   // This shell survives route changes. Close an unfinished rename when a
   // different project opens so its draft can never carry into the next one.

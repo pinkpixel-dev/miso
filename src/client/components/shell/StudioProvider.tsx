@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useMatch } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { projectIdFrom } from '../../lib/routes.ts';
 import { useCatalog } from '../../lib/useCatalog.ts';
 import { useJobs } from '../../lib/useJobs.ts';
+import { usePlayer } from '../../lib/usePlayer.ts';
 import { useProject } from '../../lib/useProject.ts';
 import { StudioContext, type StudioValue } from '../../lib/useStudio.ts';
 
@@ -20,8 +22,11 @@ import { StudioContext, type StudioValue } from '../../lib/useStudio.ts';
  * project change is a new value here and nothing more.
  */
 export function StudioProvider({ children }: { children: ReactNode }) {
-  const match = useMatch('/projects/:id');
-  const routeId = match?.params.id;
+  // Read through the shared matcher rather than a pattern written here, so the
+  // shell and this provider cannot disagree about which project is open. A
+  // nested tool path resolves to the project it sits under.
+  const { pathname } = useLocation();
+  const routeId = projectIdFrom(pathname);
   const [lastId, setLastId] = useState(routeId);
 
   useEffect(() => {
@@ -57,6 +62,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     dismiss,
   } = useJobs(projectId, reload);
   const { catalog, loading: catalogLoading } = useCatalog();
+
+  // The dock's skip buttons move through the open project's takes. This lives
+  // here rather than in the workspace column because that column is not on
+  // screen on a full width tool route, and a take finishing while you are
+  // remixing would otherwise never reach the queue. Order matches the list, so
+  // Next still means the row below. The provider drops an identical list, so
+  // handing it over on every refetch costs nothing.
+  const { setQueue } = usePlayer();
+
+  useEffect(() => {
+    setQueue(assets);
+  }, [assets, setQueue]);
 
   const value = useMemo<StudioValue>(
     () => ({
