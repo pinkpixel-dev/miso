@@ -119,3 +119,104 @@ stereo, with a window of 5 to 10 seconds.
 - Timing for this source was about 4.1 seconds wall for 20 seconds of audio, an rtf of 0.23.
 - Still unknown: whether repainting a vocal section needs the lyrics for that section. The
   confirmed run sent no lyrics and the window was instrumental.
+
+## ACE-Step source audio routes
+
+Confirmed against the running container on 2026-09-14, same image, model
+`miso:ace_step_turbo_q8_0`. The source was `samples/phase0-original.wav`, 20 seconds, 48 kHz
+stereo, staged once through `POST /v1/ui/upload` and reused for all 29 runs so the
+comparisons stay honest.
+
+The useful split is not prompt behaviour. It is whether the route reads the source at all.
+
+### extract, cover and cover-nofsq: these read the source
+
+```json
+{
+  "model": "miso:ace_step_turbo_q8_0",
+  "request": {
+    "task_route": "extract",
+    "text": "extract vocals",
+    "audio": "/tmp/audiocpp-ui-<id>/<n>-phase0-original.wav",
+    "track_name": "vocals",
+    "seed": 12345
+  }
+}
+```
+
+```json
+{
+  "model": "miso:ace_step_turbo_q8_0",
+  "request": {
+    "task_route": "cover",
+    "text": "a bright solo piano break, gentle acoustic piano only",
+    "lyrics": "We keep moving through the night",
+    "audio": "/tmp/audiocpp-ui-<id>/<n>-phase0-original.wav",
+    "seed": 12345
+  }
+}
+```
+
+`cover-nofsq` takes the same body with `task_route` changed.
+
+- **All three lock the output to the source duration.** 20 seconds in, 20 seconds out.
+- **All three follow the source.** The proof is the silence. The source falls to near nothing
+  after second 16 (per-second level 54, 31, 31, 31) and every one of these routes falls
+  silent with it: extract 69, 1.4, 1.5, 1.6, cover 747, 41, 11, 2, cover-nofsq 952, 198, 131,
+  2. A route that rebuilt the track would have put audio there.
+- **`track_name` steers extract.** `vocals` against `drums` differ by 149.8 on zero-crossing
+  rate, deterministic on both sides. Extract returns one output, not named stems:
+  `named_audio_outputs` came back empty.
+- **The prompt steers cover hard.** The piano and metal pair differ by 2244.9, wider than
+  text2music's own 1098 from 5a. The manual lists cover's planner as `Not used`, the same
+  words it uses for repaint where the prompt is inert, so that column does not predict
+  whether a prompt works. Do not read it as one again.
+- **`cover` and `cover-nofsq` are genuinely different routes.** They differ by 308 on the
+  same request, and nofsq stays far closer to the source (per-second difference around 1300
+  against cover's 3400 to 7000). One is a rework, the other is a lighter pass.
+- Timing was about 4.2 to 5.1 seconds wall for 20 seconds of audio.
+
+### complete and lego: these ignore the source
+
+Both accept `audio`, and both discard it.
+
+- **Sending the source changes nothing.** With the prompt and seed held still, `complete`
+  returned sha `c758f11259e41775` with and without the `audio` key, and `lego` returned
+  `8c8829966dc40e8c` both ways. Byte-identical, and both routes are deterministic, so this is
+  not variance.
+- **Neither is text2music either.** The same prompt and seed through `text2music` gave
+  `deeb05492beb6f69`. These are three distinct generation flavours, and two of them take no
+  input audio.
+- **Duration is not locked and not close to the source.** A 20 second source produced 130
+  seconds, and a different prompt produced 140. The manual says lego is "Locked to source
+  audio". It is not.
+- **The prompt steers both**, 1658.8 for complete and 1646.2 for lego.
+- **`track_name` is read by lego**, worth 61.6 between `drums` and `strings`.
+- **`complete_track_classes` is ignored in every shape tried**, both the comma separated
+  string `"drums,bass"` and the array `["drums","bass"]`, byte-identical to sending nothing.
+- Timing was about 25 to 30 seconds, for a 130 second output.
+
+### What was ruled out
+
+- **`audio_cover_strength` does nothing on cover either.** 1.0 and 0.0 returned
+  byte-identical audio. 5a found it inert on repaint and suspected audio.cpp wired it into
+  the cover routes instead. It is not wired into those either.
+- Determinism holds across this whole family. Every route above returned byte-identical audio
+  for a repeated request, which is what makes each number here meaningful.
+
+## Stable Audio audio input
+
+Confirmed on 2026-09-14, model `miso:stable_audio_3_small_music_q8_0`. Outputs come back at
+44.1 kHz under `named_audio_outputs` with the id `audio_0`.
+
+**The source is opened and then discarded.** Do not build on either mode.
+
+- `init_noise_level` at 0.2 and 0.9 returned byte-identical audio.
+- `inpaint_mask_start_seconds` and `inpaint_mask_end_seconds` returned byte-identical audio in
+  all three shapes: a number, a string, and an array.
+- Removing the `audio` key entirely changed nothing, and a plain text2music request on the
+  same prompt and seed returned that same audio again, sha `c13bd3d67b3b34ca` throughout.
+- **The file is genuinely read.** A path that does not exist answers
+  `HTTP 500 {"error":{"message":"could not open WAV input: /tmp/definitely-not-here.wav"}}`.
+  That is what makes this different from a wrong field name: the server opens the WAV and
+  then does not use it. There is no better spelling to find.
