@@ -3,6 +3,36 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.14.0 - September 15, 2026
+
+### 🎛️ Remix
+
+- The remix page carries more than one tool. A picker chooses between them, and the heading,
+  description, fields and button all come from whichever tool is in force.
+- Two new tools: **Cover a take** performs a track again in a style you describe, keeping its
+  structure and length, and **Light cover** does the same while staying much closer to the
+  original recording.
+- The region editor now appears only for a tool that asks for a region, so a cover no longer
+  shows a control that does nothing.
+- The take detail panel's action reads "Remix this take" rather than naming a single tool.
+
+### 📁 The project page
+
+- Section headings now read as names rather than instructions: "Repaints" over a list of
+  takes instead of "Repaint a section".
+
+### 🔬 Routes that were measured and left out
+
+- `complete`, `lego`, `extract`, and Stable Audio's init-audio and inpainting were all probed
+  against a live backend and none of them does what its name says. Each is written up in
+  `DOCS/ERRORS.md` with the measurement, so none of them is a missing feature.
+
+### 🧹 Maintenance
+
+- The task registry was split into one module per model family. Behaviour is unchanged.
+- Adds `scripts/probe-routes.mjs`, the tool that measured the routes above, so the findings
+  can be re-checked when the audio.cpp image changes.
+
 ## 0.13.0 - September 14, 2026
 
 ### 📁 The project page
