@@ -57,6 +57,42 @@ describe('GET /api/tasks', () => {
 
     expect(tasks.find((task) => task.id === 'generate.text2music')?.inputRoles).toEqual([]);
     expect(tasks.find((task) => task.id === 'remix.repaint')?.inputRoles).toEqual(['source']);
+    expect(tasks.find((task) => task.id === 'remix.cover')?.inputRoles).toEqual(['source']);
+    expect(tasks.find((task) => task.id === 'remix.covernofsq')?.inputRoles).toEqual(['source']);
+  });
+
+  /**
+   * Both directions, because the create column and the remix page split this
+   * one list between them. A task landing in neither would simply disappear
+   * from the studio, which no page would report as an error.
+   */
+  it('puts every task on exactly one side of that filter', async () => {
+    const response = await app().request('/api/tasks');
+    const tasks = (await response.json()) as StudioTask[];
+
+    const generators = tasks.filter((task) => task.inputRoles.length === 0);
+    const remixes = tasks.filter((task) => task.inputRoles.length > 0);
+
+    expect(generators.length + remixes.length).toBe(tasks.length);
+    expect(remixes.map((task) => task.id).sort()).toEqual([
+      'remix.cover',
+      'remix.covernofsq',
+      'remix.repaint',
+    ]);
+  });
+
+  /**
+   * The project page heads its sections with shortLabel, so it has to survive
+   * the trip. `label` is the instruction the tool is offered under and reads as
+   * a command over a list of takes.
+   */
+  it('sends the heading name beside the action name', async () => {
+    const response = await app().request('/api/tasks');
+    const tasks = (await response.json()) as StudioTask[];
+    const repaint = tasks.find((task) => task.id === 'remix.repaint');
+
+    expect(repaint?.label).toBe('Repaint a section');
+    expect(repaint?.shortLabel).toBe('Repaints');
   });
 });
 

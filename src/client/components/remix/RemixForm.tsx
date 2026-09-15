@@ -3,34 +3,39 @@ import { Link } from 'react-router-dom';
 import type { Asset, Catalog, Job, StudioTask } from '../../../shared/types.ts';
 import { buildLabel, installedPackages } from '../../lib/models.ts';
 import type { Region } from '../../lib/region.ts';
+import { REGION_FIELDS } from '../../lib/remixTasks.ts';
 import { estimateSeconds } from '../../lib/useJobs.ts';
 import { BuilderCard } from '../BuilderCard.tsx';
 import { PlainField } from '../TaskFields.tsx';
 import { Button } from '../ui.tsx';
 
 /**
- * What to put in the selected region, and the button that queues it.
+ * The fields for whichever remix tool is in force, and the button that queues
+ * it.
+ *
+ * Everything shown here comes from the task definition. The page drives several
+ * tools now and they disagree about almost everything: repaint takes a region
+ * and treats its prompt as a nudge, while a cover takes no region and follows
+ * its prompt closely. Copy written for one of them is wrong on the others, so
+ * the labels, the help and the button all read from the registry, which is
+ * where the measurements that justify them are recorded.
  *
  * The fields are rendered plainly, the way custom mode does in the create
  * column. There is no guided builder here on purpose. The builder compiles a
- * description of a song, and a repaint takes an instruction about one section,
- * for example "replace the middle with a brighter chorus". Those are different
- * sentences and the compiler writes the wrong one.
+ * description of a song, and these tasks take an instruction about an existing
+ * one. Those are different sentences and the compiler writes the wrong one.
  *
  * That also sidesteps a trap. `supportsGuided` keys on the model family, and
- * this task is ACE-Step, so a shared panel would offer the guided switch and
- * quietly compile a song description over an edit instruction.
+ * every task here is ACE-Step, so a shared panel would offer the guided switch
+ * and quietly compile a song description over an edit instruction.
  */
-
-/** The editor owns these, so the form must not draw boxes for them too. */
-const OWNED_BY_EDITOR = new Set(['regionStart', 'regionEnd']);
 
 type Values = Record<string, string>;
 
 function initialValues(task: StudioTask): Values {
   const values: Values = {};
   for (const field of task.fields) {
-    if (OWNED_BY_EDITOR.has(field.name)) continue;
+    if (REGION_FIELDS.has(field.name)) continue;
     values[field.name] = field.default === undefined ? '' : String(field.default);
   }
   return values;
@@ -38,8 +43,8 @@ function initialValues(task: StudioTask): Values {
 
 function describeEstimate(seconds: number | undefined): string {
   if (seconds === undefined) return 'The first run also loads the model, so it takes longer.';
-  if (seconds < 90) return `Past repaints took about ${seconds} seconds.`;
-  return `Past repaints took about ${Math.round(seconds / 60)} minutes.`;
+  if (seconds < 90) return `Past runs of this took about ${seconds} seconds.`;
+  return `Past runs of this took about ${Math.round(seconds / 60)} minutes.`;
 }
 
 export function RemixForm({
@@ -52,6 +57,11 @@ export function RemixForm({
 }: {
   task: StudioTask;
   asset: Asset;
+  /**
+   * The editor's current region. Only read for a task that asks for one: the
+   * loop below writes it into the params by field name, so a task without
+   * those fields never sees it.
+   */
   region: Region;
   catalog: Catalog | undefined;
   jobs: Job[];
@@ -71,14 +81,14 @@ export function RemixForm({
   const chosen = packages.find((pkg) => pkg.id === modelId) ?? packages[0];
 
   const plainFields = task.fields.filter(
-    (field) => !field.advanced && !OWNED_BY_EDITOR.has(field.name),
+    (field) => !field.advanced && !REGION_FIELDS.has(field.name),
   );
   const advancedFields = task.fields.filter(
-    (field) => field.advanced && !OWNED_BY_EDITOR.has(field.name),
+    (field) => field.advanced && !REGION_FIELDS.has(field.name),
   );
 
   const missing = task.fields.some((field) => {
-    if (!field.required || OWNED_BY_EDITOR.has(field.name)) return false;
+    if (!field.required || REGION_FIELDS.has(field.name)) return false;
     return (values[field.name] ?? '').trim() === '';
   });
 
@@ -96,6 +106,9 @@ export function RemixForm({
       // The region comes from the editor rather than a box, but it travels as
       // an ordinary parameter. That is what makes a take able to say it came
       // from repainting seconds 32 to 48, with no new storage anywhere.
+      //
+      // Driven by the task's own fields, so a tool with no region simply never
+      // reaches these branches and the editor's numbers are not sent.
       if (field.name === 'regionStart') {
         params.regionStart = region.start;
         continue;
@@ -119,7 +132,7 @@ export function RemixForm({
 
     setSubmitting(false);
     // The form stays as it is on success, because the next thing people do is
-    // move the region slightly and run it again. The queue says it worked.
+    // change something slightly and run it again. The queue says it worked.
     setQueued(ok);
   }
 
@@ -157,7 +170,6 @@ export function RemixForm({
             field={field}
             value={values[field.name] ?? ''}
             onChange={(value) => setValue(field.name, value)}
-            placeholder="a brighter chorus with a piano lead"
           />
         ))}
       </div>
@@ -170,7 +182,7 @@ export function RemixForm({
         >
           <div className="flex flex-col gap-5">
             <p className="text-sm text-ink-faint">
-              A repaint repeats exactly for the same seed, so setting one is how a section you
+              These tools repeat exactly for the same seed, so setting one is how a result you
               liked comes back.
             </p>
             {advancedFields.map((field) => (
@@ -187,7 +199,7 @@ export function RemixForm({
 
       {packages.length === 0 ? (
         <p className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-ink">
-          No model that can repaint is installed.{' '}
+          No model that can run this is installed.{' '}
           <Link to="/models" className="text-accent underline underline-offset-4 hover:no-underline">
             Install one on the Models screen
           </Link>
@@ -202,6 +214,10 @@ export function RemixForm({
         </p>
       ) : null}
 
+      {/*
+        The task's own name, so the button says what it is about to do rather
+        than naming one tool on every tool's form.
+      */}
       <Button
         variant="primary"
         onClick={() => void submit()}
@@ -209,7 +225,7 @@ export function RemixForm({
         disabled={missing || !chosen}
         className="min-h-11 w-full"
       >
-        {submitting ? 'Queueing' : 'Repaint the region'}
+        {submitting ? 'Queueing' : task.label}
       </Button>
     </div>
   );

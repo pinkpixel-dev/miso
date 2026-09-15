@@ -6,27 +6,33 @@ import { RegionControls } from '../components/remix/RegionControls.tsx';
 import { RegionEditor } from '../components/remix/RegionEditor.tsx';
 import { RemixForm } from '../components/remix/RemixForm.tsx';
 import { SourcePicker } from '../components/remix/SourcePicker.tsx';
-import { Button, Panel } from '../components/ui.tsx';
+import { Button, Panel, SegmentedControl } from '../components/ui.tsx';
 import { defaultRegion, type Region } from '../lib/region.ts';
+import { chooseTask, hasRegion, remixTasks } from '../lib/remixTasks.ts';
 import { projectPath } from '../lib/routes.ts';
 import { usePlayer } from '../lib/usePlayer.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
 /**
- * The region editor, at /projects/:id/remix/:assetId.
+ * The remix tools, at /projects/:id/remix/:assetId.
  *
  * The source is in the path rather than in component state, so a take's detail
  * panel can link straight here with that take loaded, the back button works,
  * and the address says what is being edited. Without an asset id the page asks
  * for a source instead.
  *
+ * The tool is not in the path. One page carries every task that works from a
+ * take, and the picker chooses between them, which was decided on September 14,
+ * 2026 over a route per tool. The question the page asks is what to do with
+ * this take, so the take is the address and the tool is a control on it.
+ *
+ * Which tasks appear, and whether the chosen one wants the region editor, are
+ * decided in `lib/remixTasks.ts` rather than here, so they can be tested.
+ *
  * This page takes the full width. The takes column is the open project's list
  * and this page carries its own source list, so showing both would be one list
  * twice. The shell drops the column for this route.
  */
-/** The registry task this page drives. */
-const REMIX_TASK_ID = 'remix.repaint';
-
 export function RemixRoute() {
   const { id: routeProjectId, assetId } = useParams();
   const {
@@ -47,10 +53,14 @@ export function RemixRoute() {
   const { nowPlaying, playing, toggle } = usePlayer();
 
   const asset = assets.find((entry) => entry.id === assetId);
-  // This page is the repaint editor specifically, so it asks for that task by
-  // name rather than offering whichever remix routes happen to exist. The other
-  // ACE-Step routes get their own pages when they arrive.
-  const task = tasks.find((entry) => entry.id === REMIX_TASK_ID);
+
+  // Which tool is in force. Held by id rather than by object so it survives the
+  // tasks list being refetched, and resolved through chooseTask so an id this
+  // build no longer has falls back instead of emptying the page.
+  const [picked, setPicked] = useState<string | undefined>();
+  const offered = remixTasks(tasks);
+  const task = chooseTask(tasks, picked);
+  const regionEditor = task !== undefined && hasRegion(task);
 
   // The asset row's own figure until wavesurfer has decoded enough to disagree.
   // Starting from it means the region opens in the right place rather than
@@ -99,12 +109,14 @@ export function RemixRoute() {
             tabIndex={-1}
             className="truncate font-display text-lg font-semibold text-ink outline-none"
           >
-            Repaint a section
+            {task?.label ?? 'Remix a take'}
           </h1>
           <p className="mt-0.5 text-sm text-ink-faint">
-            {asset
-              ? `Replacing part of ${asset.label}. The rest of the take is left alone.`
-              : 'Replaces the part of a take you select, and leaves the rest alone.'}
+            {task === undefined
+              ? 'This build of Miso has no tool that works from a take.'
+              : asset
+                ? `${task.summary} Working from ${asset.label}.`
+                : task.summary}
           </p>
         </div>
 
@@ -153,53 +165,88 @@ export function RemixRoute() {
           </div>
         </Panel>
       ) : (
-        <Panel
-          title={asset.label}
-          description="Select the part to replace. Miso rebuilds it in the style of the track around it. Lyrics steer what it sings, though not on every run."
-        >
+        <Panel title={asset.label}>
           <div className="flex flex-col gap-5">
-            {asset.peaks === undefined ? (
-              <div className="flex flex-wrap items-center gap-3 rounded-md border border-warn/40 bg-warn/10 px-3 py-2">
-                <p className="text-sm text-ink">
-                  This take has no saved waveform, so the shape below is drawn from the audio as it
-                  loads.
-                </p>
-                <Button variant="ghost" onClick={() => computePeaksFor(asset.id)}>
-                  Save waveform
-                </Button>
-              </div>
-            ) : null}
-
-            <RegionEditor
-              asset={asset}
-              region={region}
-              duration={duration}
-              onRegion={setRegion}
-              onDuration={setDuration}
-              onBeforePlay={() => {
-                // The dock and this editor are two players on one page. Only
-                // one of them should be making noise.
-                if (playing && nowPlaying !== undefined) toggle();
-              }}
-            />
-
-            <RegionControls region={region} duration={duration} onRegion={setRegion} />
-
             {task === undefined ? (
               <p className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-ink">
-                This build of Miso has no repaint task, so nothing can be queued from here.
+                This build of Miso has no tool that works from a take, so nothing can be queued
+                from here.
               </p>
             ) : (
-              <div className="border-t border-line pt-5">
-                <RemixForm
-                  task={task}
-                  asset={asset}
-                  region={region}
-                  catalog={catalog}
-                  jobs={jobs}
-                  onSubmit={submit}
-                />
-              </div>
+              <>
+                {/*
+                  The question the page is asking, so it comes before the
+                  controls that answer it. Switching tools rearranges
+                  everything below, including whether the region editor is on
+                  screen at all, which is why it cannot sit lower down.
+
+                  One tool is not a choice, so the picker stays off screen
+                  until there are at least two.
+                */}
+                {offered.length > 1 ? (
+                  <SegmentedControl
+                    label="What to do with this take"
+                    name="remix-task"
+                    options={offered.map((entry) => ({ value: entry.id, label: entry.label }))}
+                    value={task.id}
+                    onChange={setPicked}
+                  />
+                ) : null}
+
+                {asset.peaks === undefined && regionEditor ? (
+                  <div className="flex flex-wrap items-center gap-3 rounded-md border border-warn/40 bg-warn/10 px-3 py-2">
+                    <p className="text-sm text-ink">
+                      This take has no saved waveform, so the shape below is drawn from the audio
+                      as it loads.
+                    </p>
+                    <Button variant="ghost" onClick={() => computePeaksFor(asset.id)}>
+                      Save waveform
+                    </Button>
+                  </div>
+                ) : null}
+
+                {/*
+                  Only for a task that asks for a region. Showing it for a cover
+                  would be a control that submits nothing, which is the mistake
+                  the phase 5b probes spent their whole budget avoiding.
+                */}
+                {regionEditor ? (
+                  <>
+                    <RegionEditor
+                      asset={asset}
+                      region={region}
+                      duration={duration}
+                      onRegion={setRegion}
+                      onDuration={setDuration}
+                      onBeforePlay={() => {
+                        // The dock and this editor are two players on one page.
+                        // Only one of them should be making noise.
+                        if (playing && nowPlaying !== undefined) toggle();
+                      }}
+                    />
+
+                    <RegionControls region={region} duration={duration} onRegion={setRegion} />
+                  </>
+                ) : null}
+
+                <div className={regionEditor ? 'border-t border-line pt-5' : undefined}>
+                  {/*
+                    Keyed on the task so switching tools rebuilds the form.
+                    Its values are seeded from the task's own defaults once, so
+                    without this a cover would open holding whatever was typed
+                    into the repaint form.
+                  */}
+                  <RemixForm
+                    key={task.id}
+                    task={task}
+                    asset={asset}
+                    region={region}
+                    catalog={catalog}
+                    jobs={jobs}
+                    onSubmit={submit}
+                  />
+                </div>
+              </>
             )}
           </div>
         </Panel>
@@ -207,7 +254,7 @@ export function RemixRoute() {
 
       {/*
         The queue lives on this page because the takes column that normally
-        carries it is not on screen here. Without it a repaint would be queued
+        carries it is not on screen here. Without it a remix would be queued
         into silence.
       */}
       {assetId === undefined ? null : (
