@@ -125,13 +125,29 @@ async function stageInputs(
  * Adds what to do about it to a failure that only says what happened.
  *
  * "backend buffer allocation failed" means the card ran out of room partway
- * through, which on a 16 GB card is normally a second model still resident or a
- * package too large for what is free. The server's own wording says none of
- * that.
+ * through. The server's own wording says nothing about why or what to try.
+ *
+ * What to suggest depends on the task. A task that reads a take allocates on
+ * top of the model, and that allocation grows with the length of the take: a
+ * cover of a 20 second source passes comfortably on a 16 GB card while the same
+ * request against a 3 minute source asks for another 1.4 GB and fails by about
+ * 30 MB. Measured on 2026-09-15, see DOCS/ERRORS.md. Suggesting a shorter take
+ * is the advice that actually works there.
+ *
+ * Generation gets the older advice, minus the part about a smaller package.
+ * ACE-Step ships Q8 as its smallest quantisation, so on that family there is no
+ * smaller package to pick and telling somebody to find one sends them looking
+ * for something that does not exist.
  */
-function describeRunFailure(message: string): string {
+function describeRunFailure(message: string, task: TaskDefinition): string {
   if (!/allocation failed|out of memory|cudaMalloc/i.test(message)) return message;
-  return `${message} The card ran out of room. Free it with Unload models, or pick a smaller package.`;
+
+  const advice =
+    task.inputRoles.length > 0
+      ? 'The card ran out of room. This tool needs memory on top of the model, and how much depends on how long the take is, so a shorter take may fit where this one did not. Unload models frees the card.'
+      : 'The card ran out of room. Free it with Unload models, or ask for a shorter track.';
+
+  return `${message} ${advice}`;
 }
 
 /**
@@ -197,7 +213,7 @@ async function runOne(job: Job): Promise<number> {
       return backoffFor(job.attempts);
     }
 
-    setJobState(db(), job.id, 'failed', describeRunFailure(result.message));
+    setJobState(db(), job.id, 'failed', describeRunFailure(result.message, task));
     return 0;
   }
 

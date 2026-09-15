@@ -350,6 +350,21 @@ export const repaint: TaskDefinition = {
  *     1300. That difference is the whole reason both are offered, so each
  *     summary has to say which one it is.
  *
+ * **These need room for the whole take, and that is a real ceiling.** On top of the
+ * model they allocate a timbre encoder buffer, and a source long enough makes
+ * that allocation fail. Measured on 2026-09-15 on a 16 GB card with ACE-Step
+ * Turbo Q8 resident: 20, 60, 120 and 150 second sources all succeed, 180
+ * seconds fails asking for 1389.49 MiB with 1359 MiB free, missing by about 30
+ * MB. `cover-nofsq` fails at 180 seconds too, so dropping the FSQ tokenizer
+ * does not drop the timbre encoder with it.
+ *
+ * The threshold is not a number to hardcode. It is whatever is free once the
+ * model is resident, so a busier card fails sooner and a larger one fails
+ * later. The summaries say a long take may not fit, and the job failure says to
+ * try a shorter one, which is the advice that works. Note that the create
+ * form's own default is 180 seconds, so a track generated with defaults is on
+ * the wrong side of this. See DOCS/ERRORS.md.
+ *
  * Not measured: whether lyrics are followed here. Every cover probe sent the
  * same lyrics and none compared against sending none, so the field is offered
  * because this family sings and a cover is a performance, not because anybody
@@ -429,7 +444,8 @@ export const cover = coverTask({
   route: 'cover',
   label: 'Cover a take',
   shortLabel: 'Covers',
-  summary: 'Performs a take again in a style you describe, keeping its structure and length.',
+  summary:
+    'Performs a take again in a style you describe, keeping its structure and length. A long take may not fit in video memory.',
 });
 
 export const coverNoFsq = coverTask({
@@ -437,5 +453,6 @@ export const coverNoFsq = coverTask({
   route: 'cover-nofsq',
   label: 'Light cover',
   shortLabel: 'Light covers',
-  summary: 'The same idea as a cover, but it stays much closer to the original recording.',
+  summary:
+    'The same idea as a cover, but it stays much closer to the original recording. A long take may not fit in video memory, the same as a cover.',
 });

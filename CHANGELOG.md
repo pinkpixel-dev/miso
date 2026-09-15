@@ -3,6 +3,21 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.16.1 - September 15, 2026
+
+### 🎛️ Remix
+
+- Both cover tools now say that a long take may not fit in video memory. They allocate on top
+  of the model in proportion to the take's length, and on a 16 GB card a three minute source
+  fails while two and a half minutes works. Worth knowing because the create form's own
+  default is three minutes.
+
+### 🩺 Errors
+
+- A job that runs out of video memory now gives advice that works. For a tool that reads a
+  take it suggests trying a shorter one, and it no longer suggests picking a smaller package:
+  ACE-Step ships Q8 as its smallest, so there was never a smaller one to pick.
+
 ## 0.16.0 - September 15, 2026
 
 ### 🧠 Models
