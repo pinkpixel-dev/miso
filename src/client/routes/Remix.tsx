@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { ImportDropZone } from '../components/ImportDropZone.tsx';
 import { JobList } from '../components/JobList.tsx';
 import { RegionControls } from '../components/remix/RegionControls.tsx';
 import { RegionEditor } from '../components/remix/RegionEditor.tsx';
@@ -44,6 +45,8 @@ export function RemixRoute() {
     jobs,
     loading,
     error,
+    importing,
+    importFile,
     submit,
     cancelJob,
     dismissJobs,
@@ -103,20 +106,25 @@ export function RemixRoute() {
             tabIndex -1 so it can be focused on arrival without joining the tab
             order. Programmatic focus does not raise a focus ring, so this is
             silent for a mouse and useful for everyone else.
+
+            The tool's own name appears only once a take is loaded, because that
+            is when the picker is on screen and the page really is that tool.
+            While it is still asking which take to work from, naming one tool
+            announces a choice nobody has made yet, and this page offers three.
           */}
           <h1
             ref={heading}
             tabIndex={-1}
             className="truncate font-display text-lg font-semibold text-ink outline-none"
           >
-            {task?.label ?? 'Remix a take'}
+            {asset && task ? task.label : 'Remix a take'}
           </h1>
           <p className="mt-0.5 text-sm text-ink-faint">
             {task === undefined
               ? 'This build of Miso has no tool that works from a take.'
               : asset
                 ? `${task.summary} Working from ${asset.label}.`
-                : task.summary}
+                : 'Pick a take to work from, then choose what to do with it.'}
           </p>
         </div>
 
@@ -140,11 +148,21 @@ export function RemixRoute() {
 
       {assetId === undefined ? (
         <Panel title="Pick a source">
-          <SourcePicker
-            projectId={routeProjectId ?? projectId ?? ''}
-            assets={assets}
-            loading={loading}
-          />
+          <div className="flex flex-col gap-4">
+            {/*
+              Every other project route gets this from the takes column, and
+              this page drops that column to take the full width. Without it the
+              only way to bring in a track to work from is to leave the page,
+              import it somewhere else, and come back.
+            */}
+            <ImportDropZone onFile={importFile} importing={importing} />
+
+            <SourcePicker
+              projectId={routeProjectId ?? projectId ?? ''}
+              assets={assets}
+              loading={loading}
+            />
+          </div>
         </Panel>
       ) : asset === undefined ? (
         <Panel title="That take is not here">

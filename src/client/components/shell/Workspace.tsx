@@ -8,7 +8,6 @@ import { generatedTakes } from '../../lib/takeGroups.ts';
 import { usePlayer } from '../../lib/usePlayer.ts';
 import { useStudio } from '../../lib/useStudio.ts';
 import { ConfirmDialog } from '../Dialog.tsx';
-import { ImportDropZone } from '../ImportDropZone.tsx';
 import { JobList } from '../JobList.tsx';
 import { IconButton } from '../ui.tsx';
 import { TakeDetailPanel } from './TakeDetailPanel.tsx';
@@ -17,14 +16,24 @@ import { TakeRow } from './TakeRow.tsx';
 /**
  * What the create form has generated, and the queue that adds to it.
  *
- * This lives in the shell rather than the create route so it survives a move
- * to the models or settings screen. What you are working on should not vanish
- * because you went to install a model.
+ * This lives in the shell rather than the create route so it survives a route
+ * change: moving between the create form and back does not rebuild it, and the
+ * dock underneath it is never remounted.
+ *
+ * It is not on screen everywhere. Models and Settings take the full width from
+ * September 15, 2026, because a project's takes have nothing to do with
+ * installing a model or changing a setting. `wantsFullWidth` in
+ * `lib/routes.ts` is what decides.
  *
  * It holds generated takes only. Imports and anything made out of another take
  * are on the project page, so the list beside the form is what the form put
  * there rather than everything in the project. The rule itself is in
  * `takeGroups.ts`, shared with that page so the two cannot disagree.
+ *
+ * There is deliberately no import zone here, which follows from that same rule.
+ * This list cannot show an imported file, so a zone above it would accept a
+ * track and then appear to lose it. Importing lives on the project page, which
+ * shows everything, and on the remix page, where a source is being picked.
  *
  * There is no search, filter or sort bar. The reference layout has one, and a
  * project with four takes has nothing to filter. It is worth adding when a real
@@ -44,8 +53,6 @@ export function Workspace() {
     jobs,
     tasks,
     loading,
-    importing,
-    importFile,
     renameProject,
     renameAsset,
     removeAsset,
@@ -171,14 +178,12 @@ export function Workspace() {
 
       {projectId === undefined ? null : (
         <>
-          <ImportDropZone onFile={importFile} importing={importing} />
-
           <div className="flex min-h-0 flex-1 flex-col gap-5 lg:grid lg:grid-rows-[minmax(0,11fr)_minmax(0,9fr)]">
             <div className="min-h-0 lg:overflow-y-auto lg:pr-1">
               {shown.length === 0 && !loading ? (
                 <p className="text-sm text-ink-muted">
                   {assets.length === 0 ? (
-                    'Nothing here yet. Generate something, or choose an audio file above.'
+                    'Nothing here yet. Generate something to get started.'
                   ) : (
                     <>
                       Nothing generated here yet.{' '}

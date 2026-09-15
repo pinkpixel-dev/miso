@@ -44,10 +44,32 @@ describe('wantsFullWidth', () => {
     expect(wantsFullWidth('/projects/abc/create')).toBe(false);
   });
 
-  it('is false away from a project entirely', () => {
+  /**
+   * Not for the reason the project and remix pages are full width, which is
+   * that they carry their own list of takes. These are app level: a project's
+   * takes standing beside them belong to something else entirely. Decided
+   * September 15, 2026.
+   */
+  it('is true on the app level screens', () => {
+    expect(wantsFullWidth('/models')).toBe(true);
+    expect(wantsFullWidth('/settings')).toBe(true);
+  });
+
+  /**
+   * Start keeps the column. A projects list with the last project's takes
+   * beside it is two halves of the same thought, unlike installing a model.
+   */
+  it('is false on the start screen, which keeps the column', () => {
     expect(wantsFullWidth('/')).toBe(false);
-    expect(wantsFullWidth('/models')).toBe(false);
-    expect(wantsFullWidth('/settings')).toBe(false);
+  });
+
+  /**
+   * Both are matched to the end, the same way the project page is, so nothing
+   * nested under them is swept in by accident if a route is added later.
+   */
+  it('is not fooled by a path that merely starts with one of them', () => {
+    expect(wantsFullWidth('/models/something')).toBe(false);
+    expect(wantsFullWidth('/settings/deep')).toBe(false);
   });
 
   it('is not fooled by a project whose id begins with remix', () => {

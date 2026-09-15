@@ -18,6 +18,10 @@ export const CREATE_PATH = '/projects/:id/create';
 /** The region editor, with or without a source chosen. */
 export const REMIX_PATH = '/projects/:id/remix';
 
+/** The app level screens, which are not scoped to a project. */
+export const MODELS_PATH = '/models';
+export const SETTINGS_PATH = '/settings';
+
 /**
  * The project a path is inside, tool routes included.
  *
@@ -34,9 +38,17 @@ export function projectIdFrom(pathname: string): string | undefined {
 /**
  * Whether this path takes the whole width.
  *
- * The takes column is per project and sits beside the create form. Both pages
- * that drop it carry their own list of takes, so keeping the column would put
- * the same list on screen twice.
+ * The takes column is per project and sits beside the create form. Two kinds of
+ * page drop it, for two different reasons.
+ *
+ * The project page and the remix page carry their own list of takes, so keeping
+ * the column would put the same list on screen twice.
+ *
+ * Models and Settings are app level and have nothing to do with whichever
+ * project happens to be open, so a project's takes beside them belong to
+ * something else. What that costs is sight of a running generation while you
+ * install a model: the dock still plays and the job still runs, so the progress
+ * view goes rather than the work. Decided September 15, 2026.
  *
  * The project page is matched with `end: true` and the remix page is not, and
  * that difference is load bearing. A prefix match on the project would make
@@ -45,6 +57,8 @@ export function projectIdFrom(pathname: string): string | undefined {
  */
 export function wantsFullWidth(pathname: string): boolean {
   if (matchPath({ path: REMIX_PATH, end: false }, pathname) !== null) return true;
+  if (matchPath({ path: MODELS_PATH, end: true }, pathname) !== null) return true;
+  if (matchPath({ path: SETTINGS_PATH, end: true }, pathname) !== null) return true;
   return matchPath({ path: PROJECT_PATH, end: true }, pathname) !== null;
 }
 

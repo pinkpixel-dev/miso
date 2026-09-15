@@ -13,7 +13,7 @@ import { Workspace } from './Workspace.tsx';
 /**
  * The frame every screen sits in.
  *
- * Three columns and a dock, or two on a full width tool route. The rails and
+ * Three columns and a dock, or two on a full width route. The rails and
  * the dock are outside the router outlet, so changing route repaints the middle
  * and nothing else, which is what lets a take keep playing while you open
  * settings or move to the region editor.
@@ -50,9 +50,10 @@ function ShellFrame() {
   const { status, checking, recheck } = useBackendStatus();
 
   /*
-    A tool route takes the width the takes column would have had. The column is
-    the open project's list of takes, and a remix page carries its own source
-    list, so keeping both would put the same list on screen twice.
+    Some routes take the width the takes column would have had. A project page
+    or a remix page carries its own list of takes, so keeping the column would
+    put the same list on screen twice. Models and Settings are app level, and a
+    project's takes standing beside them belong to something else.
 
     Only the column goes. The rail, the dock, and both providers are untouched
     and unkeyed, so nothing here can interrupt playback.

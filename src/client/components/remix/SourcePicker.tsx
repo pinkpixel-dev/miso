@@ -10,6 +10,10 @@ import { formatSeconds } from '../../lib/region.ts';
  * beside it and this page has to offer the list itself. Each row is a link
  * rather than a button, because choosing a source changes the address: the URL
  * then says what you are editing, and the back button works.
+ *
+ * The remix page puts an import zone directly above this, for the same reason:
+ * the takes column normally carries one and this route does not have it. The
+ * empty state below says "above" and depends on that, so the two move together.
  */
 export function SourcePicker({
   projectId,
@@ -28,8 +32,8 @@ export function SourcePicker({
     return (
       <div className="flex flex-col gap-2">
         <p className="text-sm text-ink-muted">
-          There is nothing to remix in this project yet. Generate a track or import one, then come
-          back.
+          There is nothing to remix in this project yet. Import a track above, or generate one
+          on the project page.
         </p>
         <Link
           to={`/projects/${encodeURIComponent(projectId)}`}

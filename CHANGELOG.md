@@ -3,6 +3,30 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.15.0 - September 15, 2026
+
+### 🎛️ Remix
+
+- You can import audio straight from the remix page. Every other project route gets an import
+  zone from the takes column, and this page drops that column to take the full width, so
+  bringing in a track to work from used to mean leaving the page and coming back.
+- The page no longer calls itself "Repaint a section" while it is still asking which take you
+  want. It names a tool once a take is loaded and the picker is on screen, and reads "Remix a
+  take" before that.
+
+### 🎹 Generate
+
+- The takes column beside the generate form no longer offers an import zone. That column shows
+  what the form generated, so an imported file landed in the project and then did not appear
+  beside you. Import from the project page, which shows everything, or from the remix page
+  while picking a source.
+
+### 🖥️ Layout
+
+- The Models and Settings screens take the full width. Both are app level, and the takes
+  column beside them was showing whichever project happened to be open, which has nothing to
+  do with installing a model or changing a setting.
+
 ## 0.14.0 - September 15, 2026
 
 ### 🎛️ Remix
