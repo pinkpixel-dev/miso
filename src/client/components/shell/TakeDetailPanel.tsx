@@ -111,10 +111,14 @@ export function TakeDetailPanel({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
               {/*
-                The fast way into the editor, with this take already the source.
-                A link rather than a button because it goes somewhere, so the
-                address ends up saying what is being edited and the back button
-                comes back here.
+                The fast way into the remix tools, with this take already the
+                source. A link rather than a button because it goes somewhere,
+                so the address ends up saying what is being edited and the back
+                button comes back here.
+
+                It does not name a tool. The remix page carries several and the
+                picker chooses between them, so a link promising one of them
+                would be answering a question this panel has not asked.
               */}
               <Link
                 to={remixPath(asset.projectId, asset.id)}
@@ -127,7 +131,7 @@ export function TakeDetailPanel({
                 )}
               >
                 <Scissors aria-hidden="true" className="h-4 w-4 shrink-0" />
-                Repaint a section
+                Remix this take
               </Link>
 
               {!job ? (
