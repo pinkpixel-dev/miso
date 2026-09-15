@@ -195,6 +195,12 @@ Both accept `audio`, and both discard it.
 - **`complete_track_classes` is ignored in every shape tried**, both the comma separated
   string `"drums,bass"` and the array `["drums","bass"]`, byte-identical to sending nothing.
 - Timing was about 25 to 30 seconds, for a 130 second output.
+- **`duration_seconds` is respected exactly.** Asking for 30 returned 30.0 seconds and asking
+  for 60 returned 60.0, on both routes. The 130 seconds above is this package's default when
+  no length is requested: plain text2music returns 130 too, so it is not a property of these
+  routes or of the source. Both can carry an ordinary length control.
+- **`track_name` empty is the same as absent.** `track_name: ""` returned byte-identical audio
+  to omitting the key, so a blank field needs no special handling.
 
 ### What was ruled out
 
