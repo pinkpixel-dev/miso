@@ -129,20 +129,7 @@ comparisons stay honest.
 
 The useful split is not prompt behaviour. It is whether the route reads the source at all.
 
-### extract, cover and cover-nofsq: these read the source
-
-```json
-{
-  "model": "miso:ace_step_turbo_q8_0",
-  "request": {
-    "task_route": "extract",
-    "text": "extract vocals",
-    "audio": "/tmp/audiocpp-ui-<id>/<n>-phase0-original.wav",
-    "track_name": "vocals",
-    "seed": 12345
-  }
-}
-```
+### cover and cover-nofsq: these read the source
 
 ```json
 {
@@ -159,14 +146,12 @@ The useful split is not prompt behaviour. It is whether the route reads the sour
 
 `cover-nofsq` takes the same body with `task_route` changed.
 
-- **All three lock the output to the source duration.** 20 seconds in, 20 seconds out.
-- **All three follow the source.** The proof is the silence. The source falls to near nothing
-  after second 16 (per-second level 54, 31, 31, 31) and every one of these routes falls
-  silent with it: extract 69, 1.4, 1.5, 1.6, cover 747, 41, 11, 2, cover-nofsq 952, 198, 131,
-  2. A route that rebuilt the track would have put audio there.
-- **`track_name` steers extract.** `vocals` against `drums` differ by 149.8 on zero-crossing
-  rate, deterministic on both sides. Extract returns one output, not named stems:
-  `named_audio_outputs` came back empty.
+- **Both lock the output to the source duration.** 20 seconds in, 20 seconds out.
+- **Both follow the source.** The proof is the silence. The source falls to near nothing
+  after second 16 (per-second level 54, 31, 31, 31) and both fall silent with it: cover 747,
+  41, 11, 2 and cover-nofsq 952, 198, 131, 2. Read this test narrowly. `extract` passes it too
+  and still separates nothing, so it shows the route read the source and never that the route
+  did what it claims.
 - **The prompt steers cover hard.** The piano and metal pair differ by 2244.9, wider than
   text2music's own 1098 from 5a. The manual lists cover's planner as `Not used`, the same
   words it uses for repaint where the prompt is inert, so that column does not predict
@@ -175,6 +160,37 @@ The useful split is not prompt behaviour. It is whether the route reads the sour
   same request, and nofsq stays far closer to the source (per-second difference around 1300
   against cover's 3400 to 7000). One is a rework, the other is a lighter pass.
 - Timing was about 4.2 to 5.1 seconds wall for 20 seconds of audio.
+
+### extract: reads the source and rebuilds it
+
+**Dropped from phase 5b on September 14, 2026.** Kept here because the request shape is
+confirmed, and because the way this route passed every measurement before failing by ear is
+the most useful thing in this file. Full write-up in `DOCS/ERRORS.md`.
+
+```json
+{
+  "model": "miso:ace_step_turbo_q8_0",
+  "request": {
+    "task_route": "extract",
+    "text": "extract vocals",
+    "audio": "/tmp/audiocpp-ui-<id>/<n>-phase0-original.wav",
+    "track_name": "vocals",
+    "seed": 12345
+  }
+}
+```
+
+- **It reads the source.** Duration locks to it and the output goes silent where the source
+  does, 69, 1.4, 1.5, 1.6.
+- **It does not separate.** The output comes back at full mix loudness, 2641 against the
+  source's 2644. Against a second source carrying known vocals it came back louder than the
+  source itself, 3231 for vocals and 3135 for drums against 2270. A part cannot be louder than
+  the mix that holds it, and this is the cheapest test here that says so.
+- **`track_name` changes the bytes without selecting a part.** On the first source `vocals`
+  against `drums` moved 149.8, which read as real selection. On the vocal source that
+  collapsed to 12.6, and the two extractions differed from each other far less than either
+  differed from the source. Asked for vocals on a track that has them, none were audible.
+- Extract returns one output, not named stems: `named_audio_outputs` came back empty.
 
 ### complete and lego: these ignore the source
 
