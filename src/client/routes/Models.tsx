@@ -23,6 +23,34 @@ export function Models() {
   const [confirmingClean, setConfirmingClean] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [cleanResult, setCleanResult] = useState<string | undefined>();
+  const [unloading, setUnloading] = useState(false);
+  const [unloadResult, setUnloadResult] = useState<string | undefined>();
+
+  /**
+   * Frees the card.
+   *
+   * No confirmation, unlike the clean-up beside it. Nothing is deleted and
+   * nothing is lost: the next job loads what it needs again, which is about
+   * nine seconds for ACE-Step. That puts it with Refresh rather than with the
+   * destructive action.
+   *
+   * This is what a generation that ran out of video memory tells people to
+   * reach for. That message has always named "Unload models" and this is the
+   * first time the control has existed: the route and the API call were both
+   * there, with nothing calling them.
+   */
+  async function runUnload() {
+    setUnloading(true);
+    setUnloadResult(undefined);
+    try {
+      await api.unloadModels();
+      setUnloadResult('Models unloaded. The card is free, and the next job loads what it needs.');
+    } catch (cause) {
+      setUnloadResult(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setUnloading(false);
+    }
+  }
 
   async function runClean() {
     setCleaning(true);
@@ -62,6 +90,14 @@ export function Models() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            onClick={() => void runUnload()}
+            busy={unloading}
+            disabled={unavailable}
+          >
+            Unload models
+          </Button>
           <Button variant="ghost" onClick={() => setConfirmingClean(true)} disabled={unavailable}>
             Clean up partial downloads
           </Button>
@@ -70,6 +106,12 @@ export function Models() {
           </Button>
         </div>
       </header>
+
+      {unloadResult ? (
+        <p role="status" className="rounded-md border border-line px-4 py-3 text-sm text-ink-muted">
+          {unloadResult}
+        </p>
+      ) : null}
 
       {cleanResult ? (
         <p role="status" className="rounded-md border border-line px-4 py-3 text-sm text-ink-muted">

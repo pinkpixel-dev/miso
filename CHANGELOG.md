@@ -3,6 +3,15 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.16.0 - September 15, 2026
+
+### 🧠 Models
+
+- The Models screen has an **Unload models** button, which frees the card without deleting
+  anything. When a generation fails for want of video memory, the error says to free the card
+  with Unload models, and until now no such control existed: the server route and the API call
+  were both there with nothing calling them.
+
 ## 0.15.0 - September 15, 2026
 
 ### 🎛️ Remix
