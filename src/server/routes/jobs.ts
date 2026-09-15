@@ -33,6 +33,7 @@ jobRoutes.get('/tasks', (c) =>
     listTasks().map((task) => ({
       id: task.id,
       label: task.label,
+      shortLabel: task.shortLabel,
       summary: task.summary,
       family: task.family,
       vocals: task.vocals,

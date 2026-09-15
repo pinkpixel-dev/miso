@@ -417,3 +417,156 @@ describe('cross-field validation', () => {
     expect(result.ok === false && result.error).toMatch(/cannot be below/i);
   });
 });
+
+describe('the cover routes', () => {
+  const cover = taskOf('remix.cover');
+  const nofsq = taskOf('remix.covernofsq');
+
+  it('reads a source track, like repaint and unlike generation', () => {
+    expect(cover.inputRoles).toEqual(['source']);
+    expect(nofsq.inputRoles).toEqual(['source']);
+  });
+
+  it('runs on ACE-Step packages and refuses another family', () => {
+    expect(packageRunsTask(cover, 'ace_step_turbo_q8_0')).toBe(true);
+    expect(packageRunsTask(cover, 'minimax_music3_q8_0')).toBe(false);
+  });
+
+  it('sends the route, the staged source, and the prompt', () => {
+    const staged = { source: '/tmp/audiocpp-ui-1/1-take.wav' };
+
+    for (const [task, route] of [[cover, 'cover'], [nofsq, 'cover-nofsq']] as const) {
+      const result = validateParams(task, { prompt: 'a softer acoustic version' });
+      const request = task.buildRequest(result.ok ? result.value : {}, staged);
+
+      expect(request, `${task.id} sends its own route`).toMatchObject({
+        task_route: route,
+        audio: '/tmp/audiocpp-ui-1/1-take.wav',
+        text: 'a softer acoustic version',
+      });
+    }
+  });
+
+  /**
+   * Measured, not assumed. 1.0 and 0.0 returned byte-identical audio on cover,
+   * the same result phase 5a got on repaint. The upstream tutorial calls it the
+   * freedom dial for exactly this kind of edit, and it is wired into neither
+   * route. See DOCS/ERRORS.md.
+   */
+  it('offers no strength, because audio_cover_strength does nothing here', () => {
+    for (const task of [cover, nofsq]) {
+      expect(task.fields.some((field) => field.name === 'strength')).toBe(false);
+
+      const result = validateParams(task, { prompt: 'x' });
+      const request = task.buildRequest(result.ok ? result.value : {}, { source: '/tmp/a.wav' });
+      expect('audio_cover_strength' in request).toBe(false);
+    }
+  });
+
+  it('asks for no duration, because a cover locks it to the source', () => {
+    for (const task of [cover, nofsq]) {
+      expect(task.fields.some((field) => field.name === 'durationSeconds')).toBe(false);
+
+      const result = validateParams(task, { prompt: 'x' });
+      const request = task.buildRequest(result.ok ? result.value : {}, { source: '/tmp/a.wav' });
+      expect('duration_seconds' in request).toBe(false);
+    }
+  });
+
+  /**
+   * The opposite of repaint, which is why the two forms differ. Opposite
+   * prompts came out 2244.9 apart through cover against text2music's own 1098
+   * on the same package, while repaint managed 4 to 13. This route follows what
+   * it is told, so the form insists on being told something.
+   */
+  it('requires a prompt, because this route actually follows one', () => {
+    expect(cover.fields.find((field) => field.name === 'prompt')?.required).toBe(true);
+    expect(validateParams(cover, {})).toMatchObject({ ok: false });
+    expect(validateParams(cover, { prompt: '' })).toMatchObject({ ok: false });
+  });
+
+  it('always sends text, the one ACE-Step field with no server-side default', () => {
+    const result = validateParams(cover, { prompt: 'x' });
+    const request = cover.buildRequest(result.ok ? result.value : {}, { source: '/tmp/a.wav' });
+
+    expect(typeof request.text).toBe('string');
+  });
+
+  it('leaves the lyrics and the seed out when they were not set', () => {
+    const result = validateParams(cover, { prompt: 'x' });
+    const request = cover.buildRequest(result.ok ? result.value : {}, { source: '/tmp/a.wav' });
+
+    expect('lyrics' in request).toBe(false);
+    expect('seed' in request).toBe(false);
+  });
+
+  /** Two routes returning the same audio would be one route with two names. */
+  it('keeps the two apart, in the route and in what each says it does', () => {
+    expect(cover.route).toBe('cover');
+    expect(nofsq.route).toBe('cover-nofsq');
+    expect(cover.summary).not.toBe(nofsq.summary);
+  });
+});
+
+describe('the routes stage 0 rejected', () => {
+  /**
+   * These are absent on purpose and each cost real GPU time to disprove.
+   * `extract` returns a re-rendered mix louder than the source it came from.
+   * Stable Audio opens the file and drops it before generation. See
+   * DOCS/ERRORS.md before adding any of them back from the upstream manual.
+   */
+  it('offers no remix route that was measured inert', () => {
+    const ids = listTasks().map((task) => task.id);
+
+    expect(ids).not.toContain('remix.extract');
+    expect(ids).not.toContain('remix.initaudio');
+    expect(ids).not.toContain('remix.inpaint');
+  });
+
+  /**
+   * `complete` and `lego` failed twice. They accept source audio and discard
+   * it, returning byte-identical output with and without it, which ruled them
+   * out as remix. Then against text2music on the same prompt, seed and lyrics
+   * they measured 8.7 and 51.0 apart, where adding lyrics to that request moves
+   * the same measure 1443, which ruled them out as generation. They are another
+   * seed of generate.text2music, not another capability.
+   */
+  it('offers no generation route that only repeats text2music', () => {
+    const ids = listTasks().map((task) => task.id);
+
+    expect(ids).not.toContain('generate.complete');
+    expect(ids).not.toContain('generate.lego');
+  });
+
+  it('keeps ACE-Step to the routes that earned an entry', () => {
+    const aceStep = listTasks().filter((task) => task.family === 'ace_step');
+
+    expect(aceStep.map((task) => task.id)).toEqual([
+      'generate.text2music',
+      'remix.repaint',
+      'remix.cover',
+      'remix.covernofsq',
+    ]);
+  });
+
+  it('keeps Stable Audio to text-to-music, which is the part that works', () => {
+    const stableAudioTasks = listTasks().filter((task) => task.family === 'stable_audio');
+
+    expect(stableAudioTasks.map((task) => task.id)).toEqual(['generate.stableaudio']);
+    expect(stableAudioTasks[0]?.inputRoles).toEqual([]);
+  });
+});
+
+describe('shortLabel', () => {
+  it('gives every task a heading name beside its action name', () => {
+    for (const task of listTasks()) {
+      expect(task.shortLabel, `${task.id} has a shortLabel`).toBeTruthy();
+    }
+  });
+
+  /** The reason the field exists: a heading should name things, not give orders. */
+  it('names repaints as a thing where the label is an instruction', () => {
+    expect(taskOf('remix.repaint').label).toBe('Repaint a section');
+    expect(taskOf('remix.repaint').shortLabel).toBe('Repaints');
+  });
+});

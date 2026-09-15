@@ -3,8 +3,10 @@
 Captured from `ghcr.io/0xshug0/audio.cpp:full-cuda13` on 2026-09-09, server started with
 `--ui --ui-management`. Tests load these instead of calling a live server.
 
-Re-record them when the image is updated, using the commands in Task 1 of
-`.superpowers/sdd/2026-09-09-phase-2-model-catalog/task-1-brief.md`.
+Re-record them when the image is updated. Everything from `## ACE-Step repaint` down was
+measured with `scripts/probe-routes.mjs`, which stages a source, runs a request, and compares
+the audio: that is the tool to re-run. The management fixtures in the table above predate it
+and were captured by hand.
 
 | Route | Method | Request | Fixture |
 |---|---|---|---|

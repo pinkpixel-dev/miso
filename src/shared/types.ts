@@ -350,6 +350,15 @@ export interface TaskField {
 export interface StudioTask {
   id: string;
   label: string;
+  /**
+   * The same task named as a thing rather than an action.
+   *
+   * `label` is how a tool is offered, which is usually an instruction:
+   * "Repaint a section". The project page groups takes under headings, where
+   * that reads as a command when it is only naming what sits below it, so a
+   * heading uses this instead.
+   */
+  shortLabel: string;
   summary: string;
   family: string;
   /**

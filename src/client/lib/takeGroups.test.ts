@@ -32,10 +32,11 @@ function job(id: string, taskId: string, outputAssetIds: string[]): Job {
   };
 }
 
-function task(id: string, label: string, inputRoles: string[]): StudioTask {
+function task(id: string, label: string, shortLabel: string, inputRoles: string[]): StudioTask {
   return {
     id,
     label,
+    shortLabel,
     summary: '',
     family: 'ace_step',
     vocals: 'both',
@@ -46,9 +47,9 @@ function task(id: string, label: string, inputRoles: string[]): StudioTask {
 }
 
 const TASKS: StudioTask[] = [
-  task('generate.text2music', 'ACE-Step 1.5', []),
-  task('generate.stableaudio', 'Stable Audio 3', []),
-  task('remix.repaint', 'Repaint a section', ['source']),
+  task('generate.text2music', 'ACE-Step 1.5', 'ACE-Step', []),
+  task('generate.stableaudio', 'Stable Audio 3', 'Stable Audio', []),
+  task('remix.repaint', 'Repaint a section', 'Repaints', ['source']),
 ];
 
 describe('groupTakes', () => {
@@ -71,9 +72,11 @@ describe('groupTakes', () => {
 
     const sections = groupTakes([generated, repainted], jobs, TASKS);
 
+    // The heading names the takes, so it reads as a noun. The task is still
+    // offered as "Repaint a section" everywhere it is an action.
     expect(sections.map((section) => section.label)).toEqual([
       'Generated songs',
-      'Repaint a section',
+      'Repaints',
     ]);
     expect(sections[1]?.takes).toEqual([repainted]);
   });

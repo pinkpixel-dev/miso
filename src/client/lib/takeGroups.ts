@@ -80,7 +80,10 @@ function originOf(
   // task id means a route added later lands in the right place on its own.
   if (found.task.inputRoles.length === 0) return GENERATED;
 
-  return { rank: 1, key: found.task.id, label: found.task.label, taskOrder: found.order };
+  // shortLabel rather than label, because this is a heading. `label` is the
+  // instruction a tool is offered under, "Repaint a section", which tells the
+  // reader to do something when it is only naming the takes underneath it.
+  return { rank: 1, key: found.task.id, label: found.task.shortLabel, taskOrder: found.order };
 }
 
 /** Newest first, matching the takes column. Ties keep the order they arrived in. */

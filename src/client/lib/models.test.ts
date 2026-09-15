@@ -28,6 +28,7 @@ function taskOf(packageIds: string[], family = 'ace_step'): StudioTask {
   return {
     id: 'remix.repaint',
     label: 'Repaint a section',
+    shortLabel: 'Repaints',
     summary: '',
     family,
     vocals: 'both',

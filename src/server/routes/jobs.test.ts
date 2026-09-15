@@ -289,6 +289,46 @@ describe('a job that reads a source track', () => {
     expect(response.status).toBe(400);
     expect(((await response.json()) as ApiError).error).toMatch(/end after it starts/i);
   });
+
+  /**
+   * The region guard reads `regionEnd` off the validated params by name, so a
+   * task carrying no region has to fall straight through it. Repaint was the
+   * only remix task when that was written, which made it an assumption rather
+   * than a tested rule. Cover is the first task to check it, and the source
+   * here is three seconds long, shorter than any region repaint would accept,
+   * so a guard that ran anyway would have something to complain about.
+   */
+  it('lets a remix task with no region past the region guard', async () => {
+    const source = take(projectId, 3);
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({
+        taskId: 'remix.cover',
+        modelId: 'ace_step_turbo_q8_0',
+        params: { prompt: 'a softer acoustic version' },
+        inputs: [{ assetId: source.id, role: 'source' }],
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    const job = (await response.json()) as Job;
+    expect(job.taskId).toBe('remix.cover');
+    expect(job.state).toBe('queued');
+  });
+
+  it('still needs a source for a cover, the same as a repaint', async () => {
+    const response = await app().request(
+      `/api/projects/${projectId}/jobs`,
+      json({
+        taskId: 'remix.cover',
+        modelId: 'ace_step_turbo_q8_0',
+        params: { prompt: 'a softer acoustic version' },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as ApiError).error).toMatch(/needs a source track/i);
+  });
 });
 
 describe('DELETE /api/projects/:id/jobs/:jobId', () => {
