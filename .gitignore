@@ -7,6 +7,9 @@ data/
 *.sqlite
 *.sqlite-journal
 
+# Takes written by scripts/probe-routes.mjs
+probe-out/
+
 # Node
 node_modules/
 dist/
