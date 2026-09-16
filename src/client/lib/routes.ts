@@ -19,6 +19,7 @@ export const CREATE_PATH = '/projects/:id/create';
 export const REMIX_PATH = '/projects/:id/remix';
 
 /** The app level screens, which are not scoped to a project. */
+export const LIBRARY_PATH = '/library';
 export const MODELS_PATH = '/models';
 export const SETTINGS_PATH = '/settings';
 
@@ -44,9 +45,11 @@ export function projectIdFrom(pathname: string): string | undefined {
  * The project page and the remix page carry their own list of takes, so keeping
  * the column would put the same list on screen twice.
  *
- * Models and Settings are app level and have nothing to do with whichever
- * project happens to be open, so a project's takes beside them belong to
- * something else. What that costs is sight of a running generation while you
+ * The library, Models and Settings are app level and have nothing to do with
+ * whichever project happens to be open, so a project's takes beside them
+ * belong to something else. The library is the sharper case: it is every
+ * project's takes, and one project's column next to that is the same list at
+ * two scopes. What that costs is sight of a running generation while you
  * install a model: the dock still plays and the job still runs, so the progress
  * view goes rather than the work. Decided September 15, 2026.
  *
@@ -57,9 +60,15 @@ export function projectIdFrom(pathname: string): string | undefined {
  */
 export function wantsFullWidth(pathname: string): boolean {
   if (matchPath({ path: REMIX_PATH, end: false }, pathname) !== null) return true;
+  if (matchPath({ path: LIBRARY_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: MODELS_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: SETTINGS_PATH, end: true }, pathname) !== null) return true;
   return matchPath({ path: PROJECT_PATH, end: true }, pathname) !== null;
+}
+
+/** Every take in Miso, whatever project it is in. */
+export function libraryPath(): string {
+  return LIBRARY_PATH;
 }
 
 /** The project itself. */

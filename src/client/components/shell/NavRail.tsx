@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Package, Plus, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Library, Package, Plus, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useProjects } from '../../lib/useProjects.ts';
@@ -11,6 +11,13 @@ import { RailSection } from './RailSection.tsx';
  * The rail is the whole navigation now. The header used to carry Library,
  * Models and Settings links; Library became this list, and the other two are
  * buttons pinned to the bottom, away from the content they are not part of.
+ *
+ * Library sits above the projects rather than below with Models and Settings,
+ * because it is the same reading matter as the list under it, at a wider scope.
+ * This overrides the September 12, 2026 decision that rejected the library as a
+ * rail peer of Projects. That entry's reason was that a rail level page would
+ * have to pick its own project context, and the library picks none: it spans
+ * every project. See DOCS/MEMORY.md.
  *
  * Collapsing keeps the projects reachable rather than hiding them. Each one
  * becomes its initial with the full name in a tooltip, because a rail that
@@ -89,6 +96,29 @@ export function NavRail() {
       </div>
 
       <nav className="flex min-h-0 flex-1 flex-col gap-3 px-2 py-2">
+        {collapsed ? (
+          <Tooltip label="Library">
+            <NavLink
+              to="/library"
+              aria-label="Library"
+              className={({ isActive }) =>
+                cx(
+                  'flex h-9 w-9 items-center justify-center rounded-md transition-colors duration-150',
+                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+                  isActive ? 'bg-raised text-ink' : 'text-ink-muted hover:bg-raised hover:text-ink',
+                )
+              }
+            >
+              <Library aria-hidden="true" className="h-4 w-4" />
+            </NavLink>
+          </Tooltip>
+        ) : (
+          <NavLink to="/library" className={({ isActive }) => link(isActive)}>
+            <Library aria-hidden="true" className="h-4 w-4 shrink-0" />
+            Library
+          </NavLink>
+        )}
+
         <RailSection title="Projects" collapsed={collapsed}>
           {loading && projects.length === 0 ? (
             collapsed ? null : (

@@ -5,6 +5,7 @@ import type {
   Catalog,
   CleanPartialsResult,
   Job,
+  LibraryTake,
   LyricsDraft,
   Project,
   ProjectDetail,
@@ -74,6 +75,9 @@ export const api = {
 
   getProject: (id: string) => request<ProjectDetail>(`/projects/${encodeURIComponent(id)}`),
 
+  /** Every take across every project, metadata only. Peaks are not included. */
+  getLibrary: () => request<LibraryTake[]>('/library'),
+
   renameProject: (id: string, name: string) =>
     request<Project>(`/projects/${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -94,6 +98,12 @@ export const api = {
     request<Asset>(
       `/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/peaks/read`,
       { method: 'POST' },
+    ),
+
+  /** One take with its peaks, for handing a library take to the player. */
+  getAsset: (projectId: string, assetId: string) =>
+    request<Asset>(
+      `/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}`,
     ),
 
   renameAsset: (projectId: string, assetId: string, label: string) =>

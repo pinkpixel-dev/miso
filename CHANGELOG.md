@@ -3,6 +3,26 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.17.0 - September 15, 2026
+
+### 📚 Library
+
+- A new Library page at `/library`, above the projects in the rail. It lists every take in
+  Miso, whatever project it lives in, newest first, with the project named on each row.
+- Search matches the take name, the project, the song title, the prompt, the lyrics, and the
+  tool that made it. Every word you type has to match somewhere, so two words narrow the list
+  rather than widening it.
+- Play, export, rename and delete all work from the library, and a take renamed or deleted
+  there updates its project straight away when that project is open.
+
+### 🔌 API
+
+- `GET /api/library` answers with every take across every project as metadata. Stored
+  waveforms are left out: they are about 23 KB a row and nothing in the list draws one.
+- `GET /api/projects/:id/assets/:assetId` answers with one take whole, waveform included.
+  This is what the player is handed when you press play in the library, so the browser never
+  has to download a whole track to draw its waveform.
+
 ## 0.16.1 - September 15, 2026
 
 ### 🎛️ Remix

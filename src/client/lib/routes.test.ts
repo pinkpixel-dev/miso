@@ -20,6 +20,7 @@ describe('projectIdFrom', () => {
 
   it('finds no project outside a project route', () => {
     expect(projectIdFrom('/')).toBeUndefined();
+    expect(projectIdFrom('/library')).toBeUndefined();
     expect(projectIdFrom('/models')).toBeUndefined();
     expect(projectIdFrom('/settings')).toBeUndefined();
   });
@@ -51,6 +52,7 @@ describe('wantsFullWidth', () => {
    * September 15, 2026.
    */
   it('is true on the app level screens', () => {
+    expect(wantsFullWidth('/library')).toBe(true);
     expect(wantsFullWidth('/models')).toBe(true);
     expect(wantsFullWidth('/settings')).toBe(true);
   });

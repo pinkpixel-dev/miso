@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Asset, Project } from '../../shared/types.ts';
 import { api } from './api.ts';
 import { computePeaks } from './computePeaks.ts';
-import { publishProjectUpdate } from './projectUpdates.ts';
+import { publishProjectUpdate, subscribeToAssetChanges } from './projectUpdates.ts';
 import { uploadAsset } from './upload.ts';
 
 export interface ImportProgress {
@@ -53,6 +53,28 @@ export function useProject(id: string | undefined) {
     setLoading(true);
     void load();
   }, [load]);
+
+  // A take can be renamed or deleted from the library while its project is
+  // open here. Without this the takes column, the project page and the dock
+  // would all keep showing the old copy. A delete reloads rather than just
+  // dropping the row, because the project's size and count change with it.
+  useEffect(
+    () =>
+      subscribeToAssetChanges((change) => {
+        if (change.kind === 'renamed') {
+          if (change.asset.projectId !== id) return;
+          setAssets((current) =>
+            current.map((asset) => (asset.id === change.asset.id ? change.asset : asset)),
+          );
+          return;
+        }
+
+        if (change.projectId !== id) return;
+        setAssets((current) => current.filter((asset) => asset.id !== change.assetId));
+        void load();
+      }),
+    [id, load],
+  );
 
   const importFile = useCallback(
     async (file: File) => {

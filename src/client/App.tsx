@@ -1,6 +1,7 @@
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { StudioShell } from './components/shell/StudioShell.tsx';
 import { CreateRoute } from './routes/Create.tsx';
+import { LibraryRoute } from './routes/Library.tsx';
 import { Models } from './routes/Models.tsx';
 import { ProjectRoute } from './routes/Project.tsx';
 import { RemixRoute } from './routes/Remix.tsx';
@@ -27,6 +28,11 @@ export function App() {
           */}
           <Route path="projects/:id/remix" element={<RemixRoute />} />
           <Route path="projects/:id/remix/:assetId" element={<RemixRoute />} />
+          {/*
+            App level, like models and settings. The library is every project's
+            takes, so it belongs to none of them.
+          */}
+          <Route path="library" element={<LibraryRoute />} />
           <Route path="models" element={<Models />} />
           <Route path="settings" element={<SettingsRoute />} />
           <Route path="*" element={<StartRoute />} />

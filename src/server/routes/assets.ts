@@ -217,6 +217,23 @@ assetRoutes.put('/projects/:id/assets/:assetId/peaks', async (c) => {
   return c.json<Asset>(updated);
 });
 
+/**
+ * One take, whole, peaks included.
+ *
+ * The library list leaves peaks out, because they are 23 KB a row and nothing
+ * in that list draws a waveform. This is how the take being played reaches the
+ * dock with one: without stored peaks the player falls back to fetching the
+ * entire file to draw it, which for a three minute WAV is the 34 MB request
+ * DOCS/ERRORS.md records a browser extension blocking outright.
+ */
+assetRoutes.get('/projects/:id/assets/:assetId', (c) => {
+  const assetId = c.req.param('assetId');
+  const asset = assetIn(c.req.param('id'), assetId);
+  if (!asset) return c.json<ApiError>({ error: `No asset with the id ${assetId}` }, 404);
+
+  return c.json<Asset>(asset);
+});
+
 assetRoutes.patch('/projects/:id/assets/:assetId', async (c) => {
   const projectId = c.req.param('id');
   const assetId = c.req.param('assetId');

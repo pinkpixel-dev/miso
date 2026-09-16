@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { Hono } from 'hono';
-import type { ApiError, Project, ProjectDetail } from '../../shared/types.ts';
-import { listAssets } from '../db/assets.ts';
+import type { ApiError, LibraryTake, Project, ProjectDetail } from '../../shared/types.ts';
+import { listAssets, listLibraryTakes } from '../db/assets.ts';
 import { db } from '../db/index.ts';
 import {
   createProject,
@@ -52,6 +52,15 @@ async function readName(c: Context): Promise<
 }
 
 projectRoutes.get('/projects', (c) => c.json<Project[]>(listProjects(db())));
+
+/**
+ * Every take in Miso, whatever project it is in.
+ *
+ * This lives with projects because it is the library across all of them. The
+ * response carries metadata only: peaks are left in the database, and the take
+ * being played is fetched whole from the asset route instead.
+ */
+projectRoutes.get('/library', (c) => c.json<LibraryTake[]>(listLibraryTakes(db())));
 
 projectRoutes.post('/projects', async (c) => {
   const name = await readName(c);

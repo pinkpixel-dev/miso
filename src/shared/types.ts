@@ -222,6 +222,40 @@ export interface Asset {
   createdAt: string;
 }
 
+/**
+ * One take as the library sees it: the audio, the project it lives in, and
+ * what made it.
+ *
+ * This is deliberately not an `Asset`. Peaks are the reason. They are about
+ * 23 KB of JSON per take and the library draws no waveforms, so a list of a
+ * few hundred takes carrying them would be megabytes of data nothing reads.
+ * `hasPeaks` is what the list actually needs, and the one take being played
+ * is fetched whole through `GET /projects/:id/assets/:assetId`.
+ *
+ * `prompt` and `lyrics` are lifted out of the producing job's parameters so
+ * the browser can search them without holding every job in every project.
+ * They are absent on an imported take, which had no job.
+ */
+export interface LibraryTake {
+  assetId: string;
+  projectId: string;
+  projectName: string;
+  label: string;
+  kind: AssetKind;
+  format: AssetFormat;
+  bytes: number;
+  durationSeconds?: number;
+  createdAt: string;
+  /** Whether a waveform is stored. The peaks themselves are not sent. */
+  hasPeaks: boolean;
+  /** The task that produced this take, absent when nothing did. */
+  taskId?: string;
+  /** What the song was called when it was generated. */
+  title?: string;
+  prompt?: string;
+  lyrics?: string;
+}
+
 /** A project together with its assets, newest first. */
 export interface ProjectDetail {
   project: Project;
