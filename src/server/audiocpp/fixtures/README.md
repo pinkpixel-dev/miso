@@ -158,6 +158,12 @@ The useful split is not prompt behaviour. It is whether the route reads the sour
   text2music's own 1098 from 5a. The manual lists cover's planner as `Not used`, the same
   words it uses for repaint where the prompt is inert, so that column does not predict
   whether a prompt works. Do not read it as one again.
+- **Lyrics are yours to supply, and the route sings only what you send.** Confirmed by ear on
+  September 15, 2026, not by measurement. A cover run with no `lyrics` field comes back
+  instrumental. The route does not hear the words in the source and does not carry them over,
+  so covering a song you want sung means sending the words with it. Every probe run on
+  2026-09-14 sent the same lyrics and none tested their absence, which is why this went
+  unanswered for a day.
 - **`cover` and `cover-nofsq` are genuinely different routes.** They differ by 308 on the
   same request, and nofsq stays far closer to the source (per-second difference around 1300
   against cover's 3400 to 7000). One is a rework, the other is a lighter pass.

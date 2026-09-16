@@ -399,12 +399,16 @@ function coverTask(options: {
         required: true,
         help: 'What the cover should sound like: the genre, the instruments, and the kind of voice. This route follows it closely.',
       },
+      // Optional, and the help has to say what leaving it empty does. This
+      // route does not hear the words in the source, so an empty box is not
+      // "keep the original words", it is an instrumental. Confirmed by ear on
+      // September 15, 2026.
       {
         name: 'lyrics',
         label: 'Lyrics',
         kind: 'lyrics',
         required: false,
-        help: 'The words this cover should sing.',
+        help: 'The words this cover should sing. Leave it empty and the cover comes back instrumental: this route does not read the words out of the take you gave it.',
       },
       STEPS,
       {

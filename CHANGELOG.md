@@ -3,6 +3,14 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.17.1 - September 15, 2026
+
+### 🎛️ Remix
+
+- The Lyrics box on both cover tools now says what leaving it empty does. A cover does not
+  read the words out of the take you gave it, so an empty box returns an instrumental rather
+  than the original words. Confirmed by ear.
+
 ## 0.17.0 - September 15, 2026
 
 ### 📚 Library
