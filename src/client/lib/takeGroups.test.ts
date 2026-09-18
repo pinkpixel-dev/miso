@@ -29,6 +29,7 @@ function job(id: string, taskId: string, outputAssetIds: string[]): Job {
     createdAt: '2026-09-14T00:00:00Z',
     updatedAt: '2026-09-14T00:00:00Z',
     outputAssetIds,
+    inputs: [],
   };
 }
 

@@ -18,6 +18,7 @@ function job(patch: Partial<Job>): Job {
     createdAt: '2026-09-12 10:00:00',
     updatedAt: '2026-09-12 10:00:00',
     outputAssetIds: [],
+    inputs: [],
     ...patch,
   };
 }

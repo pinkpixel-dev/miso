@@ -18,6 +18,7 @@ const job: Job = {
   createdAt: '2026-09-12 11:58:00',
   updatedAt: '2026-09-12 12:00:00',
   outputAssetIds: ['asset-1', 'asset-2'],
+  inputs: [],
 };
 
 describe('take details', () => {

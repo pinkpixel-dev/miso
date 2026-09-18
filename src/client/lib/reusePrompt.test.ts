@@ -15,6 +15,7 @@ function job(overrides: Partial<Job> = {}): Job {
     createdAt: '2026-09-17 10:00:00',
     updatedAt: '2026-09-17 10:04:00',
     outputAssetIds: ['a1'],
+    inputs: [],
     ...overrides,
   };
 }

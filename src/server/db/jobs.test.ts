@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { insertAsset } from './assets.ts';
+import { deleteAsset, insertAsset } from './assets.ts';
 import {
   createJob,
   dismissFinishedJobs,
@@ -136,6 +136,65 @@ describe('jobs', () => {
     });
 
     expect(listJobInputs(handle, 'job-1')).toEqual([{ assetId, role: 'source' }]);
+  });
+
+  it('carries what a job read on the job itself', () => {
+    const assetId = 'asset-1';
+    insertAsset(handle, {
+      id: assetId,
+      projectId,
+      kind: 'source',
+      label: 'Chorus',
+      filename: 'chorus.wav',
+      format: 'wav',
+      bytes: 10,
+      checksum: 'abc',
+    });
+
+    createJob(handle, 'job-1', {
+      projectId,
+      taskId: 'remix.repaint',
+      modelId: 'ace_step_turbo_q8_0',
+      params: {},
+      inputs: [{ assetId, role: 'source' }],
+    });
+
+    expect(readJob(handle, 'job-1')?.inputs).toEqual([{ assetId, role: 'source' }]);
+  });
+
+  it('gives a job that reads nothing an empty input list', () => {
+    queue('job-1');
+    expect(readJob(handle, 'job-1')?.inputs).toEqual([]);
+  });
+
+  it('loses the input when the take it pointed at is deleted', () => {
+    const assetId = 'asset-1';
+    insertAsset(handle, {
+      id: assetId,
+      projectId,
+      kind: 'source',
+      label: 'Chorus',
+      filename: 'chorus.wav',
+      format: 'wav',
+      bytes: 10,
+      checksum: 'abc',
+    });
+
+    createJob(handle, 'job-1', {
+      projectId,
+      taskId: 'remix.repaint',
+      modelId: 'ace_step_turbo_q8_0',
+      params: {},
+      inputs: [{ assetId, role: 'source' }],
+    });
+
+    // The lineage row is removed with the asset it points at, so the job cannot
+    // say what it read any more. This is the cascade doing what it was told,
+    // and it is why the panel reads an empty input list on a task that takes
+    // audio as a deleted source rather than as a job that read nothing.
+    deleteAsset(handle, assetId);
+
+    expect(readJob(handle, 'job-1')?.inputs).toEqual([]);
   });
 
   it('lists the assets a job produced', () => {

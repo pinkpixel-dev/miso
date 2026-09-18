@@ -357,6 +357,17 @@ export interface Job {
   finishedAt?: string;
   /** Assets this job produced. Empty until it completes. */
   outputAssetIds: string[];
+  /**
+   * Assets this job read, and what each one was to it.
+   *
+   * Empty for a task that reads nothing, which is every generation task. Also
+   * empty when the take a job read has since been deleted, because the lineage
+   * row is removed with the asset it points at. Those two cases look identical
+   * here and are told apart by the task: `StudioTask.inputRoles` is non-empty
+   * for a task that reads audio, so a job whose task reads audio and whose
+   * inputs are empty had a source that is gone.
+   */
+  inputs: { assetId: string; role: string }[];
 }
 
 /** One parameter of a task, as the studio form renders it. */

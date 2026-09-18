@@ -48,7 +48,15 @@ export interface NewJob {
   inputs?: { assetId: string; role: string }[];
 }
 
-/** A job row on its own is not the whole job. Outputs come from the assets table. */
+export function listJobInputs(handle: Database, jobId: string): { assetId: string; role: string }[] {
+  const rows = handle
+    .prepare('SELECT asset_id, role FROM asset_lineage WHERE job_id = ? ORDER BY role')
+    .all(jobId) as { asset_id: string; role: string }[];
+  return rows.map((row) => ({ assetId: row.asset_id, role: row.role }));
+}
+
+/** A job row on its own is not the whole job. What it read and what
+ * it wrote both come from other tables. */
 function toJob(handle: Database, record: Record_): Job {
   const outputs = handle
     .prepare('SELECT id FROM assets WHERE job_id = ? ORDER BY created_at, rowid')
@@ -97,6 +105,7 @@ function toJob(handle: Database, record: Record_): Job {
     finishedAt: record.finished_at ?? undefined,
     dismissedAt: record.dismissed_at ?? undefined,
     outputAssetIds: outputs.map((row) => row.id),
+    inputs: listJobInputs(handle, record.id),
   };
 }
 
@@ -217,12 +226,6 @@ export function requeueJob(handle: Database, id: string): Job | undefined {
   return result.changes === 0 ? undefined : readJob(handle, id);
 }
 
-export function listJobInputs(handle: Database, jobId: string): { assetId: string; role: string }[] {
-  const rows = handle
-    .prepare('SELECT asset_id, role FROM asset_lineage WHERE job_id = ? ORDER BY role')
-    .all(jobId) as { asset_id: string; role: string }[];
-  return rows.map((row) => ({ assetId: row.asset_id, role: row.role }));
-}
 
 /**
  * What Miso has already uploaded to a given backend.

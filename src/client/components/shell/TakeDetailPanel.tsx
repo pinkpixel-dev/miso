@@ -2,7 +2,9 @@ import { CopyPlus, Scissors, X } from 'lucide-react';
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
 import { Link } from 'react-router-dom';
-import type { Asset, Job } from '../../../shared/types.ts';
+import type { Asset, Job, StudioTask } from '../../../shared/types.ts';
+import type { LineageStep } from '../../lib/lineage.ts';
+import { ancestorsOf, descendantsOf, sourceWasDeleted } from '../../lib/lineage.ts';
 import { createPath, remixPath } from '../../lib/routes.ts';
 import { stringJobParam } from '../../lib/takeDetails.ts';
 import { Tooltip, cx } from '../ui.tsx';
@@ -40,15 +42,85 @@ function RecordedText({ value, missing }: { value: string | undefined; missing: 
   );
 }
 
+/**
+ * One chain of takes, as rows that move the panel rather than navigate.
+ *
+ * Selecting a row swaps which take the panel is about, so walking a chain is
+ * clicking. A navigation would close the panel and take the person somewhere
+ * else, which is the wrong shape for reading how something was made.
+ *
+ * A step whose take is not in this project renders as unavailable rather than
+ * as a button. The chain keeps its length either way, because a link nobody can
+ * follow is still a fact about where this take came from.
+ */
+function LineageList({
+  title,
+  steps,
+  tasks,
+  onSelect,
+}: {
+  title: string;
+  steps: LineageStep[];
+  tasks: StudioTask[];
+  onSelect: (assetId: string) => void;
+}) {
+  return (
+    <section className="border-t border-line pt-5">
+      <h3 className="mb-2 text-sm font-medium text-ink">{title}</h3>
+      <ul className="flex flex-col gap-1">
+        {steps.map((step) => {
+          const tool = tasks.find((task) => task.id === step.job?.taskId)?.shortLabel;
+
+          return (
+            <li key={step.assetId}>
+              {step.asset ? (
+                <button
+                  type="button"
+                  onClick={() => onSelect(step.assetId)}
+                  className={cx(
+                    'flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left',
+                    'transition-colors duration-150 hover:bg-raised active:bg-raised/70',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+                  )}
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                    {step.asset.label}
+                  </span>
+                  <span className="shrink-0 text-xs text-ink-faint">{tool ?? step.role}</span>
+                </button>
+              ) : (
+                <p className="px-2 py-1.5 text-sm text-ink-faint">
+                  A take from another project, as {step.role}
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export function TakeDetailPanel({
   asset,
   job,
+  assets,
+  jobs,
+  tasks,
   closeButtonRef,
+  onSelect,
   onClose,
 }: {
   asset: Asset | undefined;
   job: Job | undefined;
+  /** Every take in the open project, for resolving a lineage step to a take. */
+  assets: Asset[];
+  /** The full job history, which is what carries the edges between takes. */
+  jobs: Job[];
+  tasks: StudioTask[];
   closeButtonRef: RefObject<HTMLButtonElement | null>;
+  /** Moves the panel to another take, which is how a chain is walked. */
+  onSelect: (assetId: string) => void;
   onClose: () => void;
 }) {
   const open = asset !== undefined;
@@ -70,6 +142,10 @@ export function TakeDetailPanel({
 
   const prompt = job ? stringJobParam(job, 'prompt') : undefined;
   const lyrics = job ? stringJobParam(job, 'lyrics') : undefined;
+
+  const madeFrom = asset ? ancestorsOf(asset.id, assets, jobs) : [];
+  const usedIn = asset ? descendantsOf(asset.id, assets, jobs) : [];
+  const lostSource = sourceWasDeleted(job, tasks);
 
   return (
     <div
@@ -194,6 +270,44 @@ export function TakeDetailPanel({
                   </section>
                 </div>
               )}
+
+              {/*
+                Where this take sits among the others. Both lists are left out
+                when they are empty, because a generated song nothing was made
+                from should not carry two headings saying nothing.
+
+                The deleted source line takes the place of Made from rather than
+                sitting beside it. A repaint whose source is gone reports no
+                inputs at all, which is what a job that reads nothing reports,
+                so without this the panel would show it as generated from
+                nothing.
+              */}
+              {lostSource ? (
+                <section className="mt-6 border-t border-line pt-5">
+                  <h3 className="mb-2 text-sm font-medium text-ink">Made from</h3>
+                  <p className="text-sm leading-relaxed text-ink-muted">
+                    The take this was made from has been deleted, so there is no longer a record
+                    of which one it was.
+                  </p>
+                </section>
+              ) : null}
+
+              {madeFrom.length > 0 ? (
+                <div className="mt-6">
+                  <LineageList
+                    title="Made from"
+                    steps={madeFrom}
+                    tasks={tasks}
+                    onSelect={onSelect}
+                  />
+                </div>
+              ) : null}
+
+              {usedIn.length > 0 ? (
+                <div className="mt-6">
+                  <LineageList title="Used in" steps={usedIn} tasks={tasks} onSelect={onSelect} />
+                </div>
+              ) : null}
             </div>
           </>
         ) : null}

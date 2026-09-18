@@ -3,6 +3,21 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.20.0 - September 17, 2026
+
+### 🌳 Lineage
+
+- A take's detail panel now says where it came from and what came out of it. **Made from** lists
+  the chain it was built on, nearest first, and **Used in** lists the takes made directly from
+  it. Clicking either moves the panel to that take, so walking a chain is clicking.
+- When the take something was made from has been deleted, the panel says so. Deleting a take
+  erases the record that anything was made from it, and without this a repaint would have read
+  as though it were generated from nothing.
+- An imported take gets **Used in** too. It has no prompt of its own, but it can still be the
+  thing a repaint was built on.
+- A job now carries what it read as well as what it wrote, which is what made all of this
+  answerable without asking the service anything new.
+
 ## 0.19.0 - September 17, 2026
 
 ### 🔁 Reuse

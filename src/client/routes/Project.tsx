@@ -270,7 +270,11 @@ export function ProjectRoute() {
       <TakeDetailPanel
         asset={selectedAsset}
         job={selectedJob}
+        assets={assets}
+        jobs={allJobs}
+        tasks={tasks}
         closeButtonRef={detailCloseRef}
+        onSelect={setSelectedAssetId}
         onClose={closeDetails}
       />
 
