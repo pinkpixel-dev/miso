@@ -3,6 +3,25 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.21.0 - September 17, 2026
+
+### 🎧 Compare
+
+- A take made from another one gets a **Compare** button in the dock. Press it and a single
+  switch flips between the original and the new version, instantly, at the same point in the
+  song. Both takes are held while you compare, which is why it is a button you press rather
+  than something that happens to every take you play.
+- The switch names both takes rather than calling them A and B, and says which one you are
+  hearing in words as well as by style.
+- Comparing ends when you move to another take, so nothing keeps streaming behind you. If the
+  second take fails to load, what you were listening to keeps playing.
+
+### 🧹 Maintenance
+
+- The dock's wavesurfer setup moved into `createTakeSurfer`, unchanged, so the comparison can
+  build an instance the same way the dock does. The effect that decides when to rebuild is
+  untouched, which is the part `DOCS/ERRORS.md` records breaking playback when it goes wrong.
+
 ## 0.20.0 - September 17, 2026
 
 ### 🌳 Lineage

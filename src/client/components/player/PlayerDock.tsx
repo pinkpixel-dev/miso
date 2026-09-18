@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react';
-import WaveSurfer from 'wavesurfer.js';
-import { audioUrl } from '../../lib/api.ts';
+import { ancestorsOf } from '../../lib/lineage.ts';
 import { usePlayer, usePlayerInternals } from '../../lib/usePlayer.ts';
 import { useStudio } from '../../lib/useStudio.ts';
 import { Button, IconButton } from '../ui.tsx';
+import { CompareControl } from './CompareControl.tsx';
+import { createTakeSurfer } from './createTakeSurfer.ts';
+import { useComparePair } from './useComparePair.ts';
 
 /**
  * The transport, docked along the bottom for the life of the session.
@@ -40,7 +42,7 @@ export function PlayerDock() {
     cycleRepeat,
   } = usePlayer();
   const { surfer, autoplay, setPlaying, onFinish } = usePlayerInternals();
-  const { assets, computePeaksFor } = useStudio();
+  const { assets, allJobs, computePeaksFor } = useStudio();
 
   const container = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
@@ -67,6 +69,32 @@ export function PlayerDock() {
   const projectId = asset?.projectId;
   const duration = asset?.durationSeconds;
 
+  /*
+    The take this one was made from, when it is one this project can see.
+
+    The dock plays takes from the library too, which span every project, while
+    the studio holds one. So a take from elsewhere simply has no parent here and
+    no Compare control, rather than a wrong one.
+
+    Only `compareWith` reaches anything below, and never the array `ancestorsOf`
+    builds, which is a new array on every render. Nothing here may become a
+    dependency of the instance effect above.
+  */
+  const inProject = asset !== undefined && assets.some((entry) => entry.id === asset.id);
+  const compareWith = useMemo(() => {
+    if (!asset || !inProject) return undefined;
+    return ancestorsOf(asset.id, assets, allJobs)[0]?.asset;
+  }, [asset, inProject, assets, allJobs]);
+
+  const compareContainer = useRef<HTMLDivElement>(null);
+  const compare = useComparePair({
+    current: asset,
+    other: compareWith,
+    surfer,
+    playing,
+    container: compareContainer,
+  });
+
   useEffect(() => {
     if (!container.current || assetId === undefined || projectId === undefined) return;
 
@@ -75,47 +103,43 @@ export function PlayerDock() {
     setError(undefined);
     setElapsed(0);
 
-    const instance = WaveSurfer.create({
+    // How an instance is made lives in createTakeSurfer, which the comparison
+    // pair also calls. What stays here is when to rebuild one, which is what
+    // the dependency array below is about.
+    const instance = createTakeSurfer({
       container: container.current,
-      height: 48,
-      waveColor: 'oklch(0.42 0.009 285)',
-      progressColor: 'oklch(0.78 0.15 75)',
-      cursorColor: 'oklch(0.97 0.002 285)',
-      barWidth: 2,
-      barGap: 1,
-      normalize: true,
-      // Stream through a media element rather than fetching and decoding the
-      // whole file. This is what makes seeking a range request.
-      backend: 'MediaElement',
-      url: audioUrl(projectId, assetId),
-      ...(peaks.current ? { peaks: peaks.current, duration } : {}),
-    });
-
-    instance.on('ready', () => {
-      setReady(true);
-      // A take chosen by a person starts on its own. One that is merely being
-      // shown does not, which is what keeps a reload from making noise.
-      if (autoplay.current) {
-        autoplay.current = false;
-        void instance.play();
-      }
-    });
-    instance.on('play', () => setPlaying(true));
-    instance.on('pause', () => setPlaying(false));
-    // What happens next is the provider's decision, because it is the only
-    // thing holding the queue and the repeat mode. See PlayerInternals for why
-    // this arrives as a ref rather than a dependency of this effect.
-    instance.on('finish', () => {
-      setPlaying(false);
-      onFinish.current(instance);
-    });
-    instance.on('timeupdate', (time: number) => setElapsed(time));
-
-    // Without this a load that fails leaves a disabled play button next to an
-    // empty box, and nothing on the screen says why.
-    instance.on('error', (cause) => {
-      setError(cause instanceof Error ? cause.message : String(cause));
-      setReady(false);
+      projectId,
+      assetId,
+      peaks: peaks.current,
+      duration,
+      handlers: {
+        onReady: (built) => {
+          setReady(true);
+          // A take chosen by a person starts on its own. One that is merely
+          // being shown does not, which is what keeps a reload from making
+          // noise.
+          if (autoplay.current) {
+            autoplay.current = false;
+            void built.play();
+          }
+        },
+        onPlay: () => setPlaying(true),
+        onPause: () => setPlaying(false),
+        // What happens next is the provider's decision, because it is the only
+        // thing holding the queue and the repeat mode. See PlayerInternals for
+        // why this arrives as a ref rather than a dependency of this effect.
+        onFinish: (built) => {
+          setPlaying(false);
+          onFinish.current(built);
+        },
+        onTime: (time) => setElapsed(time),
+        // Without this a load that fails leaves a disabled play button next to
+        // an empty box, and nothing on the screen says why.
+        onError: (message) => {
+          setError(message);
+          setReady(false);
+        },
+      },
     });
 
     surfer.current = instance;
@@ -150,6 +174,13 @@ export function PlayerDock() {
               <div className="h-px w-full bg-line" />
             </div>
           ) : null}
+          {/*
+            Where the take being compared against draws. It is never looked at,
+            because the waveform on screen is the take you can hear, but
+            wavesurfer needs a real element to attach to. Hidden from assistive
+            technology as well as from the eye.
+          */}
+          <div ref={compareContainer} className="hidden" aria-hidden="true" />
         </div>
 
         {/*
@@ -211,6 +242,13 @@ export function PlayerDock() {
           </div>
 
           <div className="flex min-w-0 items-center justify-end gap-3">
+            {compareWith && asset ? (
+              <CompareControl
+                compare={compare}
+                currentLabel={asset.label}
+                otherLabel={compareWith.label}
+              />
+            ) : null}
             {asset && !hasPeaks ? (
               <Button variant="ghost" onClick={() => void computePeaksFor(asset.id)}>
                 Save waveform
@@ -222,6 +260,13 @@ export function PlayerDock() {
           </div>
         </div>
       </div>
+
+      {compare.error ? (
+        <p role="alert" className="border-t border-bad/30 bg-bad/10 px-4 py-2 text-sm text-ink">
+          The take to compare against could not be loaded: {compare.error} What you were
+          listening to is still playing.
+        </p>
+      ) : null}
 
       {error && asset ? (
         <p
