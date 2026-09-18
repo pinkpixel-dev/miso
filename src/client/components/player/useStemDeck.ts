@@ -220,7 +220,9 @@ export function useStemDeck(stems: Asset[]): StemDeck {
         return;
       }
 
-      setControls((was) => soloOnly(was, id));
+      // Covering every stem on the page, not only the ones already in the map,
+      // so a solo cannot quietly apply to nothing.
+      setControls((was) => soloOnly(was, id, stemIds.current));
 
       if (!instance.isPlaying()) {
         playAll({ leader: instance, followers: others(leader) });

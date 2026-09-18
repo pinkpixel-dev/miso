@@ -73,9 +73,21 @@ function clampGain(volume: number): number {
 export function soloOnly(
   controls: Map<string, StemControls>,
   id: string,
+  /**
+   * Every stem that should end up in the answer, which is not always every
+   * stem already in `controls`. A stem missing from the map would otherwise
+   * stay unsoloed and keep playing, which reads as a play button that does
+   * nothing while the mute button beside it works.
+   */
+  ids: Iterable<string> = controls.keys(),
 ): Map<string, StemControls> {
   const next = new Map<string, StemControls>();
-  for (const [key, entry] of controls) next.set(key, { ...entry, soloed: key === id });
+  for (const key of ids) {
+    next.set(key, { ...(controls.get(key) ?? DEFAULT_CONTROLS), soloed: key === id });
+  }
+  for (const [key, entry] of controls) {
+    if (!next.has(key)) next.set(key, { ...entry, soloed: key === id });
+  }
   return next;
 }
 
@@ -102,8 +114,14 @@ export function applyGains(
   takes: Map<string, SyncedTake>,
   controls: Map<string, StemControls>,
 ): void {
-  for (const [id, gain] of gainsFor(controls)) {
-    takes.get(id)?.setVolume(gain);
+  // Driven by the takes rather than by the controls, because the takes are
+  // what actually make a sound. A loaded stem with no entry in the map used to
+  // be skipped entirely, which left it at whatever volume it was placed at and
+  // audible through somebody else's solo.
+  const soloing = anySoloed(controls.values());
+
+  for (const [id, take] of takes) {
+    take.setVolume(gainFor(controls.get(id) ?? DEFAULT_CONTROLS, soloing));
   }
 }
 

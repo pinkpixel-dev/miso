@@ -338,3 +338,63 @@ describe('isOnlySolo', () => {
     expect(isOnlySolo(new Map([['vocals', controls()]]), 'vocals')).toBe(false);
   });
 });
+
+/**
+ * The two ways a solo used to apply to nothing.
+ *
+ * Both showed up as the same thing on screen: a stem's play button that
+ * started the whole mix while the mute button beside it worked, so the only
+ * way to hear one stem was to mute the others by hand.
+ */
+describe('a solo that has to reach stems the map has not caught up with', () => {
+  it('solos a stem that is not in the map yet', () => {
+    const after = soloOnly(new Map(), 'vocals', ['vocals', 'drums']);
+
+    expect(after.get('vocals')?.soloed).toBe(true);
+    expect(after.get('drums')?.soloed).toBe(false);
+    expect(gainsFor(after).get('drums')).toBe(0);
+  });
+
+  it('keeps the settings of stems that are in the map', () => {
+    const before = new Map([['drums', controls({ volume: 0.3, muted: true })]]);
+
+    const after = soloOnly(before, 'vocals', ['vocals', 'drums']);
+
+    expect(after.get('drums')?.volume).toBe(0.3);
+    expect(after.get('drums')?.muted).toBe(true);
+  });
+
+  it('keeps an entry the id list does not mention', () => {
+    const before = new Map([['ghost', controls()]]);
+
+    const after = soloOnly(before, 'vocals', ['vocals']);
+
+    expect(after.has('ghost')).toBe(true);
+    expect(after.get('ghost')?.soloed).toBe(false);
+  });
+
+  it('silences a loaded stem that has no entry in the controls', () => {
+    // applyGains used to walk the controls, so a take the map had not reached
+    // was never given a volume at all and stayed audible under a solo.
+    const vocals = fakeTake();
+    const drums = fakeTake();
+    const takes = new Map<string, SyncedTake>([
+      ['vocals', vocals.take],
+      ['drums', drums.take],
+    ]);
+
+    applyGains(takes, new Map([['vocals', controls({ soloed: true })]]));
+
+    expect(vocals.calls).toEqual(['setVolume(1)']);
+    expect(drums.calls).toEqual(['setVolume(0)']);
+  });
+
+  it('gives every loaded stem a volume even with no controls at all', () => {
+    const vocals = fakeTake();
+    const takes = new Map<string, SyncedTake>([['vocals', vocals.take]]);
+
+    applyGains(takes, new Map());
+
+    expect(vocals.calls).toEqual(['setVolume(1)']);
+  });
+});
