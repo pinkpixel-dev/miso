@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { applyFlip, correctDrift, type SyncedTake } from './compareDeck.ts';
+import {
+  applyFlip,
+  correctDrift,
+  pauseBoth,
+  placeArrival,
+  playBoth,
+  seekBoth,
+  type SyncedTake,
+} from './compareDeck.ts';
 
 /**
  * A take that records what was done to it.
@@ -35,6 +43,10 @@ function fakeTake({
     play: async () => {
       running = true;
       calls.push('play()');
+    },
+    pause: () => {
+      running = false;
+      calls.push('pause()');
     },
   };
 
@@ -165,5 +177,170 @@ describe('correctDrift', () => {
 
     expect(correctDrift({ audible: audible.take, silent: silent.take })).toBe(true);
     expect(silent.time()).toBe(94.76);
+  });
+});
+
+describe('placeArrival', () => {
+  it('drops a second take into the moment the first one is at', () => {
+    const other = fakeTake({ time: 42, playing: true });
+    const arriving = fakeTake();
+
+    placeArrival({ arriving: arriving.take, other: other.take, audible: false });
+
+    expect(arriving.time()).toBe(42);
+    expect(arriving.playing()).toBe(true);
+  });
+
+  it('arrives silent when the other side is the one being heard', () => {
+    const other = fakeTake({ time: 42, playing: true });
+    const arriving = fakeTake();
+
+    placeArrival({ arriving: arriving.take, other: other.take, audible: false });
+
+    expect(arriving.calls).toEqual(['setTime(42)', 'play()', 'setVolume(0)']);
+  });
+
+  it('arrives audible when it is the side being heard', () => {
+    // Swapping the take on the side you are listening to. The new one takes
+    // over at the same point rather than starting the song again.
+    const other = fakeTake({ time: 42, playing: true });
+    const arriving = fakeTake();
+
+    placeArrival({ arriving: arriving.take, other: other.take, audible: true });
+
+    expect(arriving.calls).toEqual(['setTime(42)', 'play()', 'setVolume(1)']);
+  });
+
+  it('sets the volume only after it has been moved', () => {
+    const other = fakeTake({ time: 42, playing: true });
+    const arriving = fakeTake();
+
+    placeArrival({ arriving: arriving.take, other: other.take, audible: true });
+
+    expect(arriving.calls.indexOf('setTime(42)')).toBeLessThan(
+      arriving.calls.indexOf('setVolume(1)'),
+    );
+  });
+
+  it('waits at the start when it is the first take picked', () => {
+    const arriving = fakeTake();
+
+    placeArrival({ arriving: arriving.take, other: undefined, audible: true });
+
+    expect(arriving.calls).toEqual(['setVolume(1)']);
+    expect(arriving.playing()).toBe(false);
+  });
+
+  it('does not start a take arriving next to a stopped one', () => {
+    const other = fakeTake({ time: 42, playing: false });
+    const arriving = fakeTake();
+
+    placeArrival({ arriving: arriving.take, other: other.take, audible: false });
+
+    expect(arriving.time()).toBe(42);
+    expect(arriving.playing()).toBe(false);
+  });
+
+  it('parks at its own end when it is shorter than where the other side is', () => {
+    const other = fakeTake({ time: 110, duration: 120, playing: true });
+    const arriving = fakeTake({ duration: 94.76 });
+
+    placeArrival({ arriving: arriving.take, other: other.take, audible: false });
+
+    expect(arriving.time()).toBe(94.76);
+    expect(arriving.playing()).toBe(false);
+  });
+});
+
+describe('playBoth', () => {
+  it('puts the silent side in step before either of them starts', () => {
+    // A resume is the one moment correctDrift cannot cover, because it returns
+    // early while the audible side is stopped.
+    const audible = fakeTake({ time: 42, playing: false });
+    const silent = fakeTake({ time: 12, playing: false });
+
+    playBoth({ audible: audible.take, silent: silent.take });
+
+    expect(silent.time()).toBe(42);
+    expect(silent.playing()).toBe(true);
+    expect(audible.playing()).toBe(true);
+  });
+
+  it('starts one take when only one is picked', () => {
+    const audible = fakeTake({ time: 42 });
+
+    playBoth({ audible: audible.take, silent: undefined });
+
+    expect(audible.calls).toEqual(['play()']);
+  });
+
+  it('does not restart a side that is already running', () => {
+    const audible = fakeTake({ time: 42, playing: true });
+    const silent = fakeTake({ time: 42, playing: true });
+
+    playBoth({ audible: audible.take, silent: silent.take });
+
+    expect(audible.calls).not.toContain('play()');
+    expect(silent.calls).not.toContain('play()');
+  });
+
+  it('leaves the shorter side stopped at its end', () => {
+    const audible = fakeTake({ time: 110, duration: 120 });
+    const silent = fakeTake({ time: 94.76, duration: 94.76 });
+
+    playBoth({ audible: audible.take, silent: silent.take });
+
+    expect(silent.playing()).toBe(false);
+    expect(audible.playing()).toBe(true);
+  });
+});
+
+describe('pauseBoth', () => {
+  it('stops both sides, so neither creeps past the other', () => {
+    const audible = fakeTake({ playing: true });
+    const silent = fakeTake({ playing: true });
+
+    pauseBoth({ audible: audible.take, silent: silent.take });
+
+    expect(audible.playing()).toBe(false);
+    expect(silent.playing()).toBe(false);
+  });
+
+  it('copes with only one side picked', () => {
+    const audible = fakeTake({ playing: true });
+
+    pauseBoth({ audible: audible.take, silent: undefined });
+
+    expect(audible.calls).toEqual(['pause()']);
+  });
+});
+
+describe('seekBoth', () => {
+  it('moves both sides to the same moment', () => {
+    const audible = fakeTake({ time: 0, duration: 120 });
+    const silent = fakeTake({ time: 0, duration: 120 });
+
+    seekBoth({ audible: audible.take, silent: silent.take, seconds: 42 });
+
+    expect(audible.time()).toBe(42);
+    expect(silent.time()).toBe(42);
+  });
+
+  it('clamps each side against its own length', () => {
+    const audible = fakeTake({ time: 0, duration: 120 });
+    const silent = fakeTake({ time: 0, duration: 94.76 });
+
+    seekBoth({ audible: audible.take, silent: silent.take, seconds: 110 });
+
+    expect(audible.time()).toBe(110);
+    expect(silent.time()).toBe(94.76);
+  });
+
+  it('treats a scrub before the start as the start', () => {
+    const audible = fakeTake({ time: 30, duration: 120 });
+
+    seekBoth({ audible: audible.take, silent: undefined, seconds: -4 });
+
+    expect(audible.time()).toBe(0);
   });
 });
