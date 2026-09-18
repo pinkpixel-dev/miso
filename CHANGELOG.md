@@ -3,6 +3,36 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.22.0 - September 18, 2026
+
+### 🎧 Compare page
+
+- A new **Compare** page holds any two takes you pick, from any project. Pick one on each side
+  and both load, both waveforms are drawn, one transport plays them together, and the switch
+  flips which one you hear at the same point in the song. Press **F** to flip without reaching
+  for the mouse.
+- Unlike the dock's compare, neither take has to have been made from the other, and they do not
+  have to be in the same project. This is the first place in Miso where two projects meet.
+- Three ways in: **Compare** in the sidebar, **Compare with** on a take's detail panel, which
+  fills one side and leaves you to pick the other, and a button on the dock's armed compare
+  that opens the page holding the two takes you were already comparing.
+- Every comparison is in the address, so one can be bookmarked or sent to yourself. A link
+  naming a take that has since been deleted opens with that side empty rather than failing.
+- Opening the page pauses whatever the dock was playing, so two songs never play at once. Your
+  take stays where it was, so going back resumes rather than restarts.
+- Takes of different lengths behave sensibly. The shorter one ends and waits at its end while
+  the longer one carries on, and scrubbing past the end of the shorter one parks it there.
+
+### 🧹 Maintenance
+
+- Everything that moves a pair of takes now lives in one place, `compareDeck.ts`, which both the
+  dock and the new page call. The dock's behaviour is unchanged, and the extraction landed
+  before the page was written so that it could be checked on its own.
+- The two way switch is shared between the dock and the page, so the two cannot drift apart.
+- Fetching a library take before playing it moved into `loadLibraryAsset`, which the library
+  page and the compare page both use. A library row carries no waveform, so it is fetched whole
+  first, and a fetch that fails still plays the take.
+
 ## 0.21.0 - September 17, 2026
 
 ### 🎧 Compare
