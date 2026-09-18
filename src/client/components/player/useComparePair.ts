@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type WaveSurfer from 'wavesurfer.js';
 import type { Asset } from '../../../shared/types.ts';
-import { driftedTooFar, flipPlan } from './compareSync.ts';
+import { applyFlip, correctDrift } from './compareDeck.ts';
+import { flipPlan } from './compareSync.ts';
 import { createTakeSurfer } from './createTakeSurfer.ts';
 
 /**
@@ -135,26 +136,18 @@ export function useComparePair({
     if (!dock || !compared) return;
 
     const goingToOther = sideRef.current === 'current';
-    const leaving = goingToOther ? dock : compared;
-    const arriving = goingToOther ? compared : dock;
-
-    const plan = flipPlan({
-      audibleTime: leaving.getCurrentTime(),
-      playing: leaving.isPlaying(),
-      arrivingDuration: arriving.getDuration(),
+    applyFlip({
+      leaving: goingToOther ? dock : compared,
+      arriving: goingToOther ? compared : dock,
     });
-
-    arriving.setTime(plan.time);
-    arriving.setVolume(1);
-    leaving.setVolume(0);
-    if (plan.play && !arriving.isPlaying()) void arriving.play();
 
     setSide(goingToOther ? 'other' : 'current');
   }, [surfer]);
 
-  // The audible side drives and the silent side follows, corrected only when it
-  // has slipped past a tolerance. Correcting continuously would fight the audio
-  // clock, and a correction that lands on the side you can hear is a stutter.
+  // The audible side drives and the silent side follows. What counts as far
+  // enough to correct, and why it is not corrected continuously, is in
+  // correctDrift. What is decided here is when the check runs at all: only
+  // while a pair is armed and both sides exist.
   useEffect(() => {
     if (!armed || loading) return;
 
@@ -163,20 +156,10 @@ export function useComparePair({
       const compared = otherSurfer.current;
       if (!dock || !compared) return;
 
-      const audible = sideRef.current === 'current' ? dock : compared;
-      const silent = sideRef.current === 'current' ? compared : dock;
-      if (!audible.isPlaying()) return;
-
-      const at = audible.getCurrentTime();
-      if (!driftedTooFar(at, silent.getCurrentTime())) return;
-
-      const plan = flipPlan({
-        audibleTime: at,
-        playing: true,
-        arrivingDuration: silent.getDuration(),
+      correctDrift({
+        audible: sideRef.current === 'current' ? dock : compared,
+        silent: sideRef.current === 'current' ? compared : dock,
       });
-      silent.setTime(plan.time);
-      if (plan.play && !silent.isPlaying()) void silent.play();
     }, SYNC_INTERVAL);
 
     return () => clearInterval(timer);
