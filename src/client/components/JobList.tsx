@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Job, JobState } from '../../shared/types.ts';
-import { createPath } from '../lib/routes.ts';
+import { createPath, stemsPath } from '../lib/routes.ts';
 import { isPending, parseStamp } from '../lib/useJobs.ts';
 import { Button, Panel, Pill, cx } from './ui.tsx';
 
@@ -100,6 +100,27 @@ function Row({ job, onCancel }: { job: Job; onCancel: (jobId: string) => void })
           Styled as the ghost button beside it because it does the same kind of
           job in the same row, and built as a link because it goes somewhere.
         */}
+        {/*
+          A separation makes several takes at once, and the page that holds
+          them together is reachable from here the moment the job finishes.
+          Without this the only way in is through one stem's detail panel,
+          which means picking a stem before you can hear the set.
+        */}
+        {job.state === 'complete' && job.outputAssetIds.length > 1 ? (
+          <Link
+            to={stemsPath(job.projectId, job.id)}
+            aria-label={`Open the stems from ${titleOf(job)}`}
+            className={cx(
+              'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md px-3.5 py-2',
+              'text-sm font-medium text-ink-muted transition-colors duration-150',
+              'hover:bg-raised hover:text-ink active:bg-raised/70',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+            )}
+          >
+            Stems
+          </Link>
+        ) : null}
+
         {!isPending(job) ? (
           <Link
             to={createPath(job.projectId, job.id)}

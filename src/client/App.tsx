@@ -8,6 +8,7 @@ import { ProjectRoute } from './routes/Project.tsx';
 import { RemixRoute } from './routes/Remix.tsx';
 import { SettingsRoute } from './routes/Settings.tsx';
 import { StartRoute } from './routes/Start.tsx';
+import { StemsRoute } from './routes/Stems.tsx';
 
 export function App() {
   return (
@@ -29,6 +30,12 @@ export function App() {
           */}
           <Route path="projects/:id/remix" element={<RemixRoute />} />
           <Route path="projects/:id/remix/:assetId" element={<RemixRoute />} />
+          {/*
+            One separation's stems, addressed by the job that made them because
+            that is what holds the set together. Project scoped, unlike compare,
+            since stems came out of one take and a take lives in one project.
+          */}
+          <Route path="projects/:id/stems/:jobId" element={<StemsRoute />} />
           {/*
             App level, like models and settings. The library is every project's
             takes, so it belongs to none of them, and compare holds two takes

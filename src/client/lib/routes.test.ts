@@ -5,6 +5,7 @@ import {
   projectIdFrom,
   projectPath,
   remixPath,
+  stemsPath,
   wantsFullWidth,
 } from './routes.ts';
 
@@ -37,6 +38,10 @@ describe('wantsFullWidth', () => {
   it('is true on the remix page, with or without a source', () => {
     expect(wantsFullWidth('/projects/abc/remix')).toBe(true);
     expect(wantsFullWidth('/projects/abc/remix/xyz')).toBe(true);
+  });
+
+  it('is true on the stems page, which carries several waveforms of its own', () => {
+    expect(wantsFullWidth('/projects/abc/stems/job-1')).toBe(true);
   });
 
   it('is true on the project page, which carries its own list of takes', () => {
@@ -142,5 +147,22 @@ describe('comparePath', () => {
     // wantsFullWidth reads a pathname, so the query must not reach it.
     const path = comparePath('asset-1', 'asset-2');
     expect(wantsFullWidth(path.split('?')[0] ?? path)).toBe(true);
+  });
+});
+
+describe('stemsPath', () => {
+  it('addresses a stem set by the job that made it', () => {
+    // A job is what holds a set of stems together: separation puts the same job
+    // id on every output row, so naming one stem would mean finding its
+    // siblings again on arrival.
+    expect(stemsPath('abc', 'job-1')).toBe('/projects/abc/stems/job-1');
+  });
+
+  it('escapes both parts', () => {
+    expect(stemsPath('a/b', 'j b')).toBe('/projects/a%2Fb/stems/j%20b');
+  });
+
+  it('round trips through projectIdFrom', () => {
+    expect(projectIdFrom(stemsPath('abc', 'job-1'))).toBe('abc');
   });
 });

@@ -18,6 +18,9 @@ export const CREATE_PATH = '/projects/:id/create';
 /** The region editor, with or without a source chosen. */
 export const REMIX_PATH = '/projects/:id/remix';
 
+/** One separation's stems, keyed by the job that made them. */
+export const STEMS_PATH = '/projects/:id/stems/:jobId';
+
 /** The app level screens, which are not scoped to a project. */
 export const LIBRARY_PATH = '/library';
 export const COMPARE_PATH = '/compare';
@@ -63,6 +66,7 @@ export function projectIdFrom(pathname: string): string | undefined {
  */
 export function wantsFullWidth(pathname: string): boolean {
   if (matchPath({ path: REMIX_PATH, end: false }, pathname) !== null) return true;
+  if (matchPath({ path: STEMS_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: LIBRARY_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: COMPARE_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: MODELS_PATH, end: true }, pathname) !== null) return true;
@@ -107,6 +111,18 @@ export function projectPath(projectId: string): string {
 export function createPath(projectId: string, fromJobId?: string): string {
   const base = `/projects/${encodeURIComponent(projectId)}/create`;
   return fromJobId === undefined ? base : `${base}?from=${encodeURIComponent(fromJobId)}`;
+}
+
+/**
+ * The stems one separation produced.
+ *
+ * The job id rather than an asset id, because a job is what holds a set of
+ * stems together: separation writes one asset per named output and puts the
+ * same job id on every row. Naming one stem would mean finding its siblings
+ * again on the way in.
+ */
+export function stemsPath(projectId: string, jobId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}/stems/${encodeURIComponent(jobId)}`;
 }
 
 /** The remix route for a take, or for picking one. */

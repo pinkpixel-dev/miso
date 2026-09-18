@@ -1,11 +1,11 @@
-import { Columns2, CopyPlus, Scissors, X } from 'lucide-react';
+import { AudioLines, Columns2, CopyPlus, Scissors, X } from 'lucide-react';
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import type { Asset, Job, StudioTask } from '../../../shared/types.ts';
 import type { LineageStep } from '../../lib/lineage.ts';
 import { ancestorsOf, descendantsOf, sourceWasDeleted } from '../../lib/lineage.ts';
-import { comparePath, createPath, remixPath } from '../../lib/routes.ts';
+import { comparePath, createPath, remixPath, stemsPath } from '../../lib/routes.ts';
 import { stringJobParam } from '../../lib/takeDetails.ts';
 import { Tooltip, cx } from '../ui.tsx';
 
@@ -253,6 +253,23 @@ export function TakeDetailPanel({
                   <Columns2 aria-hidden="true" className="h-4 w-4 shrink-0" />
                   Compare with
                 </Link>
+
+                {/*
+                  Back to the rest of the set this stem came out of. Offered
+                  only for a stem, and only when the job that made it is still
+                  here, because the job is what holds the set together.
+                */}
+                {asset.kind === 'stem' && job ? (
+                  <Link
+                    to={stemsPath(asset.projectId, job.id)}
+                    onClick={onClose}
+                    aria-label="Open every stem from this separation together"
+                    className={actionLink}
+                  >
+                    <AudioLines aria-hidden="true" className="h-4 w-4 shrink-0" />
+                    Open the stems
+                  </Link>
+                ) : null}
               </div>
 
               {!job ? (
