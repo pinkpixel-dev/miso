@@ -186,3 +186,8 @@ export function audioUrl(projectId: string, assetId: string): string {
 export function downloadUrl(projectId: string, assetId: string): string {
   return `/api/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/download`;
 }
+
+/** Every take one job produced, in one zip. Separation is what this is for. */
+export function outputsZipUrl(projectId: string, jobId: string): string {
+  return `/api/projects/${encodeURIComponent(projectId)}/jobs/${encodeURIComponent(jobId)}/outputs.zip`;
+}

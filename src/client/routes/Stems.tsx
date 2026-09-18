@@ -1,9 +1,10 @@
-import { ArrowLeft, Pause, Play } from 'lucide-react';
+import { ArrowLeft, Download, Pause, Play } from 'lucide-react';
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { StemTrack } from '../components/stems/StemTrack.tsx';
 import { useStemDeck } from '../components/player/useStemDeck.ts';
-import { Button, Panel } from '../components/ui.tsx';
+import { Button, Panel, cx } from '../components/ui.tsx';
+import { outputsZipUrl } from '../lib/api.ts';
 import { projectPath } from '../lib/routes.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
@@ -103,6 +104,25 @@ export function StemsRoute() {
           <p aria-live="off" className="tabular-nums text-sm text-ink-muted">
             {timecode(deck.elapsed)}
           </p>
+
+          {/*
+            The whole set in one file. Four stems exported one at a time is
+            four trips through a save dialog, and they belong together.
+          */}
+          <a
+            href={outputsZipUrl(job.projectId, job.id)}
+            download
+            aria-label={`Export all ${stems.length} stems as a zip`}
+            className={cx(
+              'inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-md border border-line px-3.5 py-2',
+              'text-sm font-medium text-ink-muted transition-colors duration-150',
+              'hover:bg-raised hover:text-ink active:bg-raised/70',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+            )}
+          >
+            <Download size={16} aria-hidden="true" />
+            Export all
+          </a>
           <Button
             variant="primary"
             onClick={deck.playPause}

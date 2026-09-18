@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { ZipFile } from 'yazl';
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile, rename, stat } from 'node:fs/promises';
@@ -14,6 +15,7 @@ import {
   setAssetPeaks,
 } from '../db/assets.ts';
 import { db } from '../db/index.ts';
+import { readJob } from '../db/jobs.ts';
 import { readProject } from '../db/projects.ts';
 import { readAudioFacts } from '../library/metadata.ts';
 import { validatePeaks } from '../library/peaks.ts';
@@ -97,6 +99,38 @@ function assetIn(projectId: string, assetId: string): Asset | undefined {
 function fileStream(path: string, start?: number, end?: number): ReadableStream<Uint8Array> {
   const node = start === undefined ? createReadStream(path) : createReadStream(path, { start, end });
   return Readable.toWeb(node) as ReadableStream<Uint8Array>;
+}
+
+/**
+ * A name no other entry in this zip already has.
+ *
+ * Two outputs of one job can carry the same filename, which is what happens
+ * when a take's label repeats. A zip with two identical entries is a zip that
+ * unpacks to one file on most tools, silently.
+ */
+function uniqueEntryName(taken: Set<string>, filename: string): string {
+  if (!taken.has(filename)) {
+    taken.add(filename);
+    return filename;
+  }
+
+  const dot = filename.lastIndexOf('.');
+  const stem = dot > 0 ? filename.slice(0, dot) : filename;
+  const extension = dot > 0 ? filename.slice(dot) : '';
+
+  for (let n = 2; ; n += 1) {
+    const candidate = `${stem} ${n}${extension}`;
+    if (!taken.has(candidate)) {
+      taken.add(candidate);
+      return candidate;
+    }
+  }
+}
+
+/** What the download itself is called. */
+function zipName(title: string): string {
+  const trimmed = title.trim().slice(0, MAX_LABEL_LENGTH);
+  return `${trimmed === '' ? 'stems' : trimmed}.zip`;
 }
 
 /**
@@ -376,6 +410,76 @@ assetRoutes.get('/projects/:id/assets/:assetId/audio', async (c) => {
       'content-length': String(range.end - range.start + 1),
       'content-range': `bytes ${range.start}-${range.end}/${size}`,
       'accept-ranges': 'bytes',
+    },
+  });
+});
+
+/**
+ * Every output of one job, as a zip.
+ *
+ * This exists for separation, which is the only thing that writes several
+ * takes at once. Four stems exported one at a time is four trips through a
+ * save dialog, and they belong together.
+ *
+ * Stored, not deflated. These are PCM WAVs and they do not compress to
+ * anything worth the time: the point of the container here is to carry four
+ * files under one name, not to make them smaller.
+ *
+ * Streamed from disk rather than read. A three minute stereo set is well over
+ * a hundred megabytes, and yazl reads each entry as the zip is written, so
+ * none of it is ever held whole in memory.
+ *
+ * A missing file is left out rather than failing the whole export. Three stems
+ * and one gap is more useful than a refusal, and the sweep at startup is what
+ * cleans up rows whose file has gone.
+ */
+assetRoutes.get('/projects/:id/jobs/:jobId/outputs.zip', async (c) => {
+  const projectId = c.req.param('id');
+  const jobId = c.req.param('jobId');
+
+  if (!readProject(db(), projectId)) {
+    return c.json<ApiError>({ error: `No project with the id ${projectId}` }, 404);
+  }
+
+  const job = readJob(db(), jobId);
+  if (!job || job.projectId !== projectId) {
+    return c.json<ApiError>({ error: `No job with the id ${jobId}` }, 404);
+  }
+
+  const outputs = job.outputAssetIds.flatMap((id) => {
+    const asset = assetIn(projectId, id);
+    return asset ? [asset] : [];
+  });
+
+  if (outputs.length === 0) {
+    return c.json<ApiError>({ error: 'This job has nothing to export' }, 404);
+  }
+
+  const zip = new ZipFile();
+  const taken = new Set<string>();
+
+  for (const asset of outputs) {
+    const path = assetPath(projectId, asset.id, asset.format);
+    try {
+      await stat(path);
+    } catch {
+      continue;
+    }
+    zip.addFile(path, uniqueEntryName(taken, asset.filename));
+  }
+
+  zip.end();
+
+  // yazl types its output as the NodeJS.ReadableStream interface while handing
+  // back a real Readable, and toWeb wants the class. The cast is the whole of
+  // the difference, the same shape as the one in audiocpp/client.ts.
+  const body = Readable.toWeb(zip.outputStream as Readable) as ReadableStream<Uint8Array>;
+
+  return new Response(body, {
+    status: 200,
+    headers: {
+      'content-type': 'application/zip',
+      'content-disposition': disposition(zipName(job.title ?? 'stems')),
     },
   });
 });

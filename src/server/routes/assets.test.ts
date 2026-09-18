@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { PEAK_BUCKETS } from '../../shared/limits.ts';
 import type { ApiError, Asset } from '../../shared/types.ts';
+import { randomUUID } from 'node:crypto';
 import { db } from '../db/index.ts';
+import { createJob } from '../db/jobs.ts';
 import { createProject } from '../db/projects.ts';
 import { assetPath, projectDir } from '../library/storage.ts';
 import { assetRoutes } from './assets.ts';
@@ -251,6 +253,77 @@ describe('GET /api/projects/:id/assets/:assetId/download', () => {
     const disposition = response.headers.get('content-disposition') ?? '';
     expect(disposition).toMatch(/^attachment/);
     expect(disposition).toContain("filename*=UTF-8''ma%C3%B1ana.mp3");
+  });
+});
+
+/**
+ * Separation is the only thing that writes several takes at once, and four
+ * stems exported one at a time is four trips through a save dialog.
+ */
+describe('GET /api/projects/:id/jobs/:jobId/outputs.zip', () => {
+  async function jobWithOutputs(labels: string[]): Promise<string> {
+    const jobId = randomUUID();
+    createJob(db(), jobId, {
+      projectId,
+      taskId: 'stems.separate',
+      modelId: 'htdemucs_q8_0',
+      params: {},
+    });
+
+    for (const label of labels) {
+      const imported = (await (await importFile(projectId, 'tone.wav', `${label}.wav`)).json()) as Asset;
+      db().prepare('UPDATE assets SET job_id = ?, kind = ? WHERE id = ?').run(jobId, 'stem', imported.id);
+    }
+
+    return jobId;
+  }
+
+  it('answers with a zip named after the job', async () => {
+    const jobId = await jobWithOutputs(['vocals', 'drums']);
+
+    const response = await app().request(`/api/projects/${projectId}/jobs/${jobId}/outputs.zip`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('application/zip');
+    expect(response.headers.get('content-disposition') ?? '').toMatch(/^attachment/);
+  });
+
+  it('carries one entry per output, under its own name', async () => {
+    const jobId = await jobWithOutputs(['vocals', 'drums']);
+
+    const response = await app().request(`/api/projects/${projectId}/jobs/${jobId}/outputs.zip`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+
+    // Read as text rather than unpacked. Entry names sit in the local headers
+    // and the central directory in the clear, which is enough to say what the
+    // archive holds without a reader on this side.
+    const text = bytes.toString('latin1');
+    expect(text).toContain('vocals.wav');
+    expect(text).toContain('drums.wav');
+    expect(bytes.subarray(0, 4)).toEqual(Buffer.from('PK\x03\x04', 'latin1'));
+  });
+
+  it('refuses a job from another project', async () => {
+    const other = createProject(db(), 'Elsewhere').id;
+    const jobId = await jobWithOutputs(['vocals']);
+
+    const response = await app().request(`/api/projects/${other}/jobs/${jobId}/outputs.zip`);
+
+    expect(response.status).toBe(404);
+  });
+
+  it('refuses a job that produced nothing', async () => {
+    const jobId = randomUUID();
+    createJob(db(), jobId, {
+      projectId,
+      taskId: 'stems.separate',
+      modelId: 'htdemucs_q8_0',
+      params: {},
+    });
+
+    const response = await app().request(`/api/projects/${projectId}/jobs/${jobId}/outputs.zip`);
+
+    expect(response.status).toBe(404);
   });
 });
 

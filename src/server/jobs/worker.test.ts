@@ -63,6 +63,32 @@ describe('what a finished take is called', () => {
     expect(labelFor(job({}), task)).toBe(task.label);
     expect(labelFor(job({ title: '   ', params: { prompt: '  ' } }), task)).toBe(task.label);
   });
+
+  /**
+   * Separation has no prompt, so without the source every set of stems in a
+   * project is called "Split into stems (vocals)" and no export can be told
+   * from another.
+   */
+  it('names a take with no prompt after what it was made from', () => {
+    expect(labelFor(job({ taskId: separate!.id }), separate!, 'Neon Night')).toBe('Neon Night');
+  });
+
+  it('still prefers a typed title over the source', () => {
+    expect(labelFor(job({ title: 'Stems for the remix' }), separate!, 'Neon Night')).toBe(
+      'Stems for the remix',
+    );
+  });
+
+  it('falls back to the task label when the source has no name', () => {
+    expect(labelFor(job({}), separate!, '   ')).toBe(separate!.label);
+    expect(labelFor(job({}), separate!, undefined)).toBe(separate!.label);
+  });
+
+  it('shortens a source name too long to read in a list', () => {
+    const label = labelFor(job({}), separate!, 'x'.repeat(100));
+    expect(label).toHaveLength(60);
+    expect(label.endsWith('...')).toBe(true);
+  });
 });
 
 /**

@@ -70,7 +70,7 @@ function backoffFor(attempts: number): number {
  * is called in the library, and the rest of this file cannot be reached without
  * a backend to run against.
  */
-export function labelFor(job: Job, task: TaskDefinition): string {
+export function labelFor(job: Job, task: TaskDefinition, sourceLabel?: string): string {
   if (job.title !== undefined && job.title.trim() !== '') return job.title.trim();
 
   const prompt = job.params.prompt;
@@ -78,6 +78,16 @@ export function labelFor(job: Job, task: TaskDefinition): string {
     const line = prompt.trim().split('\n')[0] ?? '';
     return line.length > 60 ? `${line.slice(0, 57)}...` : line;
   }
+
+  // A task with no prompt is named after what it worked from, because the task
+  // label is the same words every time it runs. Separation is the first one
+  // like this, and without the source every set of stems in a project is
+  // called "Split into stems (vocals)" and cannot be told apart in an export.
+  if (sourceLabel !== undefined && sourceLabel.trim() !== '') {
+    const trimmed = sourceLabel.trim();
+    return trimmed.length > 60 ? `${trimmed.slice(0, 57)}...` : trimmed;
+  }
+
   return task.label;
 }
 
@@ -142,11 +152,15 @@ async function stageInputs(
   job: Job,
   task: TaskDefinition,
   baseUrl: string,
-): Promise<{ ok: true; staged: Record<string, string> } | { ok: false; message: string }> {
-  if (task.inputRoles.length === 0) return { ok: true, staged: {} };
+): Promise<
+  | { ok: true; staged: Record<string, string>; sourceLabel: string | undefined }
+  | { ok: false; message: string }
+> {
+  if (task.inputRoles.length === 0) return { ok: true, staged: {}, sourceLabel: undefined };
 
   const inputs = listJobInputs(db(), job.id);
   const staged: Record<string, string> = {};
+  let sourceLabel: string | undefined;
 
   for (const role of task.inputRoles) {
     const input = inputs.find((entry) => entry.role === role);
@@ -154,6 +168,8 @@ async function stageInputs(
 
     const asset = readAsset(db(), input.assetId);
     if (!asset) return { ok: false, message: `The ${role} this job used is no longer in the library.` };
+
+    if (role === 'source') sourceLabel = asset.label;
 
     // A task that demands a rate the take is not already in gets a converted
     // copy, and that copy skips the cache entirely, both reading and writing.
@@ -188,7 +204,7 @@ async function stageInputs(
     staged[role] = uploaded.value;
   }
 
-  return { ok: true, staged };
+  return { ok: true, staged, sourceLabel };
 }
 
 /**
@@ -288,7 +304,11 @@ async function runOne(job: Job): Promise<number> {
   }
 
   try {
-    await storeResult(db(), { projectId: job.projectId, jobId: job.id, label: labelFor(job, task) }, result.value);
+    await storeResult(
+      db(),
+      { projectId: job.projectId, jobId: job.id, label: labelFor(job, task, staged.sourceLabel) },
+      result.value,
+    );
     setJobState(db(), job.id, 'complete');
   } catch (error) {
     setJobState(
