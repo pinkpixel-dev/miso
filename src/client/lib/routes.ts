@@ -125,8 +125,23 @@ export function stemsPath(projectId: string, jobId: string): string {
   return `/projects/${encodeURIComponent(projectId)}/stems/${encodeURIComponent(jobId)}`;
 }
 
-/** The remix route for a take, or for picking one. */
-export function remixPath(projectId: string, assetId?: string): string {
+/**
+ * The remix route for a take, or for picking one, optionally on a named tool.
+ *
+ * The tool goes in the address for the same reason the source does: so it can
+ * be linked to. One page carries every task that works from a take, which is
+ * right when you are deciding what to do with one and wrong when you already
+ * know. Splitting a take into stems is not a remix of it in any ordinary sense,
+ * and burying it in a picker labelled Remix is how it stayed unfindable.
+ *
+ * An id this build no longer has falls back through `chooseTask` to the first
+ * tool offered, which is what already happens to a dropped route.
+ */
+export function remixPath(projectId: string, assetId?: string, taskId?: string): string {
   const base = `/projects/${encodeURIComponent(projectId)}/remix`;
-  return assetId === undefined ? base : `${base}/${encodeURIComponent(assetId)}`;
+  const path = assetId === undefined ? base : `${base}/${encodeURIComponent(assetId)}`;
+  return taskId === undefined ? path : `${path}?task=${encodeURIComponent(taskId)}`;
 }
+
+/** The id of the separation task, which several places link straight to. */
+export const SEPARATE_TASK_ID = 'stems.separate';

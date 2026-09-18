@@ -1,6 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ImportDropZone } from '../components/ImportDropZone.tsx';
 import { JobList } from '../components/JobList.tsx';
 import { RegionControls } from '../components/remix/RegionControls.tsx';
@@ -54,13 +54,25 @@ export function RemixRoute() {
     computePeaksFor,
   } = useStudio();
   const { nowPlaying, playing, toggle } = usePlayer();
+  const [searchParams] = useSearchParams();
 
   const asset = assets.find((entry) => entry.id === assetId);
 
   // Which tool is in force. Held by id rather than by object so it survives the
   // tasks list being refetched, and resolved through chooseTask so an id this
   // build no longer has falls back instead of emptying the page.
-  const [picked, setPicked] = useState<string | undefined>();
+  //
+  // Seeded from the address, so a link can name the tool it means. Arriving on
+  // this page already knowing you want stems is the common case for that one,
+  // since taking a take apart is not a remix of it.
+  const requestedTask = searchParams.get('task') ?? undefined;
+  const [picked, setPicked] = useState<string | undefined>(requestedTask);
+
+  // A second link to this page with a different tool does not remount the
+  // route, so the address has to keep being read rather than only seeding.
+  useEffect(() => {
+    if (requestedTask !== undefined) setPicked(requestedTask);
+  }, [requestedTask]);
   const offered = remixTasks(tasks);
   const task = chooseTask(tasks, picked);
   const regionEditor = task !== undefined && hasRegion(task);

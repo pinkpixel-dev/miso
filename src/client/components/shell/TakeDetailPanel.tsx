@@ -5,7 +5,13 @@ import { Link } from 'react-router-dom';
 import type { Asset, Job, StudioTask } from '../../../shared/types.ts';
 import type { LineageStep } from '../../lib/lineage.ts';
 import { ancestorsOf, descendantsOf, sourceWasDeleted } from '../../lib/lineage.ts';
-import { comparePath, createPath, remixPath, stemsPath } from '../../lib/routes.ts';
+import {
+  SEPARATE_TASK_ID,
+  comparePath,
+  createPath,
+  remixPath,
+  stemsPath,
+} from '../../lib/routes.ts';
 import { stringJobParam } from '../../lib/takeDetails.ts';
 import { Tooltip, cx } from '../ui.tsx';
 
@@ -253,6 +259,24 @@ export function TakeDetailPanel({
                   <Columns2 aria-hidden="true" className="h-4 w-4 shrink-0" />
                   Compare with
                 </Link>
+
+                {/*
+                  Straight to separation with this take as the source. A
+                  separate link from Remix because taking a take apart is a
+                  different kind of thing from editing it, and it is not
+                  offered on a stem, which is already one.
+                */}
+                {asset.kind !== 'stem' ? (
+                  <Link
+                    to={remixPath(asset.projectId, asset.id, SEPARATE_TASK_ID)}
+                    onClick={onClose}
+                    aria-label="Split this take into stems"
+                    className={actionLink}
+                  >
+                    <AudioLines aria-hidden="true" className="h-4 w-4 shrink-0" />
+                    Split into stems
+                  </Link>
+                ) : null}
 
                 {/*
                   Back to the rest of the set this stem came out of. Offered

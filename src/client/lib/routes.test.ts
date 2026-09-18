@@ -4,6 +4,7 @@ import {
   createPath,
   projectIdFrom,
   projectPath,
+  SEPARATE_TASK_ID,
   remixPath,
   stemsPath,
   wantsFullWidth,
@@ -164,5 +165,29 @@ describe('stemsPath', () => {
 
   it('round trips through projectIdFrom', () => {
     expect(projectIdFrom(stemsPath('abc', 'job-1'))).toBe('abc');
+  });
+});
+
+describe('remixPath with a tool', () => {
+  it('names the tool in the address', () => {
+    expect(remixPath('abc', 'xyz', SEPARATE_TASK_ID)).toBe(
+      '/projects/abc/remix/xyz?task=stems.separate',
+    );
+  });
+
+  it('names a tool without naming a take', () => {
+    // The project page links here before a take has been chosen.
+    expect(remixPath('abc', undefined, SEPARATE_TASK_ID)).toBe(
+      '/projects/abc/remix?task=stems.separate',
+    );
+  });
+
+  it('leaves the plain paths alone', () => {
+    expect(remixPath('abc')).toBe('/projects/abc/remix');
+    expect(remixPath('abc', 'xyz')).toBe('/projects/abc/remix/xyz');
+  });
+
+  it('is still a full width route with a tool named', () => {
+    expect(wantsFullWidth('/projects/abc/remix/xyz')).toBe(true);
   });
 });

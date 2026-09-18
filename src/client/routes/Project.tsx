@@ -1,4 +1,4 @@
-import { Pencil, Plus, Scissors } from 'lucide-react';
+import { AudioLines, Pencil, Plus, Scissors } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,7 +9,7 @@ import { JobList } from '../components/JobList.tsx';
 import { TakeSections } from '../components/project/TakeSections.tsx';
 import { TakeDetailPanel } from '../components/shell/TakeDetailPanel.tsx';
 import { IconButton, Panel, cx } from '../components/ui.tsx';
-import { createPath, remixPath } from '../lib/routes.ts';
+import { SEPARATE_TASK_ID, createPath, remixPath } from '../lib/routes.ts';
 import { findProducingJob } from '../lib/takeDetails.ts';
 import { groupTakes } from '../lib/takeGroups.ts';
 import { usePlayer } from '../lib/usePlayer.ts';
@@ -205,6 +205,20 @@ export function ProjectRoute() {
               <Link to={remixPath(projectId)} className={toolLink}>
                 <Scissors aria-hidden="true" className="h-4 w-4 shrink-0" />
                 Remix a take
+              </Link>
+            )}
+            {/*
+              Its own link rather than a tool inside Remix. Splitting a take
+              apart is not a remix of it, and the picker on that page is where
+              this went unfound.
+            */}
+            {assets.length === 0 ? null : (
+              <Link
+                to={remixPath(projectId, undefined, SEPARATE_TASK_ID)}
+                className={toolLink}
+              >
+                <AudioLines aria-hidden="true" className="h-4 w-4 shrink-0" />
+                Split into stems
               </Link>
             )}
           </nav>
