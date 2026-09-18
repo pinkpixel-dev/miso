@@ -30,7 +30,7 @@ export function StemTrack({ stem, deck }: { stem: Asset; deck: StemDeck }) {
   peaks.current = stem.peaks;
   const hasPeaks = stem.peaks !== undefined;
 
-  const { register, unregister, report, reportPlaying, reportFinished } = deck;
+  const { register, unregister, report, reportPlaying, reportFinished, seek } = deck;
   const { id, projectId, durationSeconds } = stem;
 
   useEffect(() => {
@@ -53,6 +53,10 @@ export function StemTrack({ stem, deck }: { stem: Asset; deck: StemDeck }) {
         onPause: () => reportPlaying(id, false),
         onFinish: () => reportFinished(id),
         onTime: (seconds) => report(id, seconds),
+        // Clicking any stem's waveform moves the whole set. Wavesurfer has
+        // already moved this one, so without this the others would carry on
+        // where they were and the drift corrector would drag this one back.
+        onInteraction: (seconds) => seek(seconds),
         // One stem that will not load must not take the rest of the mix with
         // it. Three stems and a message about the fourth is still a useful
         // page.
@@ -74,6 +78,7 @@ export function StemTrack({ stem, deck }: { stem: Asset; deck: StemDeck }) {
     report,
     reportPlaying,
     reportFinished,
+    seek,
   ]);
 
   const controls = deck.controls.get(id);

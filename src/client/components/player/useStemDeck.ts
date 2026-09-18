@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type WaveSurfer from 'wavesurfer.js';
 import type { Asset } from '../../../shared/types.ts';
+import { clampTo } from './compareSync.ts';
 import {
   DEFAULT_CONTROLS,
   applyGains,
@@ -177,8 +178,14 @@ export function useStemDeck(stems: Asset[]): StemDeck {
   }, [leaderId, others]);
 
   const seek = useCallback((seconds: number) => {
-    seekAll([...takes.current.values()], seconds);
-    setElapsed(seconds);
+    const instances = [...takes.current.values()];
+    seekAll(instances, seconds);
+
+    // Clamped against a real stem rather than the number that was asked for.
+    // Skipping forward near the end parks every stem at its end, and a clock
+    // reading past the track is a clock disagreeing with what you can hear.
+    const longest = instances.reduce((most, take) => Math.max(most, take.getDuration()), 0);
+    setElapsed(clampTo(seconds, longest));
   }, []);
 
   const change = useCallback((id: string, patch: Partial<StemControls>) => {

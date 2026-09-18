@@ -26,6 +26,12 @@ export interface TakeSurferHandlers {
   onPause?: () => void;
   onFinish?: (instance: WaveSurfer) => void;
   onTime?: (seconds: number) => void;
+  /**
+   * Somebody clicked or dragged on the waveform, with the position they asked
+   * for. Wavesurfer has already moved this instance by the time this fires, so
+   * a caller holding several takes uses it to move the rest.
+   */
+  onInteraction?: (seconds: number) => void;
   onError?: (message: string) => void;
 }
 
@@ -69,6 +75,9 @@ export function createTakeSurfer({
   if (handlers.onPause) instance.on('pause', () => handlers.onPause?.());
   if (handlers.onFinish) instance.on('finish', () => handlers.onFinish?.(instance));
   if (handlers.onTime) instance.on('timeupdate', (time: number) => handlers.onTime?.(time));
+  if (handlers.onInteraction) {
+    instance.on('interaction', (time: number) => handlers.onInteraction?.(time));
+  }
   if (handlers.onError) {
     instance.on('error', (cause) =>
       handlers.onError?.(cause instanceof Error ? cause.message : String(cause)),

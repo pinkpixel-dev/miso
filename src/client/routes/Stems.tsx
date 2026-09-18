@@ -1,9 +1,9 @@
-import { ArrowLeft, Download, Pause, Play } from 'lucide-react';
+import { ArrowLeft, Download, Pause, Play, SkipBack, SkipForward } from 'lucide-react';
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { StemTrack } from '../components/stems/StemTrack.tsx';
 import { useStemDeck } from '../components/player/useStemDeck.ts';
-import { Button, Panel, cx } from '../components/ui.tsx';
+import { Button, IconButton, Panel, cx } from '../components/ui.tsx';
 import { outputsZipUrl } from '../lib/api.ts';
 import { projectPath } from '../lib/routes.ts';
 import { useStudio } from '../lib/useStudio.ts';
@@ -24,6 +24,9 @@ import { useStudio } from '../lib/useStudio.ts';
  * and the takes column beside it would be the same project's list next to the
  * stems of one of its takes.
  */
+
+/** How far the skip controls move, in seconds. */
+const SKIP_SECONDS = 10;
 
 function timecode(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -123,6 +126,18 @@ export function StemsRoute() {
             <Download size={16} aria-hidden="true" />
             Export all
           </a>
+          {/*
+            Clicking a waveform is the quick way to move around and it needs a
+            pointer. These do the same job from the keyboard, which rule 15 in
+            AGENTS.md asks for and a waveform cannot answer on its own.
+          */}
+          <IconButton
+            label={`Back ${SKIP_SECONDS} seconds`}
+            icon={SkipBack}
+            onClick={() => deck.seek(Math.max(0, deck.elapsed - SKIP_SECONDS))}
+            disabled={!deck.playable}
+          />
+
           <Button
             variant="primary"
             onClick={deck.playPause}
@@ -136,6 +151,13 @@ export function StemsRoute() {
             )}
             {deck.playing ? 'Pause' : 'Play'}
           </Button>
+
+          <IconButton
+            label={`Forward ${SKIP_SECONDS} seconds`}
+            icon={SkipForward}
+            onClick={() => deck.seek(deck.elapsed + SKIP_SECONDS)}
+            disabled={!deck.playable}
+          />
         </div>
       </div>
 
