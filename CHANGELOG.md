@@ -3,6 +3,21 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.19.0 - September 17, 2026
+
+### 🔁 Reuse
+
+- Every finished row in the queue offers **Reuse**. That reaches jobs a take cannot: a failed
+  or cancelled job produced nothing, so it has no take to open, and what was typed into it had
+  no way back to the form.
+
+### 🐛 Fixes
+
+- Reuse now genuinely works on a take whose job was cleared from the queue. 0.18.0 said it did
+  and it did not: the create form looked the job up in the visible queue rather than the full
+  history, so clearing finished work left the button opening an empty form. It reads the
+  history now.
+
 ## 0.18.0 - September 17, 2026
 
 ### 🔁 Reuse

@@ -21,21 +21,25 @@ import { useStudio } from '../lib/useStudio.ts';
  * is the list this form writes into rather than everything in the project.
  */
 export function CreateRoute() {
-  const { project, loading, error, tasks, jobs, catalog, catalogLoading, submit } = useStudio();
+  const { project, loading, error, tasks, jobs, allJobs, catalog, catalogLoading, submit } =
+    useStudio();
 
   /*
     The form can be seeded from a take that already exists, which the address
     says as `?from=<jobId>`. The job is found in the list this project already
-    holds rather than fetched, because `useStudio` carries every job in the
-    project including the ones cleared from the queue, which is what keeps an
-    old take reusable.
+    holds rather than fetched.
+
+    It is looked up in `allJobs` rather than `jobs`. The second is the queue,
+    which hides finished jobs once somebody clears it, and a take outlives that.
+    Reading the queue here would have meant a take reused fine until you tidied
+    up and then quietly opened an empty form.
 
     A `from` that names nothing here is ignored. Links outlive the jobs they
     point at, and an unusable one should open an ordinary empty form.
   */
   const [params] = useSearchParams();
   const fromJobId = params.get('from') ?? undefined;
-  const seedJob = jobs.find((job) => job.id === fromJobId);
+  const seedJob = allJobs.find((job) => job.id === fromJobId);
 
   const installedModelIds = useMemo(
     () => tasks.flatMap((task) => installedPackages(catalog, task).map((pkg) => pkg.id)),

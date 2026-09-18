@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Job, JobState } from '../../shared/types.ts';
+import { createPath } from '../lib/routes.ts';
 import { isPending, parseStamp } from '../lib/useJobs.ts';
-import { Button, Panel, Pill } from './ui.tsx';
+import { Button, Panel, Pill, cx } from './ui.tsx';
 
 /**
  * The queue, newest first.
@@ -11,7 +13,9 @@ import { Button, Panel, Pill } from './ui.tsx';
  *
  * Finished work stays in the same list rather than being collapsed. A job row
  * holds the prompt, lyrics, seed and every other setting that produced a take,
- * so Clear finished hides rows without deleting that history. Live work stays
+ * so Clear finished hides rows without deleting that history. Every finished
+ * row offers Reuse, which is the only way back to that history for a job that
+ * failed, because a job that made nothing has no take to open. Live work stays
  * first, followed by every visible finished job.
  */
 
@@ -84,6 +88,31 @@ function Row({ job, onCancel }: { job: Job; onCancel: (jobId: string) => void })
           <Button variant="ghost" onClick={() => onCancel(job.id)}>
             Cancel
           </Button>
+        ) : null}
+
+        {/*
+          Reuse reaches jobs a take never can. A failed or cancelled job made
+          nothing, so it has no take and no detail panel, and until this row
+          offered it the only record of what was typed was unreachable from
+          anywhere. Finished jobs only: a job still in flight has not said what
+          it produced yet, and the row is busy saying so.
+
+          Styled as the ghost button beside it because it does the same kind of
+          job in the same row, and built as a link because it goes somewhere.
+        */}
+        {!isPending(job) ? (
+          <Link
+            to={createPath(job.projectId, job.id)}
+            aria-label={`Fill the create form with the settings from ${titleOf(job)}`}
+            className={cx(
+              'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md px-3.5 py-2',
+              'text-sm font-medium text-ink-muted transition-colors duration-150',
+              'hover:bg-raised hover:text-ink active:bg-raised/70',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+            )}
+          >
+            Reuse
+          </Link>
         ) : null}
       </div>
     </li>
