@@ -27,6 +27,7 @@
  *     --audio /tmp/audiocpp-ui-123/1-phase0-original.wav
  *   node scripts/probe-routes.mjs compare out/cover-a.wav out/cover-b.wav \
  *     --source samples/phase0-original.wav
+ *   node scripts/probe-routes.mjs sum source.wav out/sep-vocals.wav out/sep-drums.wav
  */
 
 import { createHash } from 'node:crypto';
@@ -154,14 +155,30 @@ async function runTask(model, request) {
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 400)}`);
 
   const body = await res.json();
-  const audio = body.audio ?? body.named_audio_outputs?.[0]?.audio;
-  if (!audio) throw new Error(`finished with no audio, keys: ${Object.keys(body).join(', ')}`);
+
+  // Separation is the first thing here that answers with more than one track,
+  // so every named output is kept rather than the first. Taking [0] and calling
+  // it the answer is how a four stem response reads as one file that happens to
+  // sound like vocals.
+  const outputs = (body.named_audio_outputs ?? [])
+    .filter((output) => typeof output?.audio === 'string')
+    .map((output, index) => ({
+      id: String(output.id ?? `audio_${index}`),
+      bytes: Buffer.from(output.audio, 'base64'),
+    }));
+
+  if (outputs.length === 0 && typeof body.audio === 'string') {
+    outputs.push({ id: '', bytes: Buffer.from(body.audio, 'base64') });
+  }
+
+  if (outputs.length === 0) {
+    throw new Error(`finished with no audio, keys: ${Object.keys(body).join(', ')}`);
+  }
 
   return {
-    bytes: Buffer.from(audio, 'base64'),
+    outputs,
     sampleRate: body.sample_rate,
     channels: body.channels,
-    names: (body.named_audio_outputs ?? []).map((o) => o.id),
     elapsed,
   };
 }
@@ -209,20 +226,34 @@ async function cmdRun([label, ...rest]) {
 
   const result = await runTask(opts.model, request);
   await mkdir(OUT_DIR, { recursive: true });
-  const path = join(OUT_DIR, `${label}.wav`);
-  await writeFile(path, result.bytes);
 
-  const samples = await decode(result.bytes);
+  // One output keeps the old name, so every existing command in the fixtures
+  // README still writes the file it says it does. Several get one file each,
+  // named for the id the server gave them.
+  const single = result.outputs.length === 1;
+  const written = [];
+
+  for (const output of result.outputs) {
+    const name = single ? label : `${label}-${output.id}`;
+    const path = join(OUT_DIR, `${name}.wav`);
+    await writeFile(path, output.bytes);
+    const samples = await decode(output.bytes);
+    written.push({
+      ...(single ? {} : { id: output.id }),
+      path,
+      seconds: Number((await duration(path)).toFixed(2)),
+      zcr: zcr(samples),
+      level: Number((level(samples).reduce((a, b) => a + b, 0) / Math.max(1, level(samples).length)).toFixed(1)),
+      sha: sha(output.bytes),
+    });
+  }
+
   console.log(JSON.stringify({
     label,
-    path,
-    seconds: Number((await duration(path)).toFixed(2)),
     sampleRate: result.sampleRate,
     channels: result.channels,
-    zcr: zcr(samples),
-    sha: sha(result.bytes),
     elapsed: Number(result.elapsed.toFixed(1)),
-    ...(result.names.length ? { namedOutputs: result.names } : {}),
+    outputs: written,
   }, null, 2));
 }
 
@@ -248,7 +279,51 @@ async function cmdCompare([a, b, ...rest]) {
   }
 }
 
-const commands = { stage: cmdStage, run: cmdRun, compare: cmdCompare };
+/**
+ * Whether a set of stems is a separation or a set of rebuilds.
+ *
+ * Two questions, and a route has to pass both. No part may be louder than the
+ * mix that holds it, which is what caught ACE-Step's extract in DOCS/ERRORS.md.
+ * And real stems add back up: sum them and the residual against the source is
+ * small, where four rebuilt copies of the track sum to roughly four times it.
+ *
+ * Both are ruling-out tests. Passing them means the numbers are consistent with
+ * separation, never that the vocal sounds like the vocal. Listen after this.
+ */
+async function cmdSum([source, ...stems]) {
+  if (!source || stems.length === 0) throw new Error('sum wants a source wav, then one or more stem wavs');
+
+  const src = await decode(await readFile(source));
+  const decoded = [];
+  for (const path of stems) decoded.push({ path, samples: await decode(await readFile(path)) });
+
+  const mean = (rows) => (rows.length ? rows.reduce((a, b) => a + b, 0) / rows.length : 0);
+  const srcLevel = mean(level(src));
+  console.log(`source level: ${srcLevel.toFixed(1)}  (${basename(source)})`);
+
+  for (const stem of decoded) {
+    const stemLevel = mean(level(stem.samples));
+    const ratio = srcLevel === 0 ? 0 : stemLevel / srcLevel;
+    const verdict = ratio > 1 ? '  LOUDER THAN THE MIX' : '';
+    console.log(`  ${basename(stem.path).padEnd(28)} level ${stemLevel.toFixed(1).padStart(8)}  ${(ratio * 100).toFixed(1)}% of mix${verdict}`);
+  }
+
+  const longest = Math.max(src.length, ...decoded.map((stem) => stem.samples.length));
+  const summed = new Int16Array(longest);
+  for (let i = 0; i < longest; i += 1) {
+    let total = 0;
+    for (const stem of decoded) total += stem.samples[i] ?? 0;
+    summed[i] = Math.max(-32768, Math.min(32767, total));
+  }
+
+  const summedLevel = mean(level(summed));
+  const residual = mean(perSecond(src, summed));
+  console.log(`\nstems summed: level ${summedLevel.toFixed(1)}, ${(srcLevel === 0 ? 0 : (summedLevel / srcLevel) * 100).toFixed(1)}% of mix`);
+  console.log(`residual against source: ${residual.toFixed(1)}, ${(srcLevel === 0 ? 0 : (residual / srcLevel) * 100).toFixed(1)}% of mix level`);
+  console.log(`per-second residual: ${JSON.stringify(perSecond(src, summed).slice(0, 30))}`);
+}
+
+const commands = { stage: cmdStage, run: cmdRun, compare: cmdCompare, sum: cmdSum };
 const [command, ...rest] = process.argv.slice(2);
 
 if (!commands[command]) {

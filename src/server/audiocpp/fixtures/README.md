@@ -250,3 +250,118 @@ Confirmed on 2026-09-14, model `miso:stable_audio_3_small_music_q8_0`. Outputs c
   `HTTP 500 {"error":{"message":"could not open WAV input: /tmp/definitely-not-here.wav"}}`.
   That is what makes this different from a wrong field name: the server opens the WAV and
   then does not use it. There is no better spelling to find.
+
+## Separation, all three models
+
+Confirmed on 2026-09-18 against the same image, using `probe:htdemucs`, `probe:bsroformer`
+and `probe:melroformer` registered with `task: "sep"`. The source was 40 seconds cut from
+a 180 second ACE-Step take with sung lyrics, "lively swing jazz with male vocals", staged
+once and reused for all three runs.
+
+**All three separate.** This is the first family here that does what its manual says, and it
+is worth saying plainly because `extract` above did not. The request needs no options at all:
+none of the three specs carry a single entry in `options.request`, and every run below sent
+nothing but `audio`.
+
+### Registration and sample rate
+
+Registration is the ordinary `/v1/models/load` with a task kind Miso has not sent before:
+
+```json
+{
+  "id": "probe:htdemucs",
+  "family": "htdemucs",
+  "path": "/app/models/HTDemucs-GGUF",
+  "task": "sep",
+  "mode": "offline"
+}
+```
+
+**Separation runs at 44.1 kHz and every ACE-Step take is 48 kHz.** A 48 kHz source is refused
+outright:
+
+```
+HTTP 500 {"error":{"message":"HTDemucs prepare() sample rate mismatch: expected 44100, got 48000"}}
+```
+
+That is a hard stop, not a quality warning, and it applies before anything else can be tested.
+Miso must resample to 44.1 kHz on the way in. The stems come back at 44.1 kHz, so a stem and
+the take it came from do not share a rate, and anything that plays them together has to handle
+that.
+
+### What each model returns
+
+| Model | Stems | Ids | Wall time, 40 seconds in |
+|---|---|---|---|
+| HTDemucs | 4 | `drums`, `bass`, `other`, `vocals` | 3.8 s |
+| BS-RoFormer | 2 | `vocals`, `instrumental` | 77.8 s |
+| Mel-Band RoFormer | 2 | `vocals`, `instrumental` | 14.9 s |
+
+Every stem comes back the same length as the source. The ids are stable words, not indexes,
+so a stem can be labelled from `named_audio_outputs` without a lookup table.
+
+**BS-RoFormer is 20 times slower than HTDemucs for half the stems.** That is the measurement
+most likely to decide which model a default points at.
+
+### The evidence that they separate
+
+Three tests, in increasing order of how hard they are to fake.
+
+**No stem is louder than the mix.** Mean level of the source was 5269.6. HTDemucs returned
+drums at 27.3%, bass at 39.1%, other at 17.4% and vocals at 53.6%. This is the cheap test
+`extract` failed, where parts came back louder than the track holding them.
+
+**The stems add back up.** Summed, HTDemucs came to 99.7% of the source level with a residual
+of 2.7%. Read that number only for HTDemucs. Both RoFormers returned a residual of 0.0%, which
+proves nothing about them: their specs say accompaniment is derived from the mixture, so
+instrumental is the mix with vocals subtracted and the sum cannot fail. For those two the test
+is the loudness figure and the ear.
+
+**The vocal stem goes quiet where the singing stops.** This is the one that settles it. Per
+second level across seconds 21 to 24, where the take has an instrumental break:
+
+| | s20 | s21 | s22 | s23 | s24 |
+|---|---|---|---|---|---|
+| source | 6820 | 6598 | 5195 | 4483 | 5898 |
+| htdemucs vocals | 1476 | 54 | 42 | 41 | 44 |
+| htdemucs drums | 2692 | 2057 | 2864 | 1776 | 2862 |
+| htdemucs bass | 3244 | 4796 | 1540 | 2406 | 1767 |
+| mel vocals | 1515 | 0 | 0 | 0 | 0 |
+
+The source stays loud, drums and bass stay loud, and the vocal stem falls to near silence in
+both models independently. A route that rebuilds the track cannot do that.
+
+### The three models disagree with each other
+
+HTDemucs and Mel-Band RoFormer found the same instrumental break, but their vocal stems are
+not the same audio. Mel against BS-RoFormer differs by 2213.9 zcr, which is wider than the gap
+between a piano prompt and a metal prompt on text2music. These are three different models, not
+three spellings of one.
+
+### For the harness
+
+`scripts/probe-routes.mjs` was changed on 2026-09-18 to handle this family. `run` now writes
+every entry in `named_audio_outputs` as its own file, named `<label>-<id>.wav`, where before it
+took `named_audio_outputs[0]` and wrote one. A single output still writes `<label>.wav`, so
+every command recorded above this section still produces the file it says it does.
+
+A `sum` command was added for the add-back test:
+
+```
+node scripts/probe-routes.mjs sum source.wav out/sep-vocals.wav out/sep-drums.wav
+```
+
+It prints each stem's level as a percentage of the mix, flags any stem louder than the mix,
+sums the stems, and reports the residual against the source.
+
+### Still unknown
+
+- Whether separation quality holds on a real recording. Everything above used an ACE-Step
+  generation, which is the only kind of audio in the library.
+- How wall time scales past 40 seconds. A 3 minute take is 4.5 times this source, and
+  BS-RoFormer at 77.8 seconds for 40 is the one to measure before it is offered.
+- `num_overlap` on both RoFormers. It is a session option, not a request field, so it is set
+  at load and was left at the package default for every run here.
+- Whether the three separation models can be resident at once, and what that costs. All three
+  were loaded together during this session and unloaded afterwards, but nothing measured the
+  memory.
