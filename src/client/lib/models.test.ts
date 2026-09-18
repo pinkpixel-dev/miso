@@ -24,13 +24,13 @@ function catalogOf(packages: CatalogPackage[], family = 'ace_step'): Catalog {
   };
 }
 
-function taskOf(packageIds: string[], family = 'ace_step'): StudioTask {
+function taskOf(packageIds: string[], ...families: string[]): StudioTask {
   return {
     id: 'remix.repaint',
     label: 'Repaint a section',
     shortLabel: 'Repaints',
     summary: '',
-    family,
+    families: families.length > 0 ? families : ['ace_step'],
     vocals: 'both',
     packageIds,
     inputRoles: ['source'],

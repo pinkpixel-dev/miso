@@ -405,7 +405,16 @@ export interface StudioTask {
    */
   shortLabel: string;
   summary: string;
-  family: string;
+  /**
+   * Spec families this task runs on.
+   *
+   * A list because separation is one task over three families, which all answer
+   * the same request. Every generation task names exactly one. Package choice
+   * does not read this: `packageIds` is the service's own answer and is
+   * authoritative. The prompt builder reads the first entry, which is the only
+   * entry on every task that has a prompt.
+   */
+  families: string[];
   /**
    * Whether this family can sing.
    *

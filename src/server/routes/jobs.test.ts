@@ -41,7 +41,7 @@ describe('GET /api/tasks', () => {
     const tasks = (await response.json()) as StudioTask[];
 
     const generate = tasks.find((task) => task.id === 'generate.text2music');
-    expect(generate?.family).toBe('ace_step');
+    expect(generate?.families).toEqual(['ace_step']);
     expect(generate?.fields.find((field) => field.name === 'prompt')?.required).toBe(true);
   });
 
@@ -78,6 +78,7 @@ describe('GET /api/tasks', () => {
       'remix.cover',
       'remix.covernofsq',
       'remix.repaint',
+      'stems.separate',
     ]);
   });
 

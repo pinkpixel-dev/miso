@@ -2,6 +2,7 @@ import { findPackage, loadSpecs } from '../catalog/registry.ts';
 import { cover, coverNoFsq, repaint, text2music } from './acestep.ts';
 import { heartmula } from './heartmula.ts';
 import { minimax } from './minimax.ts';
+import { separate } from './separate.ts';
 import { stableAudio } from './stableaudio.ts';
 import type { TaskDefinition, TaskParams } from './types.ts';
 
@@ -26,7 +27,7 @@ export type { ParamField, ParamValue, TaskDefinition, TaskParams } from './types
  * order, so this is also the order the tools appear in beside a take.
  */
 const tasks = new Map<string, TaskDefinition>(
-  [text2music, minimax, heartmula, stableAudio, repaint, cover, coverNoFsq].map((task) => [
+  [text2music, minimax, heartmula, stableAudio, repaint, cover, coverNoFsq, separate].map((task) => [
     task.id,
     task,
   ]),
@@ -97,9 +98,32 @@ export function validateParams(task: TaskDefinition, raw: unknown): ParamResult 
   return { ok: true, value };
 }
 
+/**
+ * The families a task runs on, however it spelled them.
+ *
+ * `family` is one string on every generation task and a list on separation.
+ * Both spellings are answered here so no task module has to care.
+ */
+export function familiesOf(task: TaskDefinition): string[] {
+  return Array.isArray(task.family) ? task.family : [task.family];
+}
+
+/**
+ * The families a task needs, as a sentence fragment for a refusal.
+ *
+ * "needs a htdemucs, bs_roformer or mel_band_roformer model" rather than a bare
+ * array printed into a message.
+ */
+export function familyList(task: TaskDefinition): string {
+  const families = familiesOf(task);
+  if (families.length <= 1) return families[0] ?? '';
+  return `${families.slice(0, -1).join(', ')} or ${families[families.length - 1]}`;
+}
+
 /** Whether a catalog package can run this task: a family match, then the task's own say. */
 export function packageRunsTask(task: TaskDefinition, packageId: string): boolean {
-  if (findPackage(packageId)?.spec.family !== task.family) return false;
+  const family = findPackage(packageId)?.spec.family;
+  if (family === undefined || !familiesOf(task).includes(family)) return false;
   return task.acceptsPackage?.(packageId) ?? true;
 }
 
@@ -111,8 +135,10 @@ export function packageRunsTask(task: TaskDefinition, packageId: string): boolea
  * the fact.
  */
 export function taskPackageIds(task: TaskDefinition): string[] {
+  const families = familiesOf(task);
+
   return loadSpecs()
-    .filter((spec) => spec.family === task.family)
+    .filter((spec) => families.includes(spec.family))
     .flatMap((spec) => spec.packages)
     .map((pkg) => pkg.id)
     .filter((id) => task.acceptsPackage?.(id) ?? true);

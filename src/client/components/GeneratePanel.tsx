@@ -193,7 +193,7 @@ export function GeneratePanel({
 
   // A family with no compilation rules has no guided mode to offer, so the
   // switch disappears rather than sitting there doing nothing.
-  const guidedAvailable = supportsGuided(task.family);
+  const guidedAvailable = supportsGuided(task.families[0] ?? '');
   const guided = guidedAvailable && mode === 'guided';
 
   const setValue = (name: string, value: string) => setValues({ ...fieldValues, [name]: value });
@@ -201,7 +201,7 @@ export function GeneratePanel({
   // Compiled once per render. The prompt is shown in full before anything is
   // queued, and the params are whatever else this family asks the builder to
   // write, which today is HeartMuLa's tags and nothing else.
-  const compiled = guided ? compile(builder, task.family, task.vocals) : undefined;
+  const compiled = guided ? compile(builder, task.families[0] ?? '', task.vocals) : undefined;
   const written = compiled ? compiled.prompt : (fieldValues.prompt ?? '').trim();
 
   // What the expansion was made from, which is not the same as what it compiled

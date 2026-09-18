@@ -557,6 +557,58 @@ describe('the routes stage 0 rejected', () => {
   });
 });
 
+/**
+ * Separation is the first task that runs on more than one family, so the family
+ * match had to stop being a string comparison. All three answer the same
+ * request and differ only in what they return, which is why they are one entry
+ * in the tool list rather than three.
+ */
+describe('stems.separate across three families', () => {
+  it('accepts a package from every separation family', () => {
+    const task = taskOf('stems.separate');
+
+    expect(packageRunsTask(task, 'htdemucs_q8_0')).toBe(true);
+    expect(packageRunsTask(task, 'bs_roformer_q8_0')).toBe(true);
+    expect(packageRunsTask(task, 'mel_band_roformer_q8_0')).toBe(true);
+  });
+
+  it('refuses a package that cannot separate', () => {
+    const task = taskOf('stems.separate');
+
+    expect(packageRunsTask(task, 'ace_step_turbo_q8_0')).toBe(false);
+    expect(packageRunsTask(task, 'stable_audio_3_small_music_q8_0')).toBe(false);
+  });
+
+  it('offers packages from all three families at once', () => {
+    const ids = taskPackageIds(taskOf('stems.separate'));
+
+    expect(ids).toContain('htdemucs_q8_0');
+    expect(ids).toContain('bs_roformer_q8_0');
+    expect(ids).toContain('mel_band_roformer_q8_0');
+  });
+
+  it('keeps a single family task to its own family', () => {
+    expect(packageRunsTask(taskOf('generate.text2music'), 'htdemucs_q8_0')).toBe(false);
+    expect(taskPackageIds(taskOf('generate.text2music'))).not.toContain('htdemucs_q8_0');
+  });
+
+  it('asks for a source and no parameters', () => {
+    const task = taskOf('stems.separate');
+
+    expect(task.inputRoles).toEqual(['source']);
+    expect(task.fields).toEqual([]);
+    expect(task.serverTask).toBe('sep');
+    // Refused outright below 44.1 kHz, before any work starts.
+    expect(task.inputSampleRate).toBe(44_100);
+  });
+
+  it('sends nothing but the staged source', () => {
+    const request = taskOf('stems.separate').buildRequest({}, { source: '/tmp/audiocpp-ui-1/2-take.wav' });
+
+    expect(request).toEqual({ audio: '/tmp/audiocpp-ui-1/2-take.wav' });
+  });
+});
+
 describe('shortLabel', () => {
   it('gives every task a heading name beside its action name', () => {
     for (const task of listTasks()) {

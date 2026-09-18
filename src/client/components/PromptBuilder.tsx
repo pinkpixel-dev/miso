@@ -181,7 +181,7 @@ export function PromptBuilder({
   const [writing, setWriting] = useState(false);
   const field = (name: string) => task.fields.find((entry) => entry.name === name);
 
-  const prompt = compilePrompt(builder, task.family, task.vocals);
+  const prompt = compilePrompt(builder, task.families[0] ?? '', task.vocals);
   const lyricsField = field('lyrics');
   const bpmField = field('bpm');
   const keyField = field('keyscale');

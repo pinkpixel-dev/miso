@@ -57,6 +57,28 @@ describe('storeResult', () => {
     }
   });
 
+  /**
+   * Stable Audio returns its single track under named_audio_outputs with the id
+   * audio_0. Reading a name as evidence of a stem filed ordinary generations
+   * under the Stems heading, called "Take 1 (audio_0)". The count decides.
+   */
+  it('treats a single named output as the take, not a stem', async () => {
+    const assets = await storeResult(
+      handle,
+      { projectId, jobId, label: 'Take 1' },
+      {
+        audio: tone,
+        sampleRate: 44100,
+        channels: 2,
+        namedOutputs: [{ id: 'audio_0', audio: tone }],
+      },
+    );
+
+    expect(assets).toHaveLength(1);
+    expect(assets[0]?.kind).toBe('generated');
+    expect(assets[0]?.label).toBe('Take 1');
+  });
+
   it('writes one stem per named output', async () => {
     const assets = await storeResult(
       handle,

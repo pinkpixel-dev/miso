@@ -92,16 +92,23 @@ async function writeOne(
 /**
  * Stores every audio output a job produced.
  *
- * A task that names its outputs (the stem routes) writes one asset per name and
- * marks them as stems. Everything else writes the single result. The job id is
- * on each row, which is what links a take back to the prompt that made it.
+ * One output is the take, whatever the server called it. Several are stems.
+ *
+ * The count is what decides, not whether the outputs were named, because a
+ * name is not evidence of a stem. Stable Audio returns its single track under
+ * `named_audio_outputs` with the id `audio_0`, and reading that as a stem filed
+ * ordinary generations under the Stems heading with a machine id stuck on the
+ * end of their name. Two such rows exist in libraries built before 2026-09-18.
+ *
+ * The job id is on each row, which is what links a take back to the prompt that
+ * made it, and what holds a set of stems together.
  */
 export async function storeResult(
   handle: Database,
   options: { projectId: string; jobId: string; label: string },
   result: TaskResult,
 ): Promise<Asset[]> {
-  if (result.namedOutputs.length > 0) {
+  if (result.namedOutputs.length > 1) {
     const assets: Asset[] = [];
     for (const output of result.namedOutputs) {
       assets.push(

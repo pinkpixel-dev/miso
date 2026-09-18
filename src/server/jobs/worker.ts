@@ -1,4 +1,5 @@
 import { createReadStream } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { runTask, stageAudio } from '../audiocpp/client.ts';
 import { readAsset } from '../db/assets.ts';
@@ -13,11 +14,13 @@ import {
   setJobState,
 } from '../db/jobs.ts';
 import { readSettings } from '../db/settings.ts';
+import { resampleChannels } from '../library/resample.ts';
 import { assetPath } from '../library/storage.ts';
+import { readWav, writeWav } from '../library/wav.ts';
 import { findTask, validateParams, type TaskDefinition } from '../tasks/registry.ts';
 import { ensureLoaded } from './residency.ts';
 import { storeResult } from './results.ts';
-import type { Job } from '../../shared/types.ts';
+import type { Asset, Job } from '../../shared/types.ts';
 
 /**
  * One worker, one job at a time.
@@ -79,6 +82,56 @@ export function labelFor(job: Job, task: TaskDefinition): string {
 }
 
 /**
+ * The rate a source has to be converted to before this task sees it, if any.
+ *
+ * Undefined means upload the file as it is, which is every task but separation
+ * and every source already at the right rate. Stable Audio writes at 44.1 kHz,
+ * so some takes in a library are already there and skip the work.
+ *
+ * A take whose rate was never recorded is converted rather than trusted. The
+ * conversion reads the real rate out of the file and does nothing when it
+ * already matches, so the cost of being wrong here is one pass over samples,
+ * where trusting a missing value costs a job that fails at the backend.
+ *
+ * Exported for its own test. The rest of the staging path needs a live backend.
+ */
+export function conversionRate(task: TaskDefinition, asset: Asset): number | undefined {
+  if (task.inputSampleRate === undefined) return undefined;
+  return asset.sampleRate === task.inputSampleRate ? undefined : task.inputSampleRate;
+}
+
+/**
+ * Converts a source to the rate a task demands, when it is not already there.
+ *
+ * Returns the bytes to upload, or a sentence saying why it could not. Only
+ * separation needs this: it refuses anything but 44.1 kHz before it starts any
+ * work, and every take audio.cpp generates is 48 kHz.
+ *
+ * A non-WAV source cannot be converted here. Miso spawns no media subprocess,
+ * by a decision recorded in DOCS/MEMORY.md, so an imported mp3 or flac has no
+ * decoder on this side. The browser has one and imports use it for waveforms,
+ * but a queued job runs with no browser anywhere near it.
+ */
+async function convertForTask(
+  asset: Asset,
+  path: string,
+  rate: number,
+): Promise<{ ok: true; bytes: Buffer } | { ok: false; message: string }> {
+  const audio = readWav(await readFile(path));
+
+  if (!audio) {
+    return {
+      ok: false,
+      message:
+        `This tool needs audio at ${rate / 1000} kHz and ${asset.label} is ${asset.format}, ` +
+        'which Miso cannot convert on its own. Only WAV takes can be used here for now.',
+    };
+  }
+
+  return { ok: true, bytes: writeWav(resampleChannels(audio.channels, audio.sampleRate, rate), rate) };
+}
+
+/**
  * Uploads the assets a task reads, and reuses anything already up there.
  *
  * The recorded path is keyed by backend, so pointing Miso at a different
@@ -99,22 +152,39 @@ async function stageInputs(
     const input = inputs.find((entry) => entry.role === role);
     if (!input) return { ok: false, message: `This job has no ${role} to work from.` };
 
-    const cached = readStagedPath(db(), input.assetId, baseUrl);
-    if (cached) {
-      staged[role] = cached;
-      continue;
-    }
-
     const asset = readAsset(db(), input.assetId);
     if (!asset) return { ok: false, message: `The ${role} this job used is no longer in the library.` };
 
+    // A task that demands a rate the take is not already in gets a converted
+    // copy, and that copy skips the cache entirely, both reading and writing.
+    // The cache is keyed by asset and backend, so it cannot tell a 44.1 kHz
+    // copy from the 48 kHz original, and handing a cover job the converted one
+    // would be silent and wrong.
+    const rate = conversionRate(task, asset);
+
+    if (rate === undefined) {
+      const cached = readStagedPath(db(), input.assetId, baseUrl);
+      if (cached) {
+        staged[role] = cached;
+        continue;
+      }
+    }
+
     const path = assetPath(asset.projectId, asset.id, asset.format);
-    const body = Readable.toWeb(createReadStream(path)) as ReadableStream<Uint8Array>;
+    let body: ReadableStream<Uint8Array>;
+
+    if (rate === undefined) {
+      body = Readable.toWeb(createReadStream(path)) as ReadableStream<Uint8Array>;
+    } else {
+      const converted = await convertForTask(asset, path, rate);
+      if (!converted.ok) return { ok: false, message: converted.message };
+      body = Readable.toWeb(Readable.from(converted.bytes)) as ReadableStream<Uint8Array>;
+    }
 
     const uploaded = await stageAudio(baseUrl, body, asset.filename);
     if (!uploaded.ok) return { ok: false, message: uploaded.message };
 
-    recordStagedPath(db(), input.assetId, baseUrl, uploaded.value);
+    if (rate === undefined) recordStagedPath(db(), input.assetId, baseUrl, uploaded.value);
     staged[role] = uploaded.value;
   }
 

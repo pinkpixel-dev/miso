@@ -1,10 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import type { Job } from '../../shared/types.ts';
+import type { Asset, Job } from '../../shared/types.ts';
 import { findTask } from '../tasks/registry.ts';
-import { labelFor } from './worker.ts';
+import { conversionRate, labelFor } from './worker.ts';
 
 const task = findTask('generate.text2music');
 if (!task) throw new Error('generate.text2music is missing from the registry');
+
+const separate = findTask('stems.separate');
+if (!separate) throw new Error('stems.separate is missing from the registry');
+
+function asset(patch: Partial<Asset>): Asset {
+  return {
+    id: 'a1',
+    projectId: 'p1',
+    kind: 'generated',
+    label: 'Take 1',
+    filename: 'Take 1.wav',
+    format: 'wav',
+    bytes: 1000,
+    checksum: 'f'.repeat(64),
+    createdAt: '2026-09-18 10:00:00',
+    ...patch,
+  };
+}
 
 function job(patch: Partial<Job>): Job {
   return {
@@ -44,5 +62,30 @@ describe('what a finished take is called', () => {
   it('falls back to the task label when there is neither', () => {
     expect(labelFor(job({}), task)).toBe(task.label);
     expect(labelFor(job({ title: '   ', params: { prompt: '  ' } }), task)).toBe(task.label);
+  });
+});
+
+/**
+ * Separation refuses anything but 44.1 kHz before it starts any work, and every
+ * take audio.cpp generates is 48 kHz. Measured 2026-09-18, see
+ * src/server/audiocpp/fixtures/README.md.
+ */
+describe('whether a source is converted before it is staged', () => {
+  it('leaves a task that asks for no particular rate alone', () => {
+    expect(conversionRate(task!, asset({ sampleRate: 48_000 }))).toBeUndefined();
+    expect(conversionRate(task!, asset({ sampleRate: 44_100 }))).toBeUndefined();
+  });
+
+  it('converts a 48 kHz take for separation', () => {
+    expect(conversionRate(separate!, asset({ sampleRate: 48_000 }))).toBe(44_100);
+  });
+
+  it('leaves a take that is already at the right rate', () => {
+    // Stable Audio writes at 44.1 kHz, so some takes skip the work entirely.
+    expect(conversionRate(separate!, asset({ sampleRate: 44_100 }))).toBeUndefined();
+  });
+
+  it('converts when the rate was never recorded rather than trusting it', () => {
+    expect(conversionRate(separate!, asset({ sampleRate: undefined }))).toBe(44_100);
   });
 });

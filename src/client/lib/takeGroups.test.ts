@@ -39,7 +39,7 @@ function task(id: string, label: string, shortLabel: string, inputRoles: string[
     label,
     shortLabel,
     summary: '',
-    family: 'ace_step',
+    families: ['ace_step'],
     vocals: 'both',
     packageIds: [],
     inputRoles,

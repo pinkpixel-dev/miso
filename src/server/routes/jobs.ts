@@ -11,6 +11,8 @@ import { unloadAll } from '../jobs/residency.ts';
 import { parseOriginalPrompt, parseStudioState, parseTitle } from '../jobs/studioState.ts';
 import { wake } from '../jobs/worker.ts';
 import {
+  familiesOf,
+  familyList,
   findTask,
   listTasks,
   packageRunsTask,
@@ -35,7 +37,7 @@ jobRoutes.get('/tasks', (c) =>
       label: task.label,
       shortLabel: task.shortLabel,
       summary: task.summary,
-      family: task.family,
+      families: familiesOf(task),
       vocals: task.vocals,
       packageIds: taskPackageIds(task),
       inputRoles: task.inputRoles,
@@ -87,7 +89,7 @@ jobRoutes.post('/projects/:id/jobs', async (c) => {
     return c.json<ApiError>(
       {
         error: `${modelId} cannot run ${task.label}`,
-        detail: `${task.label} needs a ${task.family} model.`,
+        detail: `${task.label} needs a ${familyList(task)} model.`,
       },
       400,
     );

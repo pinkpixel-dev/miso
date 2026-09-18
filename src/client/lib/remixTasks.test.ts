@@ -12,7 +12,7 @@ function task(id: string, inputRoles: string[], fieldNames: string[] = []): Stud
     label: id,
     shortLabel: id,
     summary: '',
-    family: 'ace_step',
+    families: ['ace_step'],
     vocals: 'both',
     packageIds: [],
     inputRoles,

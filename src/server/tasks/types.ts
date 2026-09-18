@@ -59,10 +59,23 @@ export interface TaskDefinition {
   shortLabel: string;
   /** The one line the studio shows under the task name. */
   summary: string;
-  /** Spec family this task runs on, for example ace_step. */
-  family: string;
-  /** Runtime task kind for /v1/models/load, never the spec's task word. */
-  serverTask: 'gen';
+  /**
+   * Spec families this task runs on, for example ace_step.
+   *
+   * A list because separation is one task over three families: HTDemucs,
+   * BS-RoFormer and Mel-Band RoFormer all answer the same request and differ
+   * only in what they return. Three entries in the tool list beside a take
+   * would be three ways to do one thing. Every generation task names a single
+   * family and reads exactly as it did before.
+   */
+  family: string | string[];
+  /**
+   * Runtime task kind for /v1/models/load, never the spec's task word.
+   *
+   * `sep` is separation. Sending a spec word here is rejected outright, which
+   * cost a phase 0 debugging session recorded in DOCS/ERRORS.md.
+   */
+  serverTask: 'gen' | 'sep';
   /**
    * The audio.cpp route inside that task kind, for a family that has routes.
    *
@@ -102,6 +115,17 @@ export interface TaskDefinition {
    * the backend gave back. Empty for a task that generates from nothing.
    */
   inputRoles: string[];
+  /**
+   * The sample rate this task's source audio must arrive at.
+   *
+   * Separation refuses anything but 44.1 kHz before it starts any work, and
+   * every take audio.cpp generates is 48 kHz, so something has to convert. The
+   * task says what it needs and the worker honours it, rather than the worker
+   * knowing which families are fussy.
+   *
+   * Left out by every task that takes the source as it is.
+   */
+  inputSampleRate?: number;
   /**
    * Whether a package of this family can run this task, past the family match.
    *

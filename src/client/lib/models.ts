@@ -17,10 +17,14 @@ import type { Catalog, CatalogPackage, StudioTask } from '../../shared/types.ts'
  * suggest and the one most people should take.
  */
 export function installedPackages(catalog: Catalog | undefined, task: StudioTask): CatalogPackage[] {
-  const family = catalog?.families.find((entry) => entry.family === task.family);
-  if (!family) return [];
+  if (!catalog) return [];
 
-  return family.packages
+  // Gathered across every family the task names, because separation runs on
+  // three of them. `packageIds` is the service's own answer about what it would
+  // accept, so it decides membership and the family only decides where to look.
+  return catalog.families
+    .filter((entry) => task.families.includes(entry.family))
+    .flatMap((entry) => entry.packages)
     .filter((pkg) => pkg.installed && task.packageIds.includes(pkg.id))
     .sort((a, b) => Number(b.recommended) - Number(a.recommended));
 }

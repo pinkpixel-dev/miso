@@ -43,7 +43,7 @@ function task(id: string, inputRoles: string[]): StudioTask {
     label: id,
     shortLabel: id,
     summary: id,
-    family: 'ace_step',
+    families: ['ace_step'],
     packageIds: [],
     vocals: 'both',
     inputRoles,
