@@ -6,10 +6,12 @@ import {
   applyGains,
   correctFollowers,
   gainsFor,
+  isOnlySolo,
   pauseAll,
   placeStem,
   playAll,
   seekAll,
+  soloOnly,
   type StemControls,
 } from './stemDeck.ts';
 
@@ -52,6 +54,10 @@ export interface StemDeck {
   setVolume: (id: string, volume: number) => void;
   toggleMute: (id: string) => void;
   toggleSolo: (id: string) => void;
+  /** Hear this stem on its own, or stop if that is already what is happening. */
+  playOnly: (id: string) => void;
+  /** Whether this stem is the only one soloed. */
+  onlySolo: (id: string) => boolean;
   /** Called by a track once its instance is ready. */
   register: (id: string, instance: WaveSurfer) => void;
   unregister: (id: string) => void;
@@ -199,6 +205,31 @@ export function useStemDeck(stems: Asset[]): StemDeck {
     [change],
   );
 
+  const onlySolo = useCallback((id: string) => isOnlySolo(controlsRef.current, id), []);
+
+  const playOnly = useCallback(
+    (id: string) => {
+      const leader = leaderId();
+      const instance = leader === undefined ? undefined : takes.current.get(leader);
+      if (!instance) return;
+
+      // Already hearing just this one, so the button is a pause.
+      if (isOnlySolo(controlsRef.current, id) && instance.isPlaying()) {
+        pauseAll([...takes.current.values()]);
+        setPlaying(false);
+        return;
+      }
+
+      setControls((was) => soloOnly(was, id));
+
+      if (!instance.isPlaying()) {
+        playAll({ leader: instance, followers: others(leader) });
+        setPlaying(true);
+      }
+    },
+    [leaderId, others],
+  );
+
   // Gains follow the controls rather than being set where a button was pressed,
   // so one rule decides what every stem plays at and a solo anywhere updates
   // the whole set.
@@ -232,6 +263,8 @@ export function useStemDeck(stems: Asset[]): StemDeck {
     setVolume,
     toggleMute,
     toggleSolo,
+    playOnly,
+    onlySolo,
     register,
     unregister,
     report,

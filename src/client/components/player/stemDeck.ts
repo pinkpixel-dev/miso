@@ -60,6 +60,35 @@ function clampGain(volume: number): number {
   return Math.max(0, Math.min(1, volume));
 }
 
+/**
+ * Solo exactly one stem and release every other.
+ *
+ * This is what a stem's own play button does. Hearing one stem on its own is
+ * the common reason to touch a mix at all, and doing it through the solo
+ * buttons means releasing however many are already lit first.
+ *
+ * Mutes are left alone. Solo already overrides them while it is on, and they
+ * come back when it is released, which is the behaviour the buttons promise.
+ */
+export function soloOnly(
+  controls: Map<string, StemControls>,
+  id: string,
+): Map<string, StemControls> {
+  const next = new Map<string, StemControls>();
+  for (const [key, entry] of controls) next.set(key, { ...entry, soloed: key === id });
+  return next;
+}
+
+/** Whether this stem is the only one soloed, which is what its play button shows. */
+export function isOnlySolo(controls: Map<string, StemControls>, id: string): boolean {
+  let found = false;
+  for (const [key, entry] of controls) {
+    if (entry.soloed && key !== id) return false;
+    if (entry.soloed && key === id) found = true;
+  }
+  return found;
+}
+
 /** Every stem's gain, with the solo question asked once for the set. */
 export function gainsFor(controls: Map<string, StemControls>): Map<string, number> {
   const soloing = anySoloed(controls.values());

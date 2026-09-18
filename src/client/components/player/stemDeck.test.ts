@@ -7,10 +7,12 @@ import {
   correctFollowers,
   gainFor,
   gainsFor,
+  isOnlySolo,
   pauseAll,
   placeStem,
   playAll,
   seekAll,
+  soloOnly,
   type StemControls,
 } from './stemDeck.ts';
 
@@ -261,5 +263,78 @@ describe('placeStem', () => {
     placeStem({ arriving: arriving.take, leader: leader.take, gain: 0 });
 
     expect(arriving.calls).toEqual(['setTime(62)', 'setVolume(0)']);
+  });
+});
+
+describe('soloOnly', () => {
+  it('solos one stem and releases the rest', () => {
+    const before = new Map([
+      ['vocals', controls({ soloed: true })],
+      ['drums', controls({ soloed: true })],
+      ['bass', controls()],
+    ]);
+
+    const after = soloOnly(before, 'bass');
+
+    expect(after.get('vocals')?.soloed).toBe(false);
+    expect(after.get('drums')?.soloed).toBe(false);
+    expect(after.get('bass')?.soloed).toBe(true);
+  });
+
+  it('leaves mutes and faders alone', () => {
+    // Solo overrides a mute while it is on and gives it back when released,
+    // so pressing play on one stem must not throw the mute away.
+    const before = new Map([['vocals', controls({ muted: true, volume: 0.4 })]]);
+
+    const after = soloOnly(before, 'vocals');
+
+    expect(after.get('vocals')?.muted).toBe(true);
+    expect(after.get('vocals')?.volume).toBe(0.4);
+  });
+
+  it('makes that stem the only thing you hear', () => {
+    const gains = gainsFor(
+      soloOnly(
+        new Map([
+          ['vocals', controls()],
+          ['drums', controls()],
+        ]),
+        'drums',
+      ),
+    );
+
+    expect(gains.get('vocals')).toBe(0);
+    expect(gains.get('drums')).toBe(1);
+  });
+
+  it('does not change a map it was given', () => {
+    const before = new Map([['vocals', controls()]]);
+    soloOnly(before, 'vocals');
+    expect(before.get('vocals')?.soloed).toBe(false);
+  });
+});
+
+describe('isOnlySolo', () => {
+  it('is true when this stem is the only one soloed', () => {
+    const map = new Map([
+      ['vocals', controls({ soloed: true })],
+      ['drums', controls()],
+    ]);
+
+    expect(isOnlySolo(map, 'vocals')).toBe(true);
+    expect(isOnlySolo(map, 'drums')).toBe(false);
+  });
+
+  it('is false when something else is soloed too', () => {
+    const map = new Map([
+      ['vocals', controls({ soloed: true })],
+      ['drums', controls({ soloed: true })],
+    ]);
+
+    expect(isOnlySolo(map, 'vocals')).toBe(false);
+  });
+
+  it('is false when nothing is soloed', () => {
+    expect(isOnlySolo(new Map([['vocals', controls()]]), 'vocals')).toBe(false);
   });
 });

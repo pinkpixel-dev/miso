@@ -1,8 +1,10 @@
+import { Download, Pause, Play } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Asset } from '../../../shared/types.ts';
+import { downloadUrl } from '../../lib/api.ts';
 import { createTakeSurfer } from '../player/createTakeSurfer.ts';
 import type { StemDeck } from '../player/useStemDeck.ts';
-import { cx } from '../ui.tsx';
+import { Tooltip, cx } from '../ui.tsx';
 
 /**
  * One stem: its waveform, its fader, and its two buttons.
@@ -83,6 +85,12 @@ export function StemTrack({ stem, deck }: { stem: Asset; deck: StemDeck }) {
   // say: anything not soloed is silent while something else is.
   const silenced = deck.soloing ? !soloed : muted;
 
+  // This stem's own play button is about hearing it alone, which is not the
+  // same question as whether the set is running. It reads as playing only when
+  // this stem is the one you can hear.
+  const alone = deck.onlySolo(id);
+  const playingAlone = alone && deck.playing;
+
   return (
     <section
       aria-label={stem.label}
@@ -92,7 +100,37 @@ export function StemTrack({ stem, deck }: { stem: Asset; deck: StemDeck }) {
         soloed ? 'border-accent' : 'border-line',
       )}
     >
-      <div className="flex min-w-0 items-center justify-between gap-3 md:w-48 md:shrink-0">
+      <div className="flex min-w-0 items-center gap-3 md:w-56 md:shrink-0">
+        {/*
+          Hears this stem on its own. The others keep running silently rather
+          than pausing, which is the rule the whole deck follows: a paused stem
+          stops advancing, and the next thing you press would need a seek
+          before it made a sound.
+        */}
+        <Tooltip label={playingAlone ? `Stop ${stem.label}` : `Hear ${stem.label} on its own`}>
+          <button
+            type="button"
+            onClick={() => deck.playOnly(id)}
+            disabled={!deck.playable}
+            aria-label={playingAlone ? `Stop ${stem.label}` : `Hear ${stem.label} on its own`}
+            className={cx(
+              'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border',
+              'transition-colors duration-150',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+              'disabled:cursor-not-allowed disabled:opacity-45',
+              playingAlone
+                ? 'border-accent bg-accent text-accent-ink'
+                : 'border-line text-ink-muted hover:bg-raised hover:text-ink',
+            )}
+          >
+            {playingAlone ? (
+              <Pause aria-hidden="true" className="h-4 w-4" />
+            ) : (
+              <Play aria-hidden="true" className="h-4 w-4" />
+            )}
+          </button>
+        </Tooltip>
+
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-ink">{stem.label}</p>
           {/*
@@ -154,6 +192,25 @@ export function StemTrack({ stem, deck }: { stem: Asset; deck: StemDeck }) {
             className="w-24 accent-[var(--color-accent)]"
           />
         </label>
+
+        {/*
+          The same plain download link every take gets, pointed at one stem.
+          Exporting a stem is most of the reason to separate a take at all.
+        */}
+        <Tooltip label={`Export ${stem.label}`}>
+          <a
+            href={downloadUrl(stem.projectId, stem.id)}
+            download={stem.filename}
+            aria-label={`Export ${stem.label}`}
+            className={cx(
+              'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
+              'text-ink-muted transition-colors duration-150 hover:bg-raised hover:text-ink',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+            )}
+          >
+            <Download aria-hidden="true" className="h-4 w-4" />
+          </a>
+        </Tooltip>
       </div>
 
       {state.loading ? (
