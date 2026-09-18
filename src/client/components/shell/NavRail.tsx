@@ -1,4 +1,12 @@
-import { ChevronLeft, ChevronRight, Library, Package, Plus, Settings } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Columns2,
+  Library,
+  Package,
+  Plus,
+  Settings,
+} from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useProjects } from '../../lib/useProjects.ts';
@@ -116,6 +124,34 @@ export function NavRail() {
           <NavLink to="/library" className={({ isActive }) => link(isActive)}>
             <Library aria-hidden="true" className="h-4 w-4 shrink-0" />
             Library
+          </NavLink>
+        )}
+
+        {/*
+          Next to the library because it reads the same list. Compare is the
+          one place that holds two takes at once, and neither of them has to
+          belong to the project that happens to be open.
+        */}
+        {collapsed ? (
+          <Tooltip label="Compare">
+            <NavLink
+              to="/compare"
+              aria-label="Compare"
+              className={({ isActive }) =>
+                cx(
+                  'flex h-9 w-9 items-center justify-center rounded-md transition-colors duration-150',
+                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+                  isActive ? 'bg-raised text-ink' : 'text-ink-muted hover:bg-raised hover:text-ink',
+                )
+              }
+            >
+              <Columns2 aria-hidden="true" className="h-4 w-4" />
+            </NavLink>
+          </Tooltip>
+        ) : (
+          <NavLink to="/compare" className={({ isActive }) => link(isActive)}>
+            <Columns2 aria-hidden="true" className="h-4 w-4 shrink-0" />
+            Compare
           </NavLink>
         )}
 

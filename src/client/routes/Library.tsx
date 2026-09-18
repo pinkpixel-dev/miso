@@ -1,11 +1,11 @@
 import { Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Asset, LibraryTake } from '../../shared/types.ts';
+import type { LibraryTake } from '../../shared/types.ts';
 import { LibraryRow } from '../components/library/LibraryRow.tsx';
 import { ConfirmDialog } from '../components/Dialog.tsx';
 import { IconButton, Panel, cx } from '../components/ui.tsx';
-import { api } from '../lib/api.ts';
+import { loadLibraryAsset } from '../lib/libraryAsset.ts';
 import { searchTakes, taskLabels } from '../lib/librarySearch.ts';
 import { useLibrary } from '../lib/useLibrary.ts';
 import { usePlayer } from '../lib/usePlayer.ts';
@@ -54,30 +54,15 @@ export function LibraryRoute() {
   /**
    * Hands a take to the dock with its waveform.
    *
-   * The library list carries no peaks, and the player draws from them or else
-   * downloads the whole file to work them out, which for a three minute WAV is
-   * 34 MB. So the take is fetched whole first. If that fails the take still
-   * plays, because a missing waveform is not a reason to refuse.
+   * Why a row has to be fetched before it can be played is in loadLibraryAsset,
+   * which the compare page calls for the same reason. What is decided here is
+   * only what to say when the fetch fails: the take plays either way, and the
+   * message goes on the page rather than into the dock.
    */
   async function playTake(take: LibraryTake) {
-    try {
-      play(await api.getAsset(take.projectId, take.assetId));
-      setPlayError(undefined);
-    } catch (cause) {
-      setPlayError(cause instanceof Error ? cause.message : String(cause));
-      play({
-        id: take.assetId,
-        projectId: take.projectId,
-        kind: take.kind,
-        label: take.label,
-        filename: `${take.label}.${take.format}`,
-        format: take.format,
-        bytes: take.bytes,
-        checksum: '',
-        durationSeconds: take.durationSeconds,
-        createdAt: take.createdAt,
-      } satisfies Asset);
-    }
+    const loaded = await loadLibraryAsset(take);
+    play(loaded.asset);
+    setPlayError(loaded.error);
   }
 
   return (

@@ -1,5 +1,6 @@
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { StudioShell } from './components/shell/StudioShell.tsx';
+import { CompareRoute } from './routes/Compare.tsx';
 import { CreateRoute } from './routes/Create.tsx';
 import { LibraryRoute } from './routes/Library.tsx';
 import { Models } from './routes/Models.tsx';
@@ -30,9 +31,11 @@ export function App() {
           <Route path="projects/:id/remix/:assetId" element={<RemixRoute />} />
           {/*
             App level, like models and settings. The library is every project's
-            takes, so it belongs to none of them.
+            takes, so it belongs to none of them, and compare holds two takes
+            that can come from two different projects.
           */}
           <Route path="library" element={<LibraryRoute />} />
+          <Route path="compare" element={<CompareRoute />} />
           <Route path="models" element={<Models />} />
           <Route path="settings" element={<SettingsRoute />} />
           <Route path="*" element={<StartRoute />} />

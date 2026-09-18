@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createPath, projectIdFrom, projectPath, remixPath, wantsFullWidth } from './routes.ts';
+import {
+  comparePath,
+  createPath,
+  projectIdFrom,
+  projectPath,
+  remixPath,
+  wantsFullWidth,
+} from './routes.ts';
 
 describe('projectIdFrom', () => {
   it('reads the project off its own route', () => {
@@ -53,6 +60,7 @@ describe('wantsFullWidth', () => {
    */
   it('is true on the app level screens', () => {
     expect(wantsFullWidth('/library')).toBe(true);
+    expect(wantsFullWidth('/compare')).toBe(true);
     expect(wantsFullWidth('/models')).toBe(true);
     expect(wantsFullWidth('/settings')).toBe(true);
   });
@@ -110,5 +118,29 @@ describe('remixPath', () => {
     const path = remixPath('abc', 'xyz');
     expect(projectIdFrom(path)).toBe('abc');
     expect(wantsFullWidth(path)).toBe(true);
+  });
+});
+
+describe('comparePath', () => {
+  it('opens the page with nothing picked', () => {
+    expect(comparePath()).toBe('/compare');
+  });
+
+  it('seeds one side, which is what a take links to', () => {
+    expect(comparePath('asset-1')).toBe('/compare?a=asset-1');
+  });
+
+  it('seeds both, which is what the dock links to', () => {
+    expect(comparePath('asset-1', 'asset-2')).toBe('/compare?a=asset-1&b=asset-2');
+  });
+
+  it('encodes an id that needs it', () => {
+    expect(comparePath('a b&c')).toBe('/compare?a=a+b%26c');
+  });
+
+  it('stays full width with takes in the address', () => {
+    // wantsFullWidth reads a pathname, so the query must not reach it.
+    const path = comparePath('asset-1', 'asset-2');
+    expect(wantsFullWidth(path.split('?')[0] ?? path)).toBe(true);
   });
 });

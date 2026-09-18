@@ -247,6 +247,8 @@ export function PlayerDock() {
                 compare={compare}
                 currentLabel={asset.label}
                 otherLabel={compareWith.label}
+                currentId={asset.id}
+                otherId={compareWith.id}
               />
             ) : null}
             {asset && !hasPeaks ? (

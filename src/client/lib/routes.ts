@@ -20,6 +20,7 @@ export const REMIX_PATH = '/projects/:id/remix';
 
 /** The app level screens, which are not scoped to a project. */
 export const LIBRARY_PATH = '/library';
+export const COMPARE_PATH = '/compare';
 export const MODELS_PATH = '/models';
 export const SETTINGS_PATH = '/settings';
 
@@ -45,9 +46,11 @@ export function projectIdFrom(pathname: string): string | undefined {
  * The project page and the remix page carry their own list of takes, so keeping
  * the column would put the same list on screen twice.
  *
- * The library, Models and Settings are app level and have nothing to do with
+ * The library, Compare, Models and Settings are app level and have nothing to do with
  * whichever project happens to be open, so a project's takes beside them
- * belong to something else. The library is the sharper case: it is every
+ * belong to something else. Compare is the same case as the library twice
+ * over, since its two takes can be from two different projects. The library is
+ * the sharper case: it is every
  * project's takes, and one project's column next to that is the same list at
  * two scopes. What that costs is sight of a running generation while you
  * install a model: the dock still plays and the job still runs, so the progress
@@ -61,6 +64,7 @@ export function projectIdFrom(pathname: string): string | undefined {
 export function wantsFullWidth(pathname: string): boolean {
   if (matchPath({ path: REMIX_PATH, end: false }, pathname) !== null) return true;
   if (matchPath({ path: LIBRARY_PATH, end: true }, pathname) !== null) return true;
+  if (matchPath({ path: COMPARE_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: MODELS_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: SETTINGS_PATH, end: true }, pathname) !== null) return true;
   return matchPath({ path: PROJECT_PATH, end: true }, pathname) !== null;
@@ -69,6 +73,22 @@ export function wantsFullWidth(pathname: string): boolean {
 /** Every take in Miso, whatever project it is in. */
 export function libraryPath(): string {
   return LIBRARY_PATH;
+}
+
+/**
+ * Two takes heard against each other.
+ *
+ * Asset ids alone, with no project, because the page resolves them against the
+ * library and a library row already carries the project it lives in. A link
+ * naming a take that has since been deleted opens the page with that side
+ * empty rather than failing.
+ */
+export function comparePath(a?: string, b?: string): string {
+  const params = new URLSearchParams();
+  if (a !== undefined) params.set('a', a);
+  if (b !== undefined) params.set('b', b);
+  const query = params.toString();
+  return query === '' ? COMPARE_PATH : `${COMPARE_PATH}?${query}`;
 }
 
 /** The project itself. */

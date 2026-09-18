@@ -1,11 +1,11 @@
-import { CopyPlus, Scissors, X } from 'lucide-react';
+import { Columns2, CopyPlus, Scissors, X } from 'lucide-react';
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import type { Asset, Job, StudioTask } from '../../../shared/types.ts';
 import type { LineageStep } from '../../lib/lineage.ts';
 import { ancestorsOf, descendantsOf, sourceWasDeleted } from '../../lib/lineage.ts';
-import { createPath, remixPath } from '../../lib/routes.ts';
+import { comparePath, createPath, remixPath } from '../../lib/routes.ts';
 import { stringJobParam } from '../../lib/takeDetails.ts';
 import { Tooltip, cx } from '../ui.tsx';
 
@@ -237,6 +237,22 @@ export function TakeDetailPanel({
                     Reuse these settings
                   </Link>
                 ) : null}
+
+                {/*
+                  Into the compare page with this take on one side and the
+                  other side still to pick. Unlike the dock's compare it does
+                  not need this take to have been made from anything, and the
+                  take it ends up next to can be from any project.
+                */}
+                <Link
+                  to={comparePath(asset.id)}
+                  onClick={onClose}
+                  aria-label="Compare this take against another one"
+                  className={actionLink}
+                >
+                  <Columns2 aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  Compare with
+                </Link>
               </div>
 
               {!job ? (
