@@ -1,5 +1,5 @@
 import { Plus, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type {
   Catalog,
@@ -11,6 +11,7 @@ import type {
 } from '../../shared/types.ts';
 import { api } from '../lib/api.ts';
 import { buildLabel, installedPackages } from '../lib/models.ts';
+import type { Mode, Prefill, Values } from '../lib/reusePrompt.ts';
 import { EMPTY_STUDIO, compile, supportsGuided, wantsLyrics } from '../lib/studio.ts';
 import { estimateSeconds } from '../lib/useJobs.ts';
 import { BuilderCard } from './BuilderCard.tsx';
@@ -38,9 +39,6 @@ import { Button, IconButton, Panel, SegmentedControl } from './ui.tsx';
  * Everything that is not a box lives in a card header, so the form reads as
  * things to fill in rather than a run of buttons to press.
  */
-
-type Values = Record<string, string>;
-type Mode = 'guided' | 'custom';
 
 const MODES: { value: Mode; label: string }[] = [
   { value: 'guided', label: 'Guided' },
@@ -103,12 +101,18 @@ export function GeneratePanel({
   jobs,
   catalog,
   catalogLoading,
+  prefill,
+  seedId,
   onSubmit,
 }: {
   tasks: StudioTask[];
   jobs: Job[];
   catalog: Catalog | undefined;
   catalogLoading: boolean;
+  /** What a past job says this form should start from, when one was named. */
+  prefill?: Prefill;
+  /** The job that seed came from, so one seed is applied once. */
+  seedId?: string;
   onSubmit: (body: {
     taskId: string;
     modelId: string;
@@ -137,6 +141,31 @@ export function GeneratePanel({
   const [suggestion, setSuggestion] = useState<PromptSuggestion | undefined>();
   const [suggestBusy, setSuggestBusy] = useState(false);
   const [suggestError, setSuggestError] = useState<string | undefined>();
+
+  /*
+    The one effect in this file, and it is here because the seed arrives as a
+    prop while everything else the form shows is derived from its own state.
+
+    Keyed on the job id rather than on the object, so a re-render never seeds a
+    form somebody has typed in since. Arriving from a different take changes the
+    id and seeds again, which is the point: the address said to.
+
+    An expansion goes with it. One made from the previous contents of the form
+    is not an expansion of these, and leaving it would show a prompt belonging
+    to the take you just navigated away from.
+  */
+  useEffect(() => {
+    if (!prefill || seedId === undefined) return;
+    setModelId(prefill.modelId);
+    setValues(prefill.values);
+    setTitle(prefill.title);
+    setBuilder(prefill.builder);
+    setMode(prefill.mode);
+    setEnhanced(undefined);
+    setSuggestion(undefined);
+    setSuggestError(undefined);
+    setSuggesting(false);
+  }, [seedId]);
 
   // Only the tasks that write a track from nothing. A remix route runs on the
   // same families and draws its fields the same way, so without this filter
@@ -400,6 +429,23 @@ export function GeneratePanel({
       <p className="-mt-2 text-xs text-ink-faint">
         {describeEstimate(chosenModel ? estimateSeconds(jobs, task.id, chosenModel) : undefined)}
       </p>
+
+      {/*
+        The take this form was seeded from was made on a model that is not
+        installed any more. The settings still loaded, so this says what is
+        different rather than refusing to seed. Text, not colour, and it names
+        the missing package so it can be found on the Models screen.
+      */}
+      {prefill?.missingModelId !== undefined ? (
+        <p
+          role="status"
+          className="-mt-2 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-ink"
+        >
+          These settings were made with{' '}
+          <span className="font-mono">{prefill.missingModelId}</span>, which is not installed.
+          Everything else loaded, and the model above is the one that will run.
+        </p>
+      ) : null}
 
       {/*
         The title is the name of the thing being made, so it reads as one:

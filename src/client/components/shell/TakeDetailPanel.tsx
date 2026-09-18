@@ -1,9 +1,9 @@
-import { Scissors, X } from 'lucide-react';
+import { CopyPlus, Scissors, X } from 'lucide-react';
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import type { Asset, Job } from '../../../shared/types.ts';
-import { remixPath } from '../../lib/routes.ts';
+import { createPath, remixPath } from '../../lib/routes.ts';
 import { stringJobParam } from '../../lib/takeDetails.ts';
 import { Tooltip, cx } from '../ui.tsx';
 
@@ -18,6 +18,17 @@ function formatDuration(seconds: number | undefined): string {
   const whole = Math.round(seconds);
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 }
+
+/*
+  Both ways on from a take look the same, because they are the same kind of
+  thing: a link out of this panel into a page that carries on from here.
+*/
+const actionLink = cx(
+  'inline-flex min-h-11 items-center gap-2 rounded-md border border-line bg-raised px-3.5 py-2',
+  'text-sm font-medium text-ink transition-colors duration-150',
+  'hover:border-line-strong hover:bg-raised/70 active:bg-raised',
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+);
 
 function RecordedText({ value, missing }: { value: string | undefined; missing: string }) {
   return value === undefined ? (
@@ -111,28 +122,46 @@ export function TakeDetailPanel({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
               {/*
-                The fast way into the remix tools, with this take already the
-                source. A link rather than a button because it goes somewhere,
-                so the address ends up saying what is being edited and the back
-                button comes back here.
-
-                It does not name a tool. The remix page carries several and the
-                picker chooses between them, so a link promising one of them
-                would be answering a question this panel has not asked.
+                The two ways on from a take. Links rather than buttons because
+                they go somewhere, so the address ends up saying what is being
+                worked on and the back button comes back here. They wrap onto a
+                second row in a narrow window rather than either label breaking
+                across two lines.
               */}
-              <Link
-                to={remixPath(asset.projectId, asset.id)}
-                onClick={onClose}
-                className={cx(
-                  'mb-5 inline-flex min-h-11 items-center gap-2 rounded-md border border-line bg-raised px-3.5 py-2',
-                  'text-sm font-medium text-ink transition-colors duration-150',
-                  'hover:border-line-strong hover:bg-raised/70 active:bg-raised',
-                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-                )}
-              >
-                <Scissors aria-hidden="true" className="h-4 w-4 shrink-0" />
-                Remix this take
-              </Link>
+              <div className="mb-5 flex flex-wrap items-center gap-2">
+                {/*
+                  Into the remix tools, with this take already the source. It
+                  does not name a tool. The remix page carries several and the
+                  picker chooses between them, so a link promising one of them
+                  would be answering a question this panel has not asked.
+                */}
+                <Link
+                  to={remixPath(asset.projectId, asset.id)}
+                  onClick={onClose}
+                  className={actionLink}
+                >
+                  <Scissors aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  Remix this take
+                </Link>
+
+                {/*
+                  The other way to carry on from a take, which is to make
+                  another one like it rather than to edit this one. It needs the
+                  job, because the job is the only record of what was typed, so
+                  an imported take does not offer it at all.
+                */}
+                {job ? (
+                  <Link
+                    to={createPath(asset.projectId, job.id)}
+                    onClick={onClose}
+                    aria-label="Fill the create form with the settings that made this take"
+                    className={actionLink}
+                  >
+                    <CopyPlus aria-hidden="true" className="h-4 w-4 shrink-0" />
+                    Reuse these settings
+                  </Link>
+                ) : null}
+              </div>
 
               {!job ? (
                 <section>

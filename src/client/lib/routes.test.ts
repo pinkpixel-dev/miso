@@ -93,6 +93,11 @@ describe('createPath', () => {
     expect(projectIdFrom(createPath('abc'))).toBe('abc');
     expect(wantsFullWidth(createPath('abc'))).toBe(false);
   });
+
+  it('carries the job a form is seeded from, encoded', () => {
+    expect(createPath('abc', 'job-1')).toBe('/projects/abc/create?from=job-1');
+    expect(createPath('abc', 'a b&c')).toBe('/projects/abc/create?from=a%20b%26c');
+  });
 });
 
 describe('remixPath', () => {

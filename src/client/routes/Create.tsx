@@ -1,7 +1,10 @@
 import { ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { GeneratePanel } from '../components/GeneratePanel.tsx';
 import { Panel } from '../components/ui.tsx';
+import { installedPackages } from '../lib/models.ts';
+import { prefillFromJob } from '../lib/reusePrompt.ts';
 import { projectPath } from '../lib/routes.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
@@ -19,6 +22,41 @@ import { useStudio } from '../lib/useStudio.ts';
  */
 export function CreateRoute() {
   const { project, loading, error, tasks, jobs, catalog, catalogLoading, submit } = useStudio();
+
+  /*
+    The form can be seeded from a take that already exists, which the address
+    says as `?from=<jobId>`. The job is found in the list this project already
+    holds rather than fetched, because `useStudio` carries every job in the
+    project including the ones cleared from the queue, which is what keeps an
+    old take reusable.
+
+    A `from` that names nothing here is ignored. Links outlive the jobs they
+    point at, and an unusable one should open an ordinary empty form.
+  */
+  const [params] = useSearchParams();
+  const fromJobId = params.get('from') ?? undefined;
+  const seedJob = jobs.find((job) => job.id === fromJobId);
+
+  const installedModelIds = useMemo(
+    () => tasks.flatMap((task) => installedPackages(catalog, task).map((pkg) => pkg.id)),
+    [catalog, tasks],
+  );
+
+  const prefill = useMemo(
+    () => (seedJob ? prefillFromJob(seedJob, installedModelIds) : undefined),
+    [seedJob, installedModelIds],
+  );
+
+  /*
+    Nothing is seeded until the catalog has settled and this build has said what
+    it can do. Both arrive after the first render, and until they do every model
+    reads as uninstalled, so seeding early would fill the form in correctly and
+    then tell the person their model is missing when it is sitting right there.
+
+    The form seeds once per job id, so this is a gate rather than a retry: the
+    id stays undefined until the answer is worth acting on.
+  */
+  const ready = !catalogLoading && tasks.length > 0;
 
   if (loading && !project) {
     return <p className="text-sm text-ink-muted">Loading this project.</p>;
@@ -73,6 +111,8 @@ export function CreateRoute() {
         jobs={jobs}
         catalog={catalog}
         catalogLoading={catalogLoading}
+        prefill={prefill}
+        seedId={ready ? seedJob?.id : undefined}
         onSubmit={submit}
       />
     </div>

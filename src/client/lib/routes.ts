@@ -76,9 +76,17 @@ export function projectPath(projectId: string): string {
   return `/projects/${encodeURIComponent(projectId)}`;
 }
 
-/** The create form for a project. */
-export function createPath(projectId: string): string {
-  return `/projects/${encodeURIComponent(projectId)}/create`;
+/**
+ * The create form for a project, optionally seeded by a past job.
+ *
+ * The job id goes in the address rather than in router state so that it
+ * survives a reload, can be linked to, and says on screen what the form was
+ * filled in from. The form ignores an id that does not name a job in this
+ * project, so a stale link opens an ordinary empty form instead of breaking.
+ */
+export function createPath(projectId: string, fromJobId?: string): string {
+  const base = `/projects/${encodeURIComponent(projectId)}/create`;
+  return fromJobId === undefined ? base : `${base}?from=${encodeURIComponent(fromJobId)}`;
 }
 
 /** The remix route for a take, or for picking one. */

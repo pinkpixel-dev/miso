@@ -3,6 +3,22 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.18.0 - September 17, 2026
+
+### 🔁 Reuse
+
+- A take's detail panel has a second way on from it: **Reuse these settings** fills the create
+  form with everything that made that take. The prompt, the lyrics, every other setting the job
+  recorded, the song title, the model, and the guided builder boxes when the builder is what
+  wrote it. Change one word and generate again.
+- It works on a take whose job was cleared from the queue. Clearing has always hidden finished
+  work rather than deleting it, and this is the first thing that reads those rows back into a
+  form.
+- The form says so in the address, as `?from=<jobId>`, so a seeded form survives a reload and
+  the back button returns to the take.
+- When the model that made a take is no longer installed, the settings still load and a line
+  above the form names the missing package, rather than quietly running on something else.
+
 ## 0.17.1 - September 15, 2026
 
 ### 🎛️ Remix
