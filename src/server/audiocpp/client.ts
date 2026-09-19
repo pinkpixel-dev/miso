@@ -1,3 +1,4 @@
+import { Agent, fetch as undiciFetch } from 'undici';
 import type { BackendStatus } from '../../shared/types.ts';
 
 /**
@@ -305,6 +306,34 @@ const LOAD_TIMEOUT_MS = 10 * 60 * 1000;
 /** A ceiling, not an expectation. Miso's queue is what makes waiting bearable. */
 const RUN_TIMEOUT_MS = 60 * 60 * 1000;
 
+/**
+ * The dispatcher a run uses, because `AbortSignal` is not the only clock.
+ *
+ * Node's fetch is undici underneath, and undici applies its own header and body
+ * timeouts that default to 300 seconds. They are enforced whatever
+ * `AbortSignal.timeout` says: a request to a server that simply sleeps dies at
+ * 301.8 s with `TypeError: fetch failed`, cause `UND_ERR_HEADERS_TIMEOUT`, on a
+ * signal set to an hour. Measured 2026-09-19, Node 22.22.2.
+ *
+ * audio.cpp sends no response headers until a task is completely finished, so
+ * the whole run counts against that limit. Separating a 171 second take with
+ * BS-RoFormer already takes 285 seconds, which clears the cliff by fifteen
+ * seconds, and a three minute song does not clear it at all. The 300 seconds
+ * was never a Miso decision and it cannot be seen from the call site, which is
+ * what made it expensive to find.
+ *
+ * Zero disables both. `RUN_TIMEOUT_MS` above is then the only clock, which is
+ * the one a person can reason about.
+ *
+ * This is also why the run below calls undici's own `fetch` rather than the
+ * global one. Node's global fetch is a separate internal copy of undici, and
+ * handing it an `Agent` built from the installed package is refused with
+ * `UND_ERR_INVALID_ARG`. The dispatcher and the fetch have to come from the
+ * same copy. Every other call in this file stays on the global fetch, where the
+ * 300 second default has never been close to a problem.
+ */
+const runDispatcher = new Agent({ headersTimeout: 0, bodyTimeout: 0 });
+
 /** A 200 MB source file over a LAN to a NAS. */
 const UPLOAD_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -434,9 +463,23 @@ export function unloadModel(baseUrl: string, id: string): Promise<ManagementResu
  * There is no matching delete route, so Miso records what it staged and cleans
  * up itself.
  */
+/**
+ * Bytes already in memory are sent as bytes, never wrapped in a stream.
+ *
+ * `Readable.from(buffer)` yields the whole buffer as one chunk, and the upload
+ * route caps how big a single chunk of a chunked request body may be. Eight
+ * megabytes goes through, twelve is refused with `chunked request body: chunk
+ * size exceeds the maximum`, and sixteen closes the connection. A 44.1 kHz
+ * stereo take passes eight megabytes at about 47 seconds, so this is reachable
+ * with ordinary material rather than a pathological case. Measured 2026-09-19.
+ *
+ * Passing the bytes themselves sets a content length and sends no chunked body
+ * at all. A file on disk still streams, through `createReadStream`, which emits
+ * 64 KB chunks and was never affected.
+ */
 export async function stageAudio(
   baseUrl: string,
-  body: ReadableStream<Uint8Array>,
+  body: ReadableStream<Uint8Array> | Uint8Array,
   filename: string,
 ): Promise<ManagementResult<string>> {
   return call(
@@ -445,7 +488,8 @@ export async function stageAudio(
     {
       method: 'POST',
       body,
-      // Node needs this to stream a request body rather than buffer it.
+      // Node needs this to stream a request body rather than buffer it. Ignored
+      // for bytes, which are not streamed.
       duplex: 'half',
       headers: {
         'content-type': 'application/octet-stream',
@@ -476,11 +520,15 @@ export async function runTask(
   request: Record<string, unknown>,
 ): Promise<RunResult> {
   try {
-    const response = await fetch(`${baseUrl}/v1/tasks/run`, {
+    // undici's fetch, not the global one. See runDispatcher: without this a run
+    // dies at 300 seconds whatever the signal says, and separation already
+    // comes within fifteen seconds of that.
+    const response = await undiciFetch(`${baseUrl}/v1/tasks/run`, {
       method: 'POST',
       body: JSON.stringify({ model, request }),
       signal: AbortSignal.timeout(RUN_TIMEOUT_MS),
       headers: { 'content-type': 'application/json', accept: 'application/json' },
+      dispatcher: runDispatcher,
     });
 
     if (response.status === 503) {
@@ -508,7 +556,18 @@ export async function runTask(
         message: `The task did not finish within ${Math.round(RUN_TIMEOUT_MS / 60000)} minutes.`,
       };
     }
+    // A transport timeout is not a backend that went away, and saying so sends
+    // somebody to check a container that is running perfectly. Undici reports
+    // both as TypeError, so the cause is the only thing that tells them apart.
     if (error instanceof TypeError) {
+      const code = (error.cause as { code?: string } | undefined)?.code;
+      if (code === 'UND_ERR_HEADERS_TIMEOUT' || code === 'UND_ERR_BODY_TIMEOUT') {
+        return {
+          ok: false,
+          reason: 'error',
+          message: 'The connection to the backend timed out while the task was still running.',
+        };
+      }
       return { ok: false, reason: 'unreachable', message: `Could not reach ${baseUrl}.` };
     }
     return { ok: false, reason: 'error', message: error instanceof Error ? error.message : String(error) };

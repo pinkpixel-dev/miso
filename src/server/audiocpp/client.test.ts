@@ -15,6 +15,22 @@ import {
   stopInstall,
 } from './client.ts';
 
+/**
+ * `runTask` calls undici's own fetch rather than the global one, so it can hand
+ * it a dispatcher with the 300 second header timeout disabled. See client.ts.
+ *
+ * These tests stub the global fetch, so undici's is pointed at whatever the
+ * stub currently is. Without this every runTask case below would make a real
+ * request to a backend that is not there.
+ */
+vi.mock('undici', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('undici')>();
+  return {
+    ...actual,
+    fetch: (...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args),
+  };
+});
+
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const load = (name: string): unknown => JSON.parse(readFileSync(join(fixtures, name), 'utf8'));
 

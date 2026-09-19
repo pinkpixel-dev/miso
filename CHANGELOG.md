@@ -3,6 +3,27 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.24.1 - September 19, 2026
+
+### 🐛 Fixes
+
+- Uploading a take that Miso converted before sending no longer fails past about 47 seconds
+  of audio. Bytes already in memory are sent as bytes rather than wrapped in a stream, which
+  sent them as one chunk and was refused by the upload route past eight megabytes. This
+  affected separating any generated take, since generated takes are 48 kHz and get resampled
+  to 44.1 kHz on the way in.
+- A long task no longer dies partway through with "Could not reach" while the backend is
+  running perfectly. Node's fetch enforces its own 300 second timeout regardless of the
+  one-hour budget Miso sets, and audio.cpp sends nothing back until a task is finished.
+  Separating a three minute song with BS-RoFormer crosses that line.
+- A connection that times out mid-task now says so, instead of reporting a healthy backend
+  as unreachable and sending you to check a container that is fine.
+
+### 🧹 Maintenance
+
+- Added `undici` so the run request can use a dispatcher with those timeouts disabled. Every
+  other call keeps the defaults.
+
 ## 0.24.0 - September 19, 2026
 
 ### 🎤 Voices

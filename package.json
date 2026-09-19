@@ -1,6 +1,6 @@
 {
   "name": "miso",
-  "version": "0.24.0",
+  "version": "0.24.1",
   "private": true,
   "type": "module",
   "description": "A local music generation and remix studio built on audio.cpp",
@@ -33,6 +33,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.0.0",
+    "undici": "^8.10.2",
     "wavesurfer.js": "^7.12.12",
     "yazl": "^3.3.1"
   },

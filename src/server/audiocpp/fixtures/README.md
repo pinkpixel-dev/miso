@@ -483,3 +483,103 @@ inaudible.
   run.
 - Whether a user RVC checkpoint works. `voice_model_path` and `retrieval_index_path` were never
   sent, because Miso has no way to put a non-audio file on the backend.
+
+## AudioSR, probed and then dropped
+
+Confirmed on 2026-09-19 against the same image, using `probe:audiosr` registered with
+`task: "s2s"`. Five runs plus a two pass stereo test. **The task built on this was dropped**,
+so this section exists to stop anybody probing it a second time to reach the same conclusion.
+What it measures is still true of the model.
+
+| Measure | Result |
+|---|---|
+| Output rate | 48 kHz, from a 16 kHz source and from a 44.1 kHz source |
+| Output channels | 1, always. A stereo source is downmixed |
+| Wall time | 90 to 99 s for 40 s of audio, about 2.4x realtime |
+| Same seed twice | Byte identical |
+| Length | Preserved, 40.07 s in and 40.07 s out |
+
+Registration is the ordinary `/v1/models/load` with another new task kind:
+
+```json
+{
+  "id": "probe:audiosr",
+  "family": "audiosr",
+  "path": "/app/models/AudioSR-GGUF",
+  "task": "s2s",
+  "mode": "offline"
+}
+```
+
+### It only helps material that is genuinely band-limited
+
+Band energy, measured after resampling everything to 48 kHz so the numbers compare:
+
+| Source | 2-6 kHz | 6-8 kHz | 9-20 kHz |
+|---|---|---|---|
+| 16 kHz MeanVC2 output | -31.8 dB | -42.1 dB | -49.6 dB |
+| the same, upscaled | -32.6 dB | -40.6 dB | **-38.3 dB** |
+| 44.1 kHz separation stem | -28.8 dB | -38.0 dB | -35.8 dB |
+| the same, upscaled | -- | -39.4 dB | **-35.5 dB** |
+
+On the 16 kHz source it synthesises real content above the source's own ceiling, 11.3 dB in
+the top band, landing near where a natural 44.1 kHz vocal sits. On a stem that already has its
+top end it moves that band 0.3 dB, which is nothing, and still costs 95 seconds and a channel.
+
+**Sample rate is not bandwidth.** A 44.1 kHz file ripped from a low bitrate MP3 can be
+lowpassed at 16 kHz and has plenty to gain, so the container rate cannot be used to decide
+whether upscaling will help.
+
+### Fewer steps is damage, not a speed setting
+
+At 10 steps rather than the default 50, the run took 51 s instead of 90 s and the 9 to 20 kHz
+band came back at -26.6 dB, which is 9 dB hotter than a natural recording. Zero crossing rate
+went from 7,898 to 20,608. That is hiss, not detail. Treat 50 as a floor.
+
+### Options travel nested, and that includes the seed
+
+Same rule as the voice families. An unknown option under `options` is refused:
+
+```
+HTTP 500 {"error":{"message":"unknown AudioSR request option: miso_not_a_real_option"}}
+```
+
+The same field sent flat beside `audio` returns HTTP 200 after a full 95 second run and is
+ignored. Every AudioSR option lives under `options.request` in the spec, including `seed`,
+unlike the generation families where a seed is a flag and belongs at the top level.
+
+**`num_inference_steps` is honoured in either position**, so it cannot be used to test
+placement. That is already written above about Seed-VC and it caught us again here. Use a name
+the model cannot know.
+
+### Two passes for stereo keep the music and widen the air
+
+Since it answers in mono, stereo has to be split, upscaled per channel and rejoined. Tested on
+a 16 kHz band-limited stereo vocal, same seed on both channels:
+
+| Band | Measure | Source | Two passes joined |
+|---|---|---|---|
+| Below 6 kHz | L/R correlation | 0.9883 | 0.9871 |
+| Below 6 kHz | Side against mid | -22.2 dB | -21.8 dB |
+| Above 9 kHz | L/R correlation | 0.9503 | 0.6334 |
+| Above 9 kHz | Side against mid | -15.9 dB | -6.5 dB |
+
+Below 6 kHz the image is untouched, so per channel processing does not smear what was already
+there. Above 9 kHz the two passes each invent their own detail, so the new band is only 0.63
+correlated and sits 9.4 dB wider than the source's: a diffuse halo that is not centred with the
+voice. Quiet, around -40 dB, and audible on headphones. Judged acceptable by ear at the time.
+
+### Why it was dropped
+
+Not because of any of the above. It works. It was dropped because almost nothing in a real
+library is band-limited, so the honest answer for most takes is that nothing much happens, and
+it is the slowest thing here by a wide margin: 2.4x realtime, doubled for stereo, so about ten
+minutes for a two and a half minute song. See `DOCS/plans/2026-09-19-phase-7a-upscale.md`.
+
+### Still unknown
+
+- Whether it accepts 40 kHz, the rate RVC answers at. Only 16 kHz and 44.1 kHz were sent.
+- How the decorrelated top end behaves on a wide stereo mix. The test source was a vocal with
+  L/R correlation 0.9866, which is nearly centred.
+- `guidance_scale`, `ddim_eta` and the two chunking options were never measured. They are real
+  option names, since a wrong name nested is refused, but nothing confirmed what they do.

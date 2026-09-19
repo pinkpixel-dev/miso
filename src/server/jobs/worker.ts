@@ -206,14 +206,17 @@ async function stageInputs(
     }
 
     const path = assetPath(asset.projectId, asset.id, asset.format);
-    let body: ReadableStream<Uint8Array>;
+    let body: ReadableStream<Uint8Array> | Uint8Array;
 
     if (rate === undefined) {
       body = Readable.toWeb(createReadStream(path)) as ReadableStream<Uint8Array>;
     } else {
       const converted = await convertForTask(asset, path, rate);
       if (!converted.ok) return { ok: false, message: converted.message };
-      body = Readable.toWeb(Readable.from(converted.bytes)) as ReadableStream<Uint8Array>;
+      // The bytes themselves, not a stream around them. See stageAudio: a
+      // buffer sent as one chunk is refused once it passes eight megabytes,
+      // which a resampled take reaches at about 47 seconds.
+      body = converted.bytes;
     }
 
     const uploaded = await stageAudio(baseUrl, body, asset.filename);
