@@ -1,6 +1,6 @@
 import type { TaskField } from '../../shared/types.ts';
 import { LyricsEditor } from './LyricsEditor.tsx';
-import { Field, TextArea } from './ui.tsx';
+import { Field, SegmentedControl, TextArea } from './ui.tsx';
 
 /**
  * One task field, drawn the way its kind asks to be drawn.
@@ -34,6 +34,22 @@ export function PlainField({
         hint={field.help}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  }
+
+  // A short fixed list, so the options are all on screen rather than behind a
+  // menu. Four voices that sound nothing like each other are worth seeing at
+  // once, and the segmented control is already a radio group underneath.
+  if (field.kind === 'choice' && field.values !== undefined && field.values.length > 0) {
+    return (
+      <SegmentedControl
+        label={field.label}
+        name={field.name}
+        options={field.values}
+        value={value === '' ? (field.values[0]?.value ?? '') : value}
+        onChange={onChange}
+        hint={field.help}
       />
     );
   }

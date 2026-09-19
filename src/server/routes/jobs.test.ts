@@ -79,6 +79,7 @@ describe('GET /api/tasks', () => {
       'remix.covernofsq',
       'remix.repaint',
       'stems.separate',
+      'voice.rvc',
     ]);
   });
 

@@ -4,6 +4,7 @@ import { heartmula } from './heartmula.ts';
 import { minimax } from './minimax.ts';
 import { separate } from './separate.ts';
 import { stableAudio } from './stableaudio.ts';
+import { rvc } from './voice.ts';
 import type { TaskDefinition, TaskParams } from './types.ts';
 
 /**
@@ -27,7 +28,7 @@ export type { ParamField, ParamValue, TaskDefinition, TaskParams } from './types
  * order, so this is also the order the tools appear in beside a take.
  */
 const tasks = new Map<string, TaskDefinition>(
-  [text2music, minimax, heartmula, stableAudio, repaint, cover, coverNoFsq, separate].map((task) => [
+  [text2music, minimax, heartmula, stableAudio, repaint, cover, coverNoFsq, separate, rvc].map((task) => [
     task.id,
     task,
   ]),
@@ -87,6 +88,17 @@ export function validateParams(task: TaskDefinition, raw: unknown): ParamResult 
     if (typeof given !== 'string') {
       return { ok: false, error: `${field.label} must be text` };
     }
+
+    // A choice is checked here rather than at the backend, which refuses an
+    // unknown RVC voice only after the job has queued and the weights have
+    // loaded. The list is four entries long and this costs nothing.
+    if (field.kind === 'choice' && field.values !== undefined) {
+      if (!field.values.some((option) => option.value === given)) {
+        const names = field.values.map((option) => option.value).join(', ');
+        return { ok: false, error: `${field.label} must be one of: ${names}` };
+      }
+    }
+
     value[field.name] = given;
   }
 

@@ -22,12 +22,21 @@ export interface TaskParams {
 export interface ParamField {
   name: string;
   label: string;
-  kind: 'text' | 'lyrics' | 'number';
+  kind: 'text' | 'lyrics' | 'number' | 'choice';
   required: boolean;
   /** Numbers only. Both ends are inclusive and enforced on the server. */
   min?: number;
   max?: number;
   step?: number;
+  /**
+   * The only values a `choice` field accepts, in the order they are offered.
+   *
+   * Checked on the server as well as drawn in the browser, because RVC refuses
+   * a voice it does not know with `unknown RVC voice id: x` after the job has
+   * queued and the weights have loaded. A list this short is worth checking
+   * before any of that happens.
+   */
+  values?: { value: string; label: string }[];
   default?: ParamValue;
   /** One sentence shown under the field. */
   help?: string;
@@ -72,10 +81,11 @@ export interface TaskDefinition {
   /**
    * Runtime task kind for /v1/models/load, never the spec's task word.
    *
-   * `sep` is separation. Sending a spec word here is rejected outright, which
-   * cost a phase 0 debugging session recorded in DOCS/ERRORS.md.
+   * `sep` is separation and `vc` is voice conversion. Sending a spec word here
+   * is rejected outright, which cost a phase 0 debugging session recorded in
+   * DOCS/ERRORS.md.
    */
-  serverTask: 'gen' | 'sep';
+  serverTask: 'gen' | 'sep' | 'vc';
   /**
    * The audio.cpp route inside that task kind, for a family that has routes.
    *
@@ -127,6 +137,31 @@ export interface TaskDefinition {
    */
   inputSampleRate?: number;
   /**
+   * What a single output from this task is, when it is not an ordinary take.
+   *
+   * Voice conversion returns one track and that track is a stem: it is one
+   * part of a song, it belongs beside the stems it was converted from, and the
+   * mix route has to be able to pick it up. Left out by every task whose one
+   * output is a take in its own right.
+   *
+   * Several outputs are stems whatever this says, which is what separation
+   * relies on.
+   */
+  resultKind?: 'generated' | 'stem';
+  /**
+   * Whether the result has to be converted back to the rate its source came in
+   * at.
+   *
+   * RVC answers at 40 kHz whatever it was given, and the stems it will sit
+   * beside are 44.1 kHz. The mix route refuses a set whose rates disagree,
+   * rather than summing them and playing one part at the wrong speed, so a
+   * conversion that cannot be mixed with its own siblings is not much use.
+   *
+   * Converting once here, when the asset is written, is cheaper and easier to
+   * explain than a mix that quietly resamples whatever it is handed.
+   */
+  matchesSourceSampleRate?: boolean;
+  /**
    * Whether a package of this family can run this task, past the family match.
    *
    * Only Stable Audio needs one. Its family ships music packages and SFX
@@ -150,6 +185,18 @@ export interface TaskDefinition {
    * with, or undefined when the combination is fine.
    */
   validate?(params: TaskParams): string | undefined;
+  /**
+   * What to add to a source's name, so a derived take says what was done to it.
+   *
+   * A task with no prompt is named after what it read, which is right for
+   * separation: four stems called after the song, each with its own part in
+   * brackets. A conversion read one stem and hands back one track, so without
+   * this it would be called exactly what its source is called and the two could
+   * not be told apart in the library or in the deck.
+   *
+   * Returns undefined when there is nothing worth adding.
+   */
+  labelSuffix?(params: Record<string, unknown>): string | undefined;
   /** Turns validated params into the request body audio.cpp expects. */
   buildRequest(params: TaskParams, staged: Record<string, string>): Record<string, unknown>;
 }

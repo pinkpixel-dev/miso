@@ -6,6 +6,7 @@ import type { Asset } from '../../shared/types.ts';
 import type { TaskResult } from '../audiocpp/client.ts';
 import { insertAsset, setAssetPeaks } from '../db/assets.ts';
 import { readAudioFacts } from '../library/metadata.ts';
+import { convertWavRate } from '../library/resample.ts';
 import { peaksFromWav } from '../library/wavPeaks.ts';
 import { assetPath, ensureProjectDir, removeTemp, tempPath } from '../library/storage.ts';
 
@@ -100,6 +101,9 @@ export async function storeAudio(
  * Stores every audio output a job produced.
  *
  * One output is the take, whatever the server called it. Several are stems.
+ * `singleKind` overrides the first half of that: voice conversion returns one
+ * track and it is a stem, because it belongs beside the stems it was converted
+ * from and the mix route has to be able to reach it.
  *
  * The count is what decides, not whether the outputs were named, because a
  * name is not evidence of a stem. Stable Audio returns its single track under
@@ -112,9 +116,27 @@ export async function storeAudio(
  */
 export async function storeResult(
   handle: Database,
-  options: { projectId: string; jobId: string; label: string },
+  options: {
+    projectId: string;
+    jobId: string;
+    label: string;
+    singleKind?: 'generated' | 'stem';
+    /**
+     * The rate to write at, converting first when the model answered at
+     * another one. Left out by every task that keeps what it was sent.
+     */
+    sampleRate?: number;
+  },
   result: TaskResult,
 ): Promise<Asset[]> {
+  // A model that answers at its own rate is converted here, where the bytes are
+  // already decoded, rather than by whatever later wants them to match. An
+  // unreadable payload keeps what the model sent: storeAudio refuses it a
+  // moment later with a message about the audio itself, which is the more
+  // useful complaint of the two.
+  const atRate = (bytes: Buffer): Buffer =>
+    options.sampleRate === undefined ? bytes : convertWavRate(bytes, options.sampleRate) ?? bytes;
+
   if (result.namedOutputs.length > 1) {
     const assets: Asset[] = [];
     for (const output of result.namedOutputs) {
@@ -125,7 +147,7 @@ export async function storeResult(
           options.jobId,
           labelFor(options.label, output.id),
           'stem',
-          Buffer.from(output.audio, 'base64'),
+          atRate(Buffer.from(output.audio, 'base64')),
         ),
       );
     }
@@ -138,8 +160,8 @@ export async function storeResult(
       options.projectId,
       options.jobId,
       options.label,
-      'generated',
-      Buffer.from(result.audio, 'base64'),
+      options.singleKind ?? 'generated',
+      atRate(Buffer.from(result.audio, 'base64')),
     ),
   ];
 }

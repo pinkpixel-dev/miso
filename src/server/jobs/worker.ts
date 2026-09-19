@@ -84,8 +84,12 @@ export function labelFor(job: Job, task: TaskDefinition, sourceLabel?: string): 
   // like this, and without the source every set of stems in a project is
   // called "Split into stems (vocals)" and cannot be told apart in an export.
   if (sourceLabel !== undefined && sourceLabel.trim() !== '') {
-    const trimmed = sourceLabel.trim();
-    return trimmed.length > 60 ? `${trimmed.slice(0, 57)}...` : trimmed;
+    // The suffix goes on before the length check, so a long song name loses its
+    // tail rather than losing the thing that says which take this is.
+    const suffix = task.labelSuffix?.(job.params);
+    const named =
+      suffix === undefined || suffix === '' ? sourceLabel.trim() : `${sourceLabel.trim()} (${suffix})`;
+    return named.length > 60 ? `${named.slice(0, 57)}...` : named;
   }
 
   return task.label;
@@ -153,14 +157,22 @@ async function stageInputs(
   task: TaskDefinition,
   baseUrl: string,
 ): Promise<
-  | { ok: true; staged: Record<string, string>; sourceLabel: string | undefined }
+  | {
+      ok: true;
+      staged: Record<string, string>;
+      sourceLabel: string | undefined;
+      sourceSampleRate: number | undefined;
+    }
   | { ok: false; message: string }
 > {
-  if (task.inputRoles.length === 0) return { ok: true, staged: {}, sourceLabel: undefined };
+  if (task.inputRoles.length === 0) {
+    return { ok: true, staged: {}, sourceLabel: undefined, sourceSampleRate: undefined };
+  }
 
   const inputs = listJobInputs(db(), job.id);
   const staged: Record<string, string> = {};
   let sourceLabel: string | undefined;
+  let sourceSampleRate: number | undefined;
 
   for (const role of task.inputRoles) {
     const input = inputs.find((entry) => entry.role === role);
@@ -169,7 +181,14 @@ async function stageInputs(
     const asset = readAsset(db(), input.assetId);
     if (!asset) return { ok: false, message: `The ${role} this job used is no longer in the library.` };
 
-    if (role === 'source') sourceLabel = asset.label;
+    if (role === 'source') {
+      sourceLabel = asset.label;
+      // What a conversion has to come back as, when the task asks for that. A
+      // row with no rate recorded leaves this undefined and the result is kept
+      // exactly as the model sent it, which is visible in the library rather
+      // than silently wrong.
+      sourceSampleRate = asset.sampleRate ?? undefined;
+    }
 
     // A task that demands a rate the take is not already in gets a converted
     // copy, and that copy skips the cache entirely, both reading and writing.
@@ -204,7 +223,7 @@ async function stageInputs(
     staged[role] = uploaded.value;
   }
 
-  return { ok: true, staged, sourceLabel };
+  return { ok: true, staged, sourceLabel, sourceSampleRate };
 }
 
 /**
@@ -306,7 +325,13 @@ async function runOne(job: Job): Promise<number> {
   try {
     await storeResult(
       db(),
-      { projectId: job.projectId, jobId: job.id, label: labelFor(job, task, staged.sourceLabel) },
+      {
+        projectId: job.projectId,
+        jobId: job.id,
+        label: labelFor(job, task, staged.sourceLabel),
+        singleKind: task.resultKind,
+        sampleRate: task.matchesSourceSampleRate ? staged.sourceSampleRate : undefined,
+      },
       result.value,
     );
     setJobState(db(), job.id, 'complete');

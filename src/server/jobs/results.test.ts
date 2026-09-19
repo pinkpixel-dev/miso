@@ -98,6 +98,51 @@ describe('storeResult', () => {
     expect(assets.every((asset) => asset.kind === 'stem')).toBe(true);
   });
 
+  /**
+   * Voice conversion returns one track, and it is a stem. It has to land beside
+   * the stems it was converted from, where the mix route can reach it.
+   */
+  it('files a single output as a stem when the task asks for one', async () => {
+    const assets = await storeResult(
+      handle,
+      { projectId, jobId, label: 'Cool to Be You (vocals) (manthos)', singleKind: 'stem' },
+      { audio: tone, sampleRate: 40000, channels: 1, namedOutputs: [] },
+    );
+
+    expect(assets).toHaveLength(1);
+    expect(assets[0]?.kind).toBe('stem');
+  });
+
+  it('writes the result at the rate the task asked for', async () => {
+    // RVC answers at 40 kHz and the stems it joins are 44.1 kHz. The fixture is
+    // already 44.1, so 48 kHz here is the same conversion in the other
+    // direction: what matters is that the row says what was asked for.
+    const [asset] = await storeResult(
+      handle,
+      { projectId, jobId, label: 'converted', singleKind: 'stem', sampleRate: 48000 },
+      { audio: tone, sampleRate: 44100, channels: 2, namedOutputs: [] },
+    );
+
+    expect(asset?.sampleRate).toBe(48000);
+    // The same second of audio, not a second of something shorter.
+    expect(asset?.durationSeconds).toBeCloseTo(1, 1);
+  });
+
+  it('leaves the result alone when it is already at the rate asked for', async () => {
+    const [asset] = await storeResult(
+      handle,
+      { projectId, jobId, label: 'converted', sampleRate: 44100 },
+      { audio: tone, sampleRate: 44100, channels: 2, namedOutputs: [] },
+    );
+
+    expect(asset?.sampleRate).toBe(44100);
+    expect(asset?.checksum).toBe(
+      await import('node:crypto').then((crypto) =>
+        crypto.createHash('sha256').update(Buffer.from(tone, 'base64')).digest('hex'),
+      ),
+    );
+  });
+
   it('refuses a payload that is not audio, and leaves nothing behind', async () => {
     await expect(
       storeResult(

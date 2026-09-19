@@ -380,11 +380,13 @@ export interface Job {
 export interface TaskField {
   name: string;
   label: string;
-  kind: 'text' | 'lyrics' | 'number';
+  kind: 'text' | 'lyrics' | 'number' | 'choice';
   required: boolean;
   min?: number;
   max?: number;
   step?: number;
+  /** The only values a `choice` field accepts, in the order they are offered. */
+  values?: { value: string; label: string }[];
   default?: string | number;
   help?: string;
   /** Shown inside the advanced drawer, closed until somebody opens it. */

@@ -9,6 +9,9 @@ if (!task) throw new Error('generate.text2music is missing from the registry');
 const separate = findTask('stems.separate');
 if (!separate) throw new Error('stems.separate is missing from the registry');
 
+const rvc = findTask('voice.rvc');
+if (!rvc) throw new Error('voice.rvc is missing from the registry');
+
 function asset(patch: Partial<Asset>): Asset {
   return {
     id: 'a1',
@@ -88,6 +91,27 @@ describe('what a finished take is called', () => {
     const label = labelFor(job({}), separate!, 'x'.repeat(100));
     expect(label).toHaveLength(60);
     expect(label.endsWith('...')).toBe(true);
+  });
+
+  /**
+   * A conversion reads one stem and hands back one track. Named after its
+   * source alone, the two rows would carry the same name in the library and in
+   * the stem deck, where the point is hearing one against the other.
+   */
+  it('adds what a task did to the name of what it read', () => {
+    expect(
+      labelFor(job({ taskId: rvc!.id, params: { voiceId: 'manthos' } }), rvc!, 'Neon Night (vocals)'),
+    ).toBe('Neon Night (vocals) (manthos)');
+  });
+
+  it('keeps the suffix when the source name has to be shortened', () => {
+    const label = labelFor(job({ params: { voiceId: 'manthos' } }), rvc!, 'x'.repeat(100));
+    expect(label).toHaveLength(60);
+    expect(label.endsWith('...')).toBe(true);
+  });
+
+  it('names a conversion after its source alone when no voice was chosen', () => {
+    expect(labelFor(job({}), rvc!, 'Neon Night (vocals)')).toBe('Neon Night (vocals)');
   });
 });
 
