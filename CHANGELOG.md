@@ -3,6 +3,52 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.23.0 - September 18, 2026
+
+### 🎛️ Stems
+
+- **Split a take into stems.** A new **Split into stems** tool runs HTDemucs, BS-RoFormer or
+  Mel-Band RoFormer over any take and writes each part as its own labelled take. HTDemucs
+  returns four parts, drums, bass, other and vocals, in about four seconds for forty seconds
+  of audio. Both RoFormers return vocals and an instrumental, and BS-RoFormer is by far the
+  slowest of the three.
+- **A page for the set**, at `/projects/:id/stems/:jobId`. Every stem plays together under one
+  transport, each with its own waveform, fader, mute and solo. Click or drag any waveform to
+  move the whole set, or use the skip controls either side of Play.
+- **Hear one stem on its own.** Each row has a play button that solos that stem and leaves the
+  rest running silently, so switching between them is instant.
+- **Export one stem or all of them.** Each row has its own download, and **Export all** answers
+  with a zip of the whole set.
+- **Recombine them.** **Save mix** sums what you can hear, faders, mutes and solos included,
+  into a new take. Mixes get their own section on the project page, because a mix is a whole
+  track and does not belong under the songs a model wrote.
+
+### 🔎 Where to find it
+
+- **Split into stems** is its own link on the project page and on a take's detail panel, rather
+  than only an option inside Remix. Taking a take apart is not a remix of it.
+- A finished separation gets a **Stems** link in the queue, and a stem's detail panel has
+  **Open the stems** to reach the rest of the set.
+
+### 🐛 Fixes
+
+- **Stems are named after the take they came from**, so a separation of "Neon Night" produces
+  `Neon Night (vocals)` rather than `Split into stems (vocals)`. Every set in a project used to
+  come out with the same name, which made an export impossible to tell apart.
+- **A single named output is the take, not a stem.** Stable Audio returns its one track under
+  `named_audio_outputs`, and Miso was filing those as stems with a machine id in the name.
+  Existing rows keep their old labels; only new takes are affected.
+
+### 🧱 Under the hood
+
+- Separation refuses anything but 44.1 kHz and every generated take is 48 kHz, so Miso now
+  resamples on the way in with a windowed sinc written in TypeScript. No media binary is
+  involved, which keeps the service runnable where ffmpeg is not installed.
+- One task can now run on several model families, which is what lets three separation models
+  sit behind one tool rather than three.
+- Migration `008_mix.sql` rebuilds the assets table for the new `mix` kind, carrying
+  `asset_lineage` and `staged_uploads` across by hand.
+
 ## 0.22.0 - September 18, 2026
 
 ### 🎧 Compare page
