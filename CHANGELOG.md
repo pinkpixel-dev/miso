@@ -3,6 +3,22 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.25.0 - September 19, 2026
+
+### 📦 Models
+
+- The catalog now only lists model families that something can actually run. Removed AudioSR,
+  Seed-VC, MeanVC2, ControlFoley, MiDashengLM-Gen and MuScriptor, which were offered for
+  install with no task behind them. Eight families remain and every one has a task.
+- If you already installed any of the six, Miso no longer shows them and cannot uninstall
+  them. Delete them from your audio.cpp models directory by hand.
+
+### 🗺️ Roadmap
+
+- Phase 7 is closed rather than complete. Upscale was built and dropped, denoise is not in
+  this audio.cpp image at all, and the remaining four tasks were closed unbuilt. The reasoning
+  is in `DOCS/ROADMAP.md`.
+
 ## 0.24.1 - September 19, 2026
 
 ### 🐛 Fixes

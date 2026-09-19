@@ -20,21 +20,27 @@ const COMMIT = process.env.AUDIOCPP_COMMIT ?? '05f9c5d6e26b6a06d7d29f0c8142a1c89
 // The music families, corrected against a real directory listing of
 // model_specs/ upstream (see task-2-report.md for what changed from the
 // original plan prose). Filenames are the family id plus .json.
+// Every family here has a task behind it. A spec with no task is a package
+// offered for install that nothing can then run, which is worse than not
+// showing it: the weights are large, and AudioSR alone was 6.18 GB sitting on
+// disk with nothing able to use it.
+//
+// Six were removed on 2026-09-19. AudioSR after upscale was built and dropped.
+// Seed-VC and MeanVC2, shelved in phase 6b, whose only likely use was the
+// upscaling that went with it. ControlFoley, MiDashengLM-Gen and MuScriptor
+// when the remaining phase 7 tasks were closed unbuilt. See DOCS/ROADMAP.md.
+//
+// Adding one back means putting it here and re-running this script, which needs
+// network access to the pinned commit.
 const FAMILIES = [
   'ace_step',
   'minimax_music3',
   'heartmula',
   'stable_audio',
-  'midashenglm_gen',
   'htdemucs',
   'bs_roformer',
   'mel_band_roformer',
   'rvc',
-  'seed_vc',
-  'meanvc2',
-  'audiosr',
-  'controlfoley',
-  'muscriptor',
 ];
 
 const outDir = resolve(dirname(fileURLToPath(import.meta.url)), '../src/server/catalog/specs');

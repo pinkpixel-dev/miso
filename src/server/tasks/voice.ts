@@ -11,8 +11,14 @@ import type { TaskDefinition } from './types.ts';
  *   MeanVC2   16 kHz mono, 7 to 10 s, so nothing above 8 kHz survives
  *
  * Both of the others also need a reference clip rather than a packaged voice,
- * which is a second input role. `inputRoles` is a list, so that door is open.
- * Full measurements are in src/server/audiocpp/fixtures/README.md.
+ * which is a second input role. `inputRoles` is a list, so nothing in the task
+ * contract stands in the way.
+ *
+ * Their specs were removed from the catalog on 2026-09-19 all the same. What
+ * would have made their rates worth living with was upscaling, and that was
+ * built and dropped the same day. Bringing either back means putting the family
+ * into `scripts/vendor-specs.mjs` and re-running it. Full measurements for all
+ * three are in src/server/audiocpp/fixtures/README.md.
  *
  * The request shape is the thing to be careful with here. Every option below
  * travels nested under `options`, which is not how any other task in this

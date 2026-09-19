@@ -20,10 +20,6 @@
       "sha256": "a9c270c5ad984643a346eb754062e60e8556baa9b2a0ae748f12e8afcb9be582"
     },
     {
-      "name": "midashenglm_gen.json",
-      "sha256": "48684d9006d7398922fc3b98e662a1eeef01ad69bd37734f908a636617c17c36"
-    },
-    {
       "name": "htdemucs.json",
       "sha256": "b53e8b6eb399c30d8631850f61868bbd5efe7f03c00574ea85ca5a77079e5205"
     },
@@ -38,26 +34,6 @@
     {
       "name": "rvc.json",
       "sha256": "f60ff8e6c7ed4e8f7c38c9b5c9c16e5cf010bb8c3574bba1f91aa99334399e9d"
-    },
-    {
-      "name": "seed_vc.json",
-      "sha256": "c16632ac1626a705bacbb35011d483da1b35d4d0c2532006944fc0b73370174a"
-    },
-    {
-      "name": "meanvc2.json",
-      "sha256": "e4fe246f57d3db22d6574a0c97f593cef10523173d1f62a5762c1ac847e93e00"
-    },
-    {
-      "name": "audiosr.json",
-      "sha256": "cca03ae649c8e43fe306bb53f8bf0164cb9c7b63c356ad592d6a6b4326906abf"
-    },
-    {
-      "name": "controlfoley.json",
-      "sha256": "f874e80a413657f449d9138617093b845e86c9d50903773115f1ea2dd4744047"
-    },
-    {
-      "name": "muscriptor.json",
-      "sha256": "eaf507e8b6af24da022c5583b2e77cee2082e824005fafa8c23f79e01445cda9"
     }
   ]
 }
