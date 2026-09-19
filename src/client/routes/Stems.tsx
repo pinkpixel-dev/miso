@@ -2,6 +2,7 @@ import { ArrowLeft, Download, Pause, Play, Save, SkipBack, SkipForward } from 'l
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { StemTrack } from '../components/stems/StemTrack.tsx';
+import { audibleIds } from '../components/player/stemDeck.ts';
 import { useStemDeck } from '../components/player/useStemDeck.ts';
 import { Button, IconButton, Panel, cx } from '../components/ui.tsx';
 import { api, outputsZipUrl } from '../lib/api.ts';
@@ -55,6 +56,19 @@ export function StemsRoute() {
   const stems = useMemo(() => entries.map((entry) => entry.asset), [entries]);
 
   const deck = useStemDeck(stems);
+
+  /**
+   * What Save mix would hold if it were pressed now.
+   *
+   * The button saves what you can hear, which is the right rule and was an
+   * invisible one: a mix was saved holding one soloed vocal and nothing else,
+   * because nothing on the page said what was about to go in. The count rides
+   * on the button and the names sit under the title.
+   */
+  const audible = useMemo(() => {
+    const ids = new Set(audibleIds(deck.controls, stems.map((stem) => stem.id)));
+    return entries.filter((entry) => ids.has(entry.asset.id));
+  }, [entries, stems, deck.controls]);
 
   // What the zip actually holds, which is the separation's own outputs. The
   // route builds it from the job, so counting the conversions in this label
@@ -134,6 +148,16 @@ export function StemsRoute() {
             {stems.length} tracks, {deck.readyCount} loaded
             {deck.soloing ? ', soloing' : ''}
           </p>
+          {/*
+            Named rather than counted, because the question in front of
+            somebody muting a vocal is which vocal is left, and two tracks here
+            have nearly the same name.
+          */}
+          <p className="truncate text-xs text-ink-muted">
+            {audible.length === 0
+              ? 'Nothing is audible, so there is no mix to save.'
+              : `Save mix will save ${audible.map((entry) => entry.asset.label).join(', ')}.`}
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -145,9 +169,21 @@ export function StemsRoute() {
             The whole set in one file. Four stems exported one at a time is
             four trips through a save dialog, and they belong together.
           */}
-          <Button variant="secondary" onClick={() => void saveMix()} busy={saving}>
+          <Button
+            variant="secondary"
+            onClick={() => void saveMix()}
+            busy={saving}
+            disabled={audible.length === 0}
+            aria-label={
+              audible.length === 0
+                ? 'Nothing is audible, so there is no mix to save'
+                : `Save a mix of ${audible.map((entry) => entry.asset.label).join(', ')}`
+            }
+          >
             <Save size={16} aria-hidden="true" />
-            Save mix
+            {audible.length === stems.length
+              ? 'Save mix'
+              : `Save mix of ${audible.length} of ${stems.length}`}
           </Button>
 
           <a

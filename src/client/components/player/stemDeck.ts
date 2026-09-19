@@ -109,6 +109,24 @@ export function gainsFor(controls: Map<string, StemControls>): Map<string, numbe
   return gains;
 }
 
+/**
+ * Which stems would be in a mix saved right now, in the order given.
+ *
+ * Save mix saves what you can hear, which is the right rule and an invisible
+ * one: a soloed track and a muted track look different from each other but a
+ * button reading "Save mix" looks the same either way. A mix was saved holding
+ * one soloed vocal and nothing else because of that, so the page now says what
+ * it is about to do before it does it.
+ *
+ * A stem with no controls yet counts as audible. It is at full volume with
+ * nothing soloed, which is what the deck plays and therefore what a mix taken
+ * at that moment would hold.
+ */
+export function audibleIds(controls: Map<string, StemControls>, ids: string[]): string[] {
+  const soloing = anySoloed(controls.values());
+  return ids.filter((id) => gainFor(controls.get(id) ?? DEFAULT_CONTROLS, soloing) > 0);
+}
+
 /** Puts the gains onto the takes that are actually loaded. */
 export function applyGains(
   takes: Map<string, SyncedTake>,

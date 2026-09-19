@@ -365,3 +365,121 @@ sums the stems, and reports the residual against the source.
 - Whether the three separation models can be resident at once, and what that costs. All three
   were loaded together during this session and unloaded afterwards, but nothing measured the
   memory.
+
+## Voice conversion, all three families
+
+Confirmed on 2026-09-19 against the same image, using `probe:rvc`, `probe:seedvc` and
+`probe:meanvc2` registered with `task: "vc"`. The source was 40 seconds cut from the
+Descendents vocal stem in the live library, so unlike the separation section above this ran on
+a real recording rather than on a generation.
+
+All three convert. The important finding is not that they work, it is how the request has to
+be shaped, because getting it wrong is silent.
+
+### Request options travel nested, and sending them flat is not an error
+
+**This is the trap. Read it before adding any option to a voice task.**
+
+Every RVC option must be sent inside `options`:
+
+```json
+{
+  "model": "probe:rvc",
+  "request": {
+    "audio": "/tmp/audiocpp-ui-1789267858648519/43-vocal-40s.wav",
+    "options": { "voice_id": "manthos", "semitone_shift": 7 }
+  }
+}
+```
+
+Sent at the top level, beside `audio`, the same fields are accepted and ignored. Four runs
+asking for four different voices came back byte for byte identical, as did a run asking for a
+voice that does not exist and a run asking for a seven semitone shift. HTTP 200 every time.
+Nested, each voice returns different audio and a wrong name is refused:
+
+```
+HTTP 500 {"error":{"message":"unknown RVC voice id: notarealvoice"}}
+```
+
+The rule comes from the CLI. A flag is a top level request field, and anything documented as
+`--request-option` belongs under `options`. That is why the generation families are right to
+send `text`, `seed` and `duration_seconds` flat: those are flags. It is also why `audio` and
+`voice_ref` are flat here.
+
+Seed-VC and MeanVC2 both refuse an unknown option under `options` rather than ignoring it,
+which is the behaviour worth having. Seed-VC honours `num_inference_steps` in either position,
+so placement cannot be tested through it alone. Use a name the model does not know: nested it
+is refused, flat it is swallowed.
+
+### The reference audio field is `voice_ref`
+
+Seed-VC and MeanVC2 both need a target voice and neither takes a packaged one. The field is
+`voice_ref`, a staged path, sent flat beside `audio`:
+
+```json
+{ "audio": "/tmp/.../source.wav", "voice_ref": "/tmp/.../target.wav" }
+```
+
+Ten other spellings were tried first and every one of them failed the same way, with
+`Seed-VC request requires target speaker reference audio`, which names the problem and not the
+field. `reference_audio`, `target_audio`, `speaker_audio`, `ref_audio`, `prompt_audio`,
+`reference`, `speaker_reference`, `target_speaker_audio`, `reference_speaker_audio` and
+`audio_reference` are all wrong. The answer came out of the upstream CLI documentation, where
+the flag is `--voice-ref`.
+
+### What each family returns
+
+| Model | Output | 40 seconds in | Same input twice |
+|---|---|---|---|
+| RVC | 40 kHz mono | 9 to 10 s | identical |
+| Seed-VC | 22.05 kHz mono | 36 s, 50 s at 60 steps | **different** |
+| MeanVC2 | 16 kHz mono | 7 to 10 s | identical |
+
+Every output is the same length as the source, and all three follow it: where the vocal stem
+falls silent, the conversion falls silent too. That is the same test the separation section
+uses and it is what rules out a model that generates rather than converts.
+
+**Seed-VC is not reproducible even with `seed` pinned.** Two runs at seed 42 returned different
+audio. Nothing can be verified by comparing checksums for that family, which also means a
+person cannot ask for the render they liked a second time.
+
+**Rates only go down.** Takes are 48 kHz, stems come back at 44.1 kHz, and the best of these
+three answers at 40 kHz. Miso converts an RVC result back to its source's rate on the way out,
+because the mix route refuses a set whose rates disagree. MeanVC2 at 16 kHz has nothing above
+8 kHz and that is not recoverable by resampling.
+
+### RVC accepts any input rate
+
+Unlike separation, which refuses anything but 44.1 kHz before it starts, RVC took 44.1 kHz
+stereo and 48 kHz stereo and answered at 40 kHz mono either way. No conversion is needed on the
+way in, which is why `voice.rvc` carries no `inputSampleRate`.
+
+### The three cannot all be resident
+
+MeanVC2 failed with `failed to allocate WavLM graph tensors` on every run while RVC and Seed-VC
+were loaded, and ran in 9.7 seconds once both were unloaded. This is the first hard evidence
+for something the separation section only wondered about. `ensureLoaded` still trusts whatever
+is already resident.
+
+### Packaged voices
+
+`voice_id` takes `default`, `manthos`, `chocola` and `fraise`. `default` is a fifth distinct
+voice rather than an alias: it measured differently from all three named ones, at a zero
+crossing rate of 1696 against 1146 for manthos, 3129 for chocola and 2483 for fraise.
+
+`retrieval_blend` does change the output, which is consistent with the F16 package shipping
+retrieval sidecars for its packaged voices. At 0.5 against the same stem with no blend, the
+zero crossing rate moved from 1713 to 1742 and the per-second difference ran a few hundred
+against a signal whose own level is around 3000. Judged by ear on a full take it is close to
+inaudible.
+
+### Still unknown
+
+- How wall time scales past 40 seconds for RVC. A 2 minute 25 second stem took 1m 18s through
+  the app, which is slower per second than the 40 second probe, and nobody has measured where
+  that curve goes.
+- Seed-VC's singing route. `v1_svc` needs a model registered with `task: "svc"` rather than
+  `vc`, and answers `Seed-VC v1_svc request requires an Svc session` otherwise. It was never
+  run.
+- Whether a user RVC checkpoint works. `voice_model_path` and `retrieval_index_path` were never
+  sent, because Miso has no way to put a non-audio file on the backend.

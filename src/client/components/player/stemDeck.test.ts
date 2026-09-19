@@ -3,6 +3,7 @@ import type { SyncedTake } from './compareDeck.ts';
 import {
   DEFAULT_CONTROLS,
   anySoloed,
+  audibleIds,
   applyGains,
   correctFollowers,
   gainFor,
@@ -396,5 +397,35 @@ describe('a solo that has to reach stems the map has not caught up with', () => 
     applyGains(takes, new Map());
 
     expect(vocals.calls).toEqual(['setVolume(1)']);
+  });
+});
+
+describe('audibleIds', () => {
+  const ids = ['vocals', 'converted', 'instrumental'];
+
+  it('counts every stem when nothing is muted or soloed', () => {
+    expect(audibleIds(new Map(), ids)).toEqual(ids);
+  });
+
+  it('leaves out a muted stem', () => {
+    // The swap: original vocal muted, conversion and backing left up.
+    const controls = new Map([['vocals', { volume: 1, muted: true, soloed: false }]]);
+    expect(audibleIds(controls, ids)).toEqual(['converted', 'instrumental']);
+  });
+
+  it('counts only what is soloed while anything is soloed', () => {
+    // The state that saved a mix of one vocal and nothing else.
+    const controls = new Map([['converted', { volume: 1, muted: false, soloed: true }]]);
+    expect(audibleIds(controls, ids)).toEqual(['converted']);
+  });
+
+  it('leaves out a stem turned all the way down', () => {
+    const controls = new Map([['instrumental', { volume: 0, muted: false, soloed: false }]]);
+    expect(audibleIds(controls, ids)).toEqual(['vocals', 'converted']);
+  });
+
+  it('can end up with nothing at all', () => {
+    const controls = new Map(ids.map((id) => [id, { volume: 1, muted: true, soloed: false }]));
+    expect(audibleIds(controls, ids)).toEqual([]);
   });
 });

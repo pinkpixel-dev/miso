@@ -68,6 +68,17 @@ export const rvc: TaskDefinition = {
       advanced: true,
       help: 'Moves the pitch before the voice is applied. Twelve is an octave.',
     },
+    /**
+     * Kept, and kept small.
+     *
+     * At 0.5 against the same stem with no blend it measured as a real change
+     * and sounded like almost nothing, on 2026-09-19, on the packaged default
+     * voice. The F16 package ships retrieval sidecars for its packaged voices,
+     * so it is doing what it says. It stays because the roadmap asks for it and
+     * it costs nothing here, and it stays in the advanced drawer as a plain
+     * number rather than a fader, because what it does is not worth reaching
+     * for on an ordinary run.
+     */
     {
       name: 'retrievalBlend',
       label: 'Retrieval blend',
@@ -78,7 +89,7 @@ export const rvc: TaskDefinition = {
       step: 0.1,
       default: 0,
       advanced: true,
-      help: 'How much of the voice is drawn from its own recordings rather than from yours. Zero turns it off.',
+      help: 'Mixes in features from the recordings the voice was built from. Subtle on the packaged voices. Zero turns it off.',
     },
     {
       name: 'pitchFilterRadius',

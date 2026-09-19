@@ -3,6 +3,45 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.24.0 - September 19, 2026
+
+### 🎤 Voices
+
+- **Sing a vocal stem again in another voice.** A new **Convert the voice** tool runs RVC over
+  any stem and writes the result back as a stem of its own. Four packaged voices ship with the
+  model: Default, Manthos, Chocola and Fraise, and they sound clearly different from each
+  other. About ten seconds of work for forty seconds of audio.
+- **The way in is on the stem itself**, a microphone button on every track of the stems page,
+  which opens the conversion form with that stem already chosen.
+- **A conversion appears under the stem it came from**, on the stems page, with a line saying
+  what it was converted from. Mute the original, leave the conversion and the backing up, and
+  **Save mix** gives you the song in the new voice.
+- **Semitone shift, retrieval blend and pitch smoothing** sit in the advanced drawer. The blend
+  does change the voice, and on the packaged voices the change is subtle.
+
+### 🎛️ Stems
+
+- **Save mix now says what it is about to save**, before you press it. A line under the title
+  names the tracks going in, and the button counts them when it is not all of them. Saving a
+  mix while one track was soloed used to write that track on its own with nothing to warn you.
+- **The mix route reaches converted stems.** It walked the separation's own outputs, so a
+  conversion made from one of its stems could not be mixed back in at all.
+
+### 🐛 Fixes
+
+- **A converted stem comes back at the rate of the stem it came from.** RVC answers at 40 kHz
+  whatever it is given, and the stems it has to sit beside are 44.1 kHz, which the mix route
+  refuses to sum together.
+
+### 🧹 Maintenance
+
+- Task fields can now be a `choice`, drawn as a segmented control and checked against its own
+  values on the server, rather than after a job has queued and loaded weights.
+- Seed-VC and MeanVC2 were probed alongside RVC and left out on purpose. Seed-VC answers at
+  22.05 kHz, takes four times as long, and is not reproducible even with a pinned seed.
+  MeanVC2 answers at 16 kHz. Both need a reference clip rather than a packaged voice. The
+  measurements are in `src/server/audiocpp/fixtures/README.md`.
+
 ## 0.23.0 - September 18, 2026
 
 ### 🎛️ Stems

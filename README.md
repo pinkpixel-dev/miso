@@ -8,13 +8,13 @@ Miso runs on [audio.cpp](https://github.com/0xShug0/audio.cpp), a C++ inference 
 audio models. Miso is the studio around it: projects that persist, a history of every take,
 and a record of exactly how each clip was made so you can change one thing and try again.
 
-> **Early days.** Phases 1 through 5 of the [roadmap](DOCS/ROADMAP.md) are done, and so is the
-> first half of phase 6. Miso installs models, holds your projects and audio, generates music
+> **Early days.** Phases 1 through 6 of the [roadmap](DOCS/ROADMAP.md) are done. Miso installs
+> models, holds your projects and audio, generates music
 > with ACE-Step from a guided prompt builder with lyrics written for you if you want them,
-> repaints a section of a track, covers a take, holds any two takes against each other, and
-> splits a song into stems you can mix, export and put back together. What is left is swapping
-> a vocal onto a stem, the smaller finishing tools, and packaging Miso so somebody else can run
-> it.
+> repaints a section of a track, covers a take, holds any two takes against each other,
+> splits a song into stems you can mix, export and put back together, and sings a vocal stem
+> again in another voice so you can swap it back over the music. What is left is the smaller
+> finishing tools, and packaging Miso so somebody else can run it.
 
 ## Why it exists
 
