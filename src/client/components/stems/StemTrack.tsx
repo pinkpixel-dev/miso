@@ -1,7 +1,9 @@
-import { Download, Pause, Play } from 'lucide-react';
+import { Download, Mic, Pause, Play } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Asset } from '../../../shared/types.ts';
 import { downloadUrl } from '../../lib/api.ts';
+import { remixPath } from '../../lib/routes.ts';
 import { createTakeSurfer } from '../player/createTakeSurfer.ts';
 import type { StemDeck } from '../player/useStemDeck.ts';
 import { Tooltip, cx } from '../ui.tsx';
@@ -19,7 +21,21 @@ import { Tooltip, cx } from '../ui.tsx';
  * the last one and not the same object, so depending on it would rebuild the
  * instance and cut playback off. See `DOCS/ERRORS.md`.
  */
-export function StemTrack({ stem, deck }: { stem: Asset; deck: StemDeck }) {
+export function StemTrack({
+  stem,
+  deck,
+  convertedFrom,
+}: {
+  stem: Asset;
+  deck: StemDeck;
+  /**
+   * The stem this one was converted from, when it is not one of the
+   * separation's own outputs.
+   *
+   * Present means this track is a voice conversion sitting under its source.
+   */
+  convertedFrom?: Asset;
+}) {
   const container = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<{ loading: boolean; error: string | undefined }>({
     loading: true,
@@ -139,6 +155,16 @@ export function StemTrack({ stem, deck }: { stem: Asset; deck: StemDeck }) {
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-ink">{stem.label}</p>
           {/*
+            Said in words, not only by where the row sits. Two tracks with
+            nearly the same name is exactly the case where position is not
+            enough to tell which one is the original.
+          */}
+          {convertedFrom ? (
+            <p className="truncate text-xs text-ink-muted">
+              Converted from {convertedFrom.label}
+            </p>
+          ) : null}
+          {/*
             Said in a word rather than shown only by a dimmed waveform, because
             a stem silenced by somebody else's solo looks the same as one that
             is simply quiet.
@@ -197,6 +223,30 @@ export function StemTrack({ stem, deck }: { stem: Asset; deck: StemDeck }) {
             className="w-24 accent-[var(--color-accent)]"
           />
         </label>
+
+        {/*
+          The way into a conversion, on the track itself. Finding it meant
+          leaving for the remix page and picking this stem out of a list of
+          every take in the project, which is a long way round for something
+          that only makes sense from here.
+
+          Offered on every stem rather than on whichever one is named vocals.
+          Which stem holds the singing is a question about a label, and the
+          labels here already carry brackets of their own.
+        */}
+        <Tooltip label={`Convert the voice on ${stem.label}`}>
+          <Link
+            to={remixPath(stem.projectId, stem.id, 'voice.rvc')}
+            aria-label={`Convert the voice on ${stem.label}`}
+            className={cx(
+              'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
+              'text-ink-muted transition-colors duration-150 hover:bg-raised hover:text-ink',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+            )}
+          >
+            <Mic aria-hidden="true" className="h-4 w-4" />
+          </Link>
+        </Tooltip>
 
         {/*
           The same plain download link every take gets, pointed at one stem.

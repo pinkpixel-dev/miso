@@ -5,7 +5,7 @@ import { createReadStream } from 'node:fs';
 import { readFile, rename, stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { MAX_ASSET_BYTES, isAcceptedFormat } from '../../shared/limits.ts';
-import type { ApiError, Asset, AssetFormat } from '../../shared/types.ts';
+import type { ApiError, Asset, AssetFormat, Job } from '../../shared/types.ts';
 import {
   deleteAsset,
   insertAsset,
@@ -15,7 +15,7 @@ import {
   setAssetPeaks,
 } from '../db/assets.ts';
 import { db } from '../db/index.ts';
-import { createJob, listJobInputs, readJob } from '../db/jobs.ts';
+import { createJob, listJobInputs, listJobs, readJob } from '../db/jobs.ts';
 import { readProject } from '../db/projects.ts';
 import { storeAudio } from '../jobs/results.ts';
 import { readAudioFacts } from '../library/metadata.ts';
@@ -418,6 +418,38 @@ assetRoutes.get('/projects/:id/assets/:assetId/audio', async (c) => {
 });
 
 /**
+ * Every stem this set can be mixed from.
+ *
+ * The separation's own outputs, plus any stem made from one of them, which
+ * today means a voice conversion. A conversion is written under its own job, so
+ * the separation's output list cannot see it, and a mix that could only reach
+ * that list would be unable to save the one thing the conversion is for:
+ * hearing a new voice over the backing it was sung against.
+ *
+ * Only stems are picked up. A mix of this set is a descendant of every stem in
+ * it, and summing a set together with the mix of that set would double it.
+ *
+ * Returned as a set rather than checked per asset, because the page sends gains
+ * for whatever it is showing and the answer to "may this be mixed here" must
+ * not depend on the order they arrive in.
+ */
+function mixableStemIds(projectId: string, job: Job): Set<string> {
+  const allowed = new Set<string>(job.outputAssetIds);
+
+  for (const other of listJobs(db(), projectId)) {
+    if (other.id === job.id) continue;
+    if (!other.inputs.some((input) => allowed.has(input.assetId))) continue;
+
+    for (const producedId of other.outputAssetIds) {
+      const asset = assetIn(projectId, producedId);
+      if (asset?.kind === 'stem') allowed.add(producedId);
+    }
+  }
+
+  return allowed;
+}
+
+/**
  * Sums a separation's stems back into one take.
  *
  * The gains arrive already resolved by the page: solo and mute are questions
@@ -458,7 +490,7 @@ assetRoutes.post('/projects/:id/jobs/:jobId/mix', async (c) => {
   const usedAssetIds: string[] = [];
   let sampleRate: number | undefined;
 
-  for (const assetId of job.outputAssetIds) {
+  for (const assetId of mixableStemIds(projectId, job)) {
     const asset = assetIn(projectId, assetId);
     if (!asset) continue;
 

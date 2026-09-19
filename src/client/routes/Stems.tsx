@@ -6,6 +6,7 @@ import { useStemDeck } from '../components/player/useStemDeck.ts';
 import { Button, IconButton, Panel, cx } from '../components/ui.tsx';
 import { api, outputsZipUrl } from '../lib/api.ts';
 import { projectPath } from '../lib/routes.ts';
+import { stemSet } from '../lib/stemSet.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
 /**
@@ -47,17 +48,21 @@ export function StemsRoute() {
   );
 
   // Read from the job's own outputs rather than by filtering assets on kind, so
-  // a project with several separations shows the set that was asked for.
-  const stems = useMemo(() => {
-    if (!job) return [];
-    const byId = new Map(assets.map((asset) => [asset.id, asset]));
-    return job.outputAssetIds.flatMap((id) => {
-      const asset = byId.get(id);
-      return asset ? [asset] : [];
-    });
-  }, [job, assets]);
+  // a project with several separations shows the set that was asked for. Voice
+  // conversions are written under their own jobs and are pulled in by lineage,
+  // each one sitting under the stem it was made from.
+  const entries = useMemo(() => stemSet(job, assets, allJobs), [job, assets, allJobs]);
+  const stems = useMemo(() => entries.map((entry) => entry.asset), [entries]);
 
   const deck = useStemDeck(stems);
+
+  // What the zip actually holds, which is the separation's own outputs. The
+  // route builds it from the job, so counting the conversions in this label
+  // would promise files that are not in the file.
+  const ownStemCount = useMemo(
+    () => entries.filter((entry) => entry.convertedFrom === undefined).length,
+    [entries],
+  );
 
   /**
    * Saves what you can hear, not what the stems are.
@@ -126,7 +131,7 @@ export function StemsRoute() {
             {job.title ?? 'Stems'}
           </h1>
           <p className="text-xs text-ink-faint">
-            {stems.length} stems, {deck.readyCount} loaded
+            {stems.length} tracks, {deck.readyCount} loaded
             {deck.soloing ? ', soloing' : ''}
           </p>
         </div>
@@ -148,7 +153,7 @@ export function StemsRoute() {
           <a
             href={outputsZipUrl(job.projectId, job.id)}
             download
-            aria-label={`Export all ${stems.length} stems as a zip`}
+            aria-label={`Export all ${ownStemCount} stems as a zip`}
             className={cx(
               'inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-md border border-line px-3.5 py-2',
               'text-sm font-medium text-ink-muted transition-colors duration-150',
@@ -210,8 +215,13 @@ export function StemsRoute() {
       ) : null}
 
       <div className="flex flex-col gap-3">
-        {stems.map((stem) => (
-          <StemTrack key={stem.id} stem={stem} deck={deck} />
+        {entries.map((entry) => (
+          <StemTrack
+            key={entry.asset.id}
+            stem={entry.asset}
+            deck={deck}
+            convertedFrom={entry.convertedFrom}
+          />
         ))}
       </div>
     </div>

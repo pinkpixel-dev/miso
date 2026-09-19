@@ -296,6 +296,65 @@ describe('POST /api/projects/:id/jobs/:jobId/mix', () => {
     });
   }
 
+  /**
+   * A voice conversion reads one stem and writes its result under its own job,
+   * so the separation's output list cannot see it. Adds a converted vocal to
+   * the project and hands it back with its source.
+   */
+  async function conversionOf(stem: Asset): Promise<Asset> {
+    const converted = (await (
+      await importFile(projectId, 'tone.wav', `${stem.label} (manthos).wav`)
+    ).json()) as Asset;
+
+    const jobId = randomUUID();
+    createJob(db(), jobId, {
+      projectId,
+      taskId: 'voice.rvc',
+      modelId: 'rvc_f16',
+      params: { voiceId: 'manthos' },
+      inputs: [{ assetId: stem.id, role: 'source' }],
+    });
+    db().prepare('UPDATE assets SET job_id = ?, kind = ? WHERE id = ?').run(jobId, 'stem', converted.id);
+
+    return converted;
+  }
+
+  it('mixes a stem that was converted from one of the set', async () => {
+    const { jobId, stems } = await separation();
+    const converted = await conversionOf(stems[0]!);
+
+    // The swap: the original vocal silenced, the conversion up, the rest as
+    // they were. The conversion is not one of this job's own outputs.
+    const response = await mix(jobId, {
+      [stems[0]!.id]: 0,
+      [stems[1]!.id]: 1,
+      [converted.id]: 1,
+    });
+
+    expect(response.status).toBe(201);
+    const row = db().prepare('SELECT job_id FROM assets WHERE kind = ?').get('mix') as { job_id: string };
+    const mixJob = readJob(db(), row.job_id)!;
+
+    expect(mixJob.inputs.map((input) => input.assetId).sort()).toEqual(
+      [stems[1]!.id, converted.id].sort(),
+    );
+  });
+
+  it('refuses to reach a take that was never part of this set', async () => {
+    const { jobId, stems } = await separation();
+    const stranger = (await (
+      await importFile(projectId, 'tone.wav', 'Someone Else.wav')
+    ).json()) as Asset;
+
+    const response = await mix(jobId, { [stems[0]!.id]: 1, [stranger.id]: 1 });
+
+    expect(response.status).toBe(201);
+    const row = db().prepare('SELECT job_id FROM assets WHERE kind = ?').get('mix') as { job_id: string };
+    const mixJob = readJob(db(), row.job_id)!;
+
+    expect(mixJob.inputs.map((input) => input.assetId)).not.toContain(stranger.id);
+  });
+
   it('writes a mix named after the take the stems came from', async () => {
     const { jobId, stems } = await separation();
 
