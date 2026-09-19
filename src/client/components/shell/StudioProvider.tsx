@@ -97,6 +97,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       renameAsset,
       removeAsset,
       computePeaksFor,
+      reload,
     }),
     [
       projectId,
@@ -120,6 +121,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       renameAsset,
       removeAsset,
       computePeaksFor,
+      reload,
     ],
   );
 

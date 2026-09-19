@@ -49,6 +49,15 @@ export interface StudioValue {
   renameAsset: (assetId: string, label: string) => void;
   removeAsset: (assetId: string) => void;
   computePeaksFor: (assetId: string) => void;
+  /**
+   * Fetches the project's takes again.
+   *
+   * The queue already calls this when a job finishes. It is exposed for work
+   * the service does without a job in the queue, which today is recombining
+   * stems: the mix is written and answered in one request, so nothing else
+   * would tell the list it had a new take in it.
+   */
+  reload: () => void;
 }
 
 export const StudioContext = createContext<StudioValue | undefined>(undefined);

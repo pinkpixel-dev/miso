@@ -199,7 +199,13 @@ export interface Project {
 }
 
 export type AssetFormat = 'wav' | 'flac' | 'mp3' | 'm4a';
-export type AssetKind = 'source' | 'generated' | 'stem';
+/**
+ * Where a take came from.
+ *
+ * `mix` is a recombined set of stems. It is neither generated nor a stem:
+ * audio.cpp never saw it, and it is a whole track rather than a part of one.
+ */
+export type AssetKind = 'source' | 'generated' | 'stem' | 'mix';
 
 /**
  * One piece of audio. `peaks` is null until the browser that imported it, or a

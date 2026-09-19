@@ -15,10 +15,13 @@ import {
   setAssetPeaks,
 } from '../db/assets.ts';
 import { db } from '../db/index.ts';
-import { readJob } from '../db/jobs.ts';
+import { createJob, listJobInputs, readJob } from '../db/jobs.ts';
 import { readProject } from '../db/projects.ts';
+import { storeAudio } from '../jobs/results.ts';
 import { readAudioFacts } from '../library/metadata.ts';
+import { mixChannels, type MixSource } from '../library/mix.ts';
 import { validatePeaks } from '../library/peaks.ts';
+import { readWav, writeWav } from '../library/wav.ts';
 import { peaksFromWav } from '../library/wavPeaks.ts';
 import { parseRange } from '../library/range.ts';
 import { receiveToFile } from '../library/receive.ts';
@@ -412,6 +415,104 @@ assetRoutes.get('/projects/:id/assets/:assetId/audio', async (c) => {
       'accept-ranges': 'bytes',
     },
   });
+});
+
+/**
+ * Sums a separation's stems back into one take.
+ *
+ * The gains arrive already resolved by the page: solo and mute are questions
+ * about what you are listening to, and the answer is whatever you can hear, so
+ * a muted stem reaches here as a zero rather than as a flag this would have to
+ * interpret a second time and possibly differently. What you save is what you
+ * heard, which is the whole promise of the button.
+ *
+ * Done here and now rather than queued. Summing four stems is well under a
+ * second, nothing is sent to audio.cpp, and queueing it would mean teaching the
+ * worker to run work that never leaves this process.
+ *
+ * The job row exists for lineage rather than for the queue. It is written
+ * complete, carries the gains that produced the mix, and points at every stem
+ * that went into it, so the detail panel can answer what this was made from.
+ */
+assetRoutes.post('/projects/:id/jobs/:jobId/mix', async (c) => {
+  const projectId = c.req.param('id');
+  const jobId = c.req.param('jobId');
+
+  if (!readProject(db(), projectId)) {
+    return c.json<ApiError>({ error: `No project with the id ${projectId}` }, 404);
+  }
+
+  const job = readJob(db(), jobId);
+  if (!job || job.projectId !== projectId) {
+    return c.json<ApiError>({ error: `No job with the id ${jobId}` }, 404);
+  }
+
+  const body = (await c.req.json().catch(() => null)) as { gains?: unknown } | null;
+  const gains = body?.gains;
+  if (typeof gains !== 'object' || gains === null || Array.isArray(gains)) {
+    return c.json<ApiError>({ error: 'gains is required, as an object of asset id to level' }, 400);
+  }
+
+  const levels = gains as Record<string, unknown>;
+  const sources: MixSource[] = [];
+  const usedAssetIds: string[] = [];
+  let sampleRate: number | undefined;
+
+  for (const assetId of job.outputAssetIds) {
+    const asset = assetIn(projectId, assetId);
+    if (!asset) continue;
+
+    const raw = levels[assetId];
+    const gain = typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 1;
+    if (gain === 0) continue;
+
+    const audio = readWav(await readFile(assetPath(projectId, assetId, asset.format)));
+    if (!audio) {
+      return c.json<ApiError>({ error: `${asset.label} could not be read as a WAV` }, 422);
+    }
+
+    // Every stem of one separation comes back at one rate. A set that
+    // disagrees is not a set, and summing it would play one part at the wrong
+    // speed rather than failing.
+    if (sampleRate === undefined) sampleRate = audio.sampleRate;
+    else if (sampleRate !== audio.sampleRate) {
+      return c.json<ApiError>({ error: 'These stems are not all at the same sample rate' }, 422);
+    }
+
+    sources.push({ channels: audio.channels, gain });
+    usedAssetIds.push(assetId);
+  }
+
+  if (sources.length === 0 || sampleRate === undefined) {
+    return c.json<ApiError>({ error: 'There is nothing audible to mix' }, 400);
+  }
+
+  const mixed = mixChannels(sources);
+  const bytes = writeWav(mixed.channels, sampleRate);
+
+  // Named after the take the stems came out of, which the separation job
+  // recorded as its source. A mix called "Split into stems mix" would say
+  // nothing about which song it is.
+  const source = listJobInputs(db(), jobId).find((input) => input.role === 'source');
+  const sourceAsset = source ? readAsset(db(), source.assetId) : undefined;
+  const label = `${sourceAsset?.label ?? job.title ?? 'Stems'} (mix)`;
+
+  const mixJobId = randomUUID();
+  createJob(db(), mixJobId, {
+    projectId,
+    taskId: 'stems.mix',
+    // No model ran. This mix was summed here, and the field is the package a
+    // job used, which for this one is nothing.
+    modelId: '',
+    params: { gains: Object.fromEntries(usedAssetIds.map((id, at) => [id, sources[at]!.gain])) },
+    title: label,
+    state: 'complete',
+    inputs: usedAssetIds.map((assetId) => ({ assetId, role: 'stem' })),
+  });
+
+  const asset = await storeAudio(db(), projectId, mixJobId, label, 'mix', bytes);
+
+  return c.json({ asset, clipped: mixed.clipped }, 201);
 });
 
 /**

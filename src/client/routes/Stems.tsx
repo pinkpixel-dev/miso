@@ -1,10 +1,10 @@
-import { ArrowLeft, Download, Pause, Play, SkipBack, SkipForward } from 'lucide-react';
-import { useMemo } from 'react';
+import { ArrowLeft, Download, Pause, Play, Save, SkipBack, SkipForward } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { StemTrack } from '../components/stems/StemTrack.tsx';
 import { useStemDeck } from '../components/player/useStemDeck.ts';
 import { Button, IconButton, Panel, cx } from '../components/ui.tsx';
-import { outputsZipUrl } from '../lib/api.ts';
+import { api, outputsZipUrl } from '../lib/api.ts';
 import { projectPath } from '../lib/routes.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
@@ -36,7 +36,10 @@ function timecode(seconds: number): string {
 
 export function StemsRoute() {
   const { jobId } = useParams();
-  const { project, projectId, assets, allJobs, loading } = useStudio();
+  const { project, projectId, assets, allJobs, loading, reload } = useStudio();
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<{ label: string; clipped: number } | undefined>();
+  const [saveError, setSaveError] = useState<string | undefined>();
 
   const job = useMemo(
     () => allJobs.find((entry) => entry.id === jobId),
@@ -55,6 +58,31 @@ export function StemsRoute() {
   }, [job, assets]);
 
   const deck = useStemDeck(stems);
+
+  /**
+   * Saves what you can hear, not what the stems are.
+   *
+   * The gains carry solo and mute already, so a mix saved while one stem is
+   * soloed is that stem on its own, which is a real thing to want and not a
+   * mistake to guard against.
+   */
+  const saveMix = useCallback(async () => {
+    if (!job || projectId === undefined) return;
+
+    setSaving(true);
+    setSaveError(undefined);
+    try {
+      const result = await api.mixStems(projectId, job.id, deck.gains());
+      setSaved({ label: result.asset.label, clipped: result.clipped });
+      // The project's takes are what the mix just joined, so the list behind
+      // this page is out of date until it is asked again.
+      reload();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'The mix could not be saved');
+    } finally {
+      setSaving(false);
+    }
+  }, [job, projectId, deck, reload]);
 
   const back = projectId === undefined ? '/' : projectPath(projectId);
 
@@ -112,6 +140,11 @@ export function StemsRoute() {
             The whole set in one file. Four stems exported one at a time is
             four trips through a save dialog, and they belong together.
           */}
+          <Button variant="secondary" onClick={() => void saveMix()} busy={saving}>
+            <Save size={16} aria-hidden="true" />
+            Save mix
+          </Button>
+
           <a
             href={outputsZipUrl(job.projectId, job.id)}
             download
@@ -160,6 +193,21 @@ export function StemsRoute() {
           />
         </div>
       </div>
+
+      {saveError ? (
+        <p role="alert" className="rounded-md border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-ink">
+          {saveError}
+        </p>
+      ) : null}
+
+      {saved ? (
+        <p aria-live="polite" className="rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink">
+          Saved {saved.label} to this project.
+          {saved.clipped > 0
+            ? ` ${saved.clipped.toLocaleString()} samples were held at full scale, so turn a fader down if it sounds harsh.`
+            : ''}
+        </p>
+      ) : null}
 
       <div className="flex flex-col gap-3">
         {stems.map((stem) => (

@@ -8,7 +8,7 @@ import { PEAK_BUCKETS } from '../../shared/limits.ts';
 import type { ApiError, Asset } from '../../shared/types.ts';
 import { randomUUID } from 'node:crypto';
 import { db } from '../db/index.ts';
-import { createJob } from '../db/jobs.ts';
+import { createJob, readJob } from '../db/jobs.ts';
 import { createProject } from '../db/projects.ts';
 import { assetPath, projectDir } from '../library/storage.ts';
 import { assetRoutes } from './assets.ts';
@@ -260,6 +260,117 @@ describe('GET /api/projects/:id/assets/:assetId/download', () => {
  * Separation is the only thing that writes several takes at once, and four
  * stems exported one at a time is four trips through a save dialog.
  */
+/**
+ * Recombining is the only thing in Miso that makes audio without audio.cpp, so
+ * these cover both halves: that the sum is right, and that the row it writes
+ * says where it came from.
+ */
+describe('POST /api/projects/:id/jobs/:jobId/mix', () => {
+  async function separation(): Promise<{ jobId: string; stems: Asset[]; sourceId: string }> {
+    const source = (await (await importFile(projectId, 'tone.wav', 'Neon Night.wav')).json()) as Asset;
+
+    const jobId = randomUUID();
+    createJob(db(), jobId, {
+      projectId,
+      taskId: 'stems.separate',
+      modelId: 'htdemucs_q8_0',
+      params: {},
+      inputs: [{ assetId: source.id, role: 'source' }],
+    });
+
+    const stems: Asset[] = [];
+    for (const name of ['vocals', 'drums']) {
+      const stem = (await (await importFile(projectId, 'tone.wav', `Neon Night (${name}).wav`)).json()) as Asset;
+      db().prepare('UPDATE assets SET job_id = ?, kind = ? WHERE id = ?').run(jobId, 'stem', stem.id);
+      stems.push(stem);
+    }
+
+    return { jobId, stems, sourceId: source.id };
+  }
+
+  async function mix(jobId: string, gains: Record<string, number>): Promise<Response> {
+    return await app().request(`/api/projects/${projectId}/jobs/${jobId}/mix`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ gains }),
+    });
+  }
+
+  it('writes a mix named after the take the stems came from', async () => {
+    const { jobId, stems } = await separation();
+
+    const response = await mix(jobId, Object.fromEntries(stems.map((s) => [s.id, 1])));
+    expect(response.status).toBe(201);
+
+    const { asset } = (await response.json()) as { asset: Asset };
+    expect(asset.kind).toBe('mix');
+    expect(asset.label).toBe('Neon Night (mix)');
+    expect(asset.durationSeconds).toBeGreaterThan(0);
+    expect(existsSync(assetPath(projectId, asset.id, asset.format))).toBe(true);
+  });
+
+  it('records what the mix was made from', async () => {
+    const { jobId, stems } = await separation();
+
+    const response = await mix(jobId, Object.fromEntries(stems.map((s) => [s.id, 1])));
+    const { asset } = (await response.json()) as { asset: Asset };
+
+    const row = db().prepare('SELECT job_id FROM assets WHERE id = ?').get(asset.id) as { job_id: string };
+    const mixJob = readJob(db(), row.job_id)!;
+
+    expect(mixJob.taskId).toBe('stems.mix');
+    expect(mixJob.state).toBe('complete');
+    expect(mixJob.inputs.map((input) => input.assetId).sort()).toEqual(
+      stems.map((s) => s.id).sort(),
+    );
+  });
+
+  it('leaves a silenced stem out of the mix and out of the lineage', async () => {
+    const { jobId, stems } = await separation();
+
+    const response = await mix(jobId, { [stems[0]!.id]: 1, [stems[1]!.id]: 0 });
+    const { asset } = (await response.json()) as { asset: Asset };
+
+    const row = db().prepare('SELECT job_id FROM assets WHERE id = ?').get(asset.id) as { job_id: string };
+    const mixJob = readJob(db(), row.job_id)!;
+
+    expect(mixJob.inputs.map((input) => input.assetId)).toEqual([stems[0]!.id]);
+  });
+
+  it('refuses a mix with nothing audible in it', async () => {
+    const { jobId, stems } = await separation();
+
+    const response = await mix(jobId, Object.fromEntries(stems.map((s) => [s.id, 0])));
+
+    expect(response.status).toBe(400);
+  });
+
+  it('refuses a body with no gains', async () => {
+    const { jobId } = await separation();
+
+    const response = await app().request(`/api/projects/${projectId}/jobs/${jobId}/mix`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('refuses a job from another project', async () => {
+    const other = createProject(db(), 'Elsewhere').id;
+    const { jobId } = await separation();
+
+    const response = await app().request(`/api/projects/${other}/jobs/${jobId}/mix`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ gains: {} }),
+    });
+
+    expect(response.status).toBe(404);
+  });
+});
+
 describe('GET /api/projects/:id/jobs/:jobId/outputs.zip', () => {
   async function jobWithOutputs(labels: string[]): Promise<string> {
     const jobId = randomUUID();

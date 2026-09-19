@@ -40,12 +40,14 @@ type Origin =
   | { rank: 1; key: string; label: string; taskOrder: number }
   | { rank: 2; key: 'imported'; label: string }
   | { rank: 3; key: 'stems'; label: string }
-  | { rank: 4; key: 'unknown'; label: string };
+  | { rank: 4; key: 'mixes'; label: string }
+  | { rank: 5; key: 'unknown'; label: string };
 
 const GENERATED: Origin = { rank: 0, key: 'generated', label: 'Generated songs' };
 const IMPORTED: Origin = { rank: 2, key: 'imported', label: 'Imported audio' };
 const STEMS: Origin = { rank: 3, key: 'stems', label: 'Stems' };
-const UNKNOWN: Origin = { rank: 4, key: 'unknown', label: 'Other takes' };
+const MIXES: Origin = { rank: 4, key: 'mixes', label: 'Mixes' };
+const UNKNOWN: Origin = { rank: 5, key: 'unknown', label: 'Other takes' };
 
 /** Which job produced which take, built once instead of scanned per take. */
 function producersOf(jobs: Job[]): Map<string, Job> {
@@ -64,6 +66,11 @@ function originOf(
   // A stem is a stem whatever produced it. Checked first so a separator's
   // outputs stay together rather than splitting across the tool sections.
   if (asset.kind === 'stem') return STEMS;
+
+  // A mix likewise, and for the sharper reason: it is a whole track, so under
+  // the generated heading it would look like something a model wrote. Telling
+  // those apart is most of why somebody recombines stems in the first place.
+  if (asset.kind === 'mix') return MIXES;
 
   const job = producers.get(asset.id);
   if (job === undefined) return IMPORTED;

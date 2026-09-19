@@ -46,6 +46,15 @@ export interface NewJob {
   originalPrompt?: string;
   /** Assets this job reads, by the role the task gives them. */
   inputs?: { assetId: string; role: string }[];
+  /**
+   * The state to start in. Queued unless said otherwise.
+   *
+   * Complete is for work the service did itself and has already finished, which
+   * today means recombining stems. Such a job must never be queued: the worker
+   * drains the queue and would hand it to audio.cpp, which has no route for it
+   * and would fail a job whose output already exists.
+   */
+  state?: 'queued' | 'complete';
 }
 
 export function listJobInputs(handle: Database, jobId: string): { assetId: string; role: string }[] {
@@ -157,10 +166,15 @@ export function listPendingJobs(handle: Database): Job[] {
 
 export function createJob(handle: Database, id: string, input: NewJob): Job {
   handle.transaction(() => {
+    const state = input.state ?? 'queued';
+
     handle
       .prepare(
-        `INSERT INTO jobs (id, project_id, task_id, model_id, params, title, studio, original_prompt, state)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued')`,
+        `INSERT INTO jobs (id, project_id, task_id, model_id, params, title, studio, original_prompt, state,
+                           started_at, finished_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 CASE WHEN ? = 'complete' THEN datetime('now') END,
+                 CASE WHEN ? = 'complete' THEN datetime('now') END)`,
       )
       .run(
         id,
@@ -171,6 +185,9 @@ export function createJob(handle: Database, id: string, input: NewJob): Job {
         input.title ?? null,
         input.studio === undefined ? null : JSON.stringify(input.studio),
         input.originalPrompt ?? null,
+        state,
+        state,
+        state,
       );
 
     const link = handle.prepare('INSERT INTO asset_lineage (job_id, asset_id, role) VALUES (?, ?, ?)');

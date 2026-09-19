@@ -45,6 +45,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  /**
+   * Sums a separation's stems back into one take.
+   *
+   * The gains are what you can hear, solo and mute already applied, so the mix
+   * that is saved is the mix that was playing.
+   */
+  mixStems: (projectId: string, jobId: string, gains: Record<string, number>) =>
+    request<{ asset: Asset; clipped: number }>(
+      `/projects/${encodeURIComponent(projectId)}/jobs/${encodeURIComponent(jobId)}/mix`,
+      { method: 'POST', body: JSON.stringify({ gains }) },
+    ),
+
   getSettings: () => request<Settings>('/settings'),
 
   saveSettings: (patch: SettingsPatch) =>

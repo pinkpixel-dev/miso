@@ -59,6 +59,8 @@ export interface StemDeck {
   playOnly: (id: string) => void;
   /** Whether this stem is the only one soloed. */
   onlySolo: (id: string) => boolean;
+  /** What every stem is actually played at, solo and mute already applied. */
+  gains: () => Record<string, number>;
   /** Called by a track once its instance is ready. */
   register: (id: string, instance: WaveSurfer) => void;
   unregister: (id: string) => void;
@@ -214,6 +216,13 @@ export function useStemDeck(stems: Asset[]): StemDeck {
 
   const onlySolo = useCallback((id: string) => isOnlySolo(controlsRef.current, id), []);
 
+  // The same rule the ear gets, handed to whatever wants to save it. Read
+  // through the ref so a caller never works from a render it has held onto.
+  const gains = useCallback(
+    () => Object.fromEntries(gainsFor(controlsRef.current)),
+    [],
+  );
+
   const playOnly = useCallback(
     (id: string) => {
       const leader = leaderId();
@@ -274,6 +283,7 @@ export function useStemDeck(stems: Asset[]): StemDeck {
     toggleSolo,
     playOnly,
     onlySolo,
+    gains,
     register,
     unregister,
     report,

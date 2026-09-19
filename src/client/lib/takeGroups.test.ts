@@ -108,6 +108,19 @@ describe('groupTakes', () => {
   });
 
   /** A separator's outputs stay together rather than splitting by tool. */
+  /**
+   * A mix is a whole track, so under the generated heading it would look like
+   * something a model wrote. Telling those apart is most of the reason to
+   * recombine stems at all.
+   */
+  it('gives a mix its own section rather than filing it with the generated songs', () => {
+    const mix = asset('a1', '2026-09-14T10:00:00Z', { kind: 'mix' });
+
+    expect(groupTakes([mix], [job('j1', 'stems.mix', ['a1'])], TASKS)).toEqual([
+      { key: 'mixes', label: 'Mixes', takes: [mix] },
+    ]);
+  });
+
   it('groups stems by kind, whatever job produced them', () => {
     const stem = asset('a1', '2026-09-14T10:00:00Z', { kind: 'stem' });
     const jobs = [job('j1', 'remix.repaint', ['a1'])];
@@ -130,8 +143,9 @@ describe('groupTakes', () => {
     ]);
   });
 
-  it('orders sections generated, derived, imported, stems, then unknown', () => {
+  it('orders sections generated, derived, imported, stems, mixes, then unknown', () => {
     const takes = [
+      asset('mix', '2026-09-14T10:00:00Z', { kind: 'mix' }),
       asset('stem', '2026-09-14T10:00:00Z', { kind: 'stem' }),
       asset('orphan', '2026-09-14T10:00:00Z'),
       asset('import', '2026-09-14T10:00:00Z', { kind: 'source' }),
@@ -143,6 +157,7 @@ describe('groupTakes', () => {
       job('j2', 'remix.repaint', ['repaint']),
       job('j3', 'remix.retired', ['orphan']),
       job('j4', 'stems.separate', ['stem']),
+      job('j5', 'stems.mix', ['mix']),
     ];
 
     expect(groupTakes(takes, jobs, TASKS).map((section) => section.key)).toEqual([
@@ -150,6 +165,7 @@ describe('groupTakes', () => {
       'remix.repaint',
       'imported',
       'stems',
+      'mixes',
       'unknown',
     ]);
   });

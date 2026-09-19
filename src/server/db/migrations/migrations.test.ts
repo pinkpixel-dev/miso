@@ -118,3 +118,151 @@ describe('004_jobs.sql', () => {
     expect(handle.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
   });
 });
+
+/**
+ * The assets table is rebuilt here, which is the riskiest shape a migration
+ * takes in this project. What these check is that the rebuild kept everything:
+ * the rows, the cascade, the index, and the other tables still pointing at it.
+ */
+describe('008_mix.sql', () => {
+  function withAsset(handle: Database.Database, kind: string, id = 'a1'): void {
+    handle
+      .prepare(
+        `INSERT INTO assets (id, project_id, kind, label, filename, format, bytes, checksum)
+         VALUES (?, 'p1', ?, 'Take 1', 'take1.wav', 'wav', 100, 'abc')`,
+      )
+      .run(id, kind);
+  }
+
+  it('accepts a mix', () => {
+    const handle = fresh();
+    handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Demo')").run();
+
+    expect(() => withAsset(handle, 'mix')).not.toThrow();
+  });
+
+  it('still accepts the three kinds that came before', () => {
+    const handle = fresh();
+    handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Demo')").run();
+
+    expect(() => withAsset(handle, 'source', 'a1')).not.toThrow();
+    expect(() => withAsset(handle, 'generated', 'a2')).not.toThrow();
+    expect(() => withAsset(handle, 'stem', 'a3')).not.toThrow();
+  });
+
+  it('still refuses a kind that is not one of the four', () => {
+    const handle = fresh();
+    handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Demo')").run();
+
+    expect(() => withAsset(handle, 'remix')).toThrow();
+  });
+
+  it('keeps rows that were there before the rebuild', () => {
+    // Run the earlier migrations, put a row in, then let 008 rebuild under it.
+    const handle = new Database(':memory:');
+    handle.pragma('foreign_keys = ON');
+
+    const before = readdirSync(migrationsDir)
+      .filter((f) => f.endsWith('.sql') && f < '008')
+      .sort();
+    for (const name of before) handle.exec(readFileSync(join(migrationsDir, name), 'utf8'));
+
+    handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Demo')").run();
+    withAsset(handle, 'generated', 'kept');
+
+    handle.exec(readFileSync(join(migrationsDir, '008_mix.sql'), 'utf8'));
+
+    const row = handle.prepare("SELECT label, kind FROM assets WHERE id = 'kept'").get() as
+      | { label: string; kind: string }
+      | undefined;
+    expect(row).toEqual({ label: 'Take 1', kind: 'generated' });
+  });
+
+  /**
+   * The trap this migration was written around, and the reason it copies the
+   * children out and back.
+   *
+   * With foreign keys enforced, DROP TABLE runs an implicit DELETE of every
+   * row first, and both asset_lineage and staged_uploads cascade from assets.
+   * A rebuild that ignores this drops every record of what was made from what,
+   * silently, on a database that has history in it.
+   */
+  it('carries lineage and staged uploads across the rebuild', () => {
+    const handle = new Database(':memory:');
+    handle.pragma('foreign_keys = ON');
+
+    const before = readdirSync(migrationsDir)
+      .filter((f) => f.endsWith('.sql') && f < '008')
+      .sort();
+    for (const name of before) handle.exec(readFileSync(join(migrationsDir, name), 'utf8'));
+
+    handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Demo')").run();
+    handle
+      .prepare(
+        `INSERT INTO jobs (id, project_id, task_id, model_id, params, state)
+         VALUES ('j1', 'p1', 'stems.separate', 'htdemucs_q8_0', '{}', 'complete')`,
+      )
+      .run();
+    withAsset(handle, 'generated', 'a1');
+    handle
+      .prepare("INSERT INTO asset_lineage (job_id, asset_id, role) VALUES ('j1', 'a1', 'source')")
+      .run();
+    handle
+      .prepare(
+        `INSERT INTO staged_uploads (asset_id, server_identity, remote_path)
+         VALUES ('a1', 'http://backend', '/tmp/audiocpp-ui-1/1-a.wav')`,
+      )
+      .run();
+
+    handle.exec(readFileSync(join(migrationsDir, '008_mix.sql'), 'utf8'));
+
+    const lineage = handle.prepare('SELECT COUNT(*) AS n FROM asset_lineage').get() as { n: number };
+    const staged = handle.prepare('SELECT COUNT(*) AS n FROM staged_uploads').get() as { n: number };
+    expect(lineage.n).toBe(1);
+    expect(staged.n).toBe(1);
+
+    const violations = handle.prepare('PRAGMA foreign_key_check').all();
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps the project cascade through the rebuild', () => {
+    const handle = fresh();
+    handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Demo')").run();
+    withAsset(handle, 'mix');
+
+    handle.prepare("DELETE FROM projects WHERE id = 'p1'").run();
+
+    const left = handle.prepare('SELECT COUNT(*) AS n FROM assets').get() as { n: number };
+    expect(left.n).toBe(0);
+  });
+
+  it('keeps the lineage cascade pointing at the rebuilt table', () => {
+    const handle = fresh();
+    handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Demo')").run();
+    handle
+      .prepare(
+        `INSERT INTO jobs (id, project_id, task_id, model_id, params, state)
+         VALUES ('j1', 'p1', 'stems.separate', 'htdemucs_q8_0', '{}', 'complete')`,
+      )
+      .run();
+    withAsset(handle, 'stem');
+    handle
+      .prepare("INSERT INTO asset_lineage (job_id, asset_id, role) VALUES ('j1', 'a1', 'source')")
+      .run();
+
+    handle.prepare("DELETE FROM assets WHERE id = 'a1'").run();
+
+    const left = handle.prepare('SELECT COUNT(*) AS n FROM asset_lineage').get() as { n: number };
+    expect(left.n).toBe(0);
+  });
+
+  it('keeps the index the project list reads', () => {
+    const handle = fresh();
+    const names = handle
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'assets'")
+      .all()
+      .map((r) => (r as { name: string }).name);
+
+    expect(names).toContain('assets_by_project');
+  });
+});

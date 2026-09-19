@@ -27,18 +27,25 @@ function labelFor(base: string, outputId: string | undefined): string {
   return outputId === undefined ? base : `${base} (${outputId})`;
 }
 
-async function writeOne(
+/**
+ * Puts audio on disk and writes the row that points at it.
+ *
+ * Takes bytes rather than base64 because there are now two callers and only one
+ * of them is decoding a response. A mix is summed here in the service and never
+ * travels anywhere, so encoding it just to decode it again would be work in
+ * both directions for nothing.
+ */
+export async function storeAudio(
   handle: Database,
   projectId: string,
   jobId: string,
   label: string,
-  kind: 'generated' | 'stem',
-  base64: string,
+  kind: 'generated' | 'stem' | 'mix',
+  bytes: Buffer,
 ): Promise<Asset> {
   await ensureProjectDir(projectId);
   const temp = tempPath(projectId);
 
-  const bytes = Buffer.from(base64, 'base64');
   if (bytes.length === 0) throw new Error('The server returned an empty audio payload');
 
   await writeFile(temp, bytes);
@@ -112,13 +119,13 @@ export async function storeResult(
     const assets: Asset[] = [];
     for (const output of result.namedOutputs) {
       assets.push(
-        await writeOne(
+        await storeAudio(
           handle,
           options.projectId,
           options.jobId,
           labelFor(options.label, output.id),
           'stem',
-          output.audio,
+          Buffer.from(output.audio, 'base64'),
         ),
       );
     }
@@ -126,6 +133,13 @@ export async function storeResult(
   }
 
   return [
-    await writeOne(handle, options.projectId, options.jobId, options.label, 'generated', result.audio),
+    await storeAudio(
+      handle,
+      options.projectId,
+      options.jobId,
+      options.label,
+      'generated',
+      Buffer.from(result.audio, 'base64'),
+    ),
   ];
 }
