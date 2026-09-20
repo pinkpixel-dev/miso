@@ -32,6 +32,14 @@ RUN npm run build && npm prune --omit=dev
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 
+# GitHub links a package to its repository through this label, and shows the
+# README on the package page. Without it the published image is an orphan.
+LABEL org.opencontainers.image.source="https://github.com/pinkpixel-dev/miso" \
+      org.opencontainers.image.url="https://pinkpixel.dev" \
+      org.opencontainers.image.title="Miso" \
+      org.opencontainers.image.description="A local music generation and remix studio built on audio.cpp" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
 # MISO_HOST matters: the default is 127.0.0.1, which is right on a laptop and
 # publishes nothing at all from inside a container.
 ENV NODE_ENV=production \

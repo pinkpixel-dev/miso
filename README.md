@@ -12,7 +12,6 @@ Miso runs on [audio.cpp](https://github.com/0xShug0/audio.cpp), a C++ inference 
 audio models. Miso is the studio around it: projects that persist, a history of every take,
 and a record of exactly how each clip was made so you can change one thing and try again.
 
-<!-- TODO: screenshot of a project open, with a waveform loaded and the queue visible. -->
 
 <p align="center">
   <img src="screenshots/screenshot1.png" alt="Miso Project page" width="85%">
