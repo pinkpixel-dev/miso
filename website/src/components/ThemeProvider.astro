@@ -1,0 +1,48 @@
+---
+/**
+ * Theme provider, with dark as the default instead of the operating system's
+ * preference.
+ *
+ * The studio itself is dark only. Documentation gets a light theme, because
+ * people read it in daylight and on other people's machines, but a first
+ * visitor should see the product's own colours rather than whichever way their
+ * laptop happens to be set. An explicit choice still wins and is still stored,
+ * so the picker works exactly as it does upstream.
+ *
+ * This is a copy of Starlight's own provider with one line changed: the
+ * fallback when nothing is stored. It stays inlined to avoid a flash of the
+ * wrong theme.
+ */
+import { Icon } from '@astrojs/starlight/components';
+---
+
+<script is:inline>
+  window.StarlightThemeProvider = (() => {
+    const storedTheme =
+      typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+    const theme = storedTheme || 'dark';
+    document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+    return {
+      updatePickers(theme = storedTheme || 'auto') {
+        document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+          const select = picker.querySelector('select');
+          if (select) select.value = theme;
+          const tmpl = document.querySelector('#theme-icons');
+          const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+          if (newIcon) {
+            const oldIcon = picker.querySelector('svg.label-icon');
+            if (oldIcon) {
+              oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+            }
+          }
+        });
+      },
+    };
+  })();
+</script>
+
+<template id="theme-icons">
+  <Icon name="sun" class="light" />
+  <Icon name="moon" class="dark" />
+  <Icon name="laptop" class="auto" />
+</template>

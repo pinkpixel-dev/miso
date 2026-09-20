@@ -1,0 +1,452 @@
+/*
+ * Miso documentation theme.
+ *
+ * The palette, the type and the spacing are lifted from the application's own
+ * design tokens in `src/client/styles.css`, so the docs and the studio look
+ * like one product. Surfaces are warm charcoal rather than black, the single
+ * accent is amber, and it is used sparingly.
+ *
+ * The app is dark only. Documentation is not, because people read it in
+ * daylight and on other people's machines, so a light theme is built from the
+ * same hues here. Dark stays the default.
+ *
+ * Everything below is unlayered, which puts it after Starlight's own layers in
+ * the cascade. That is the documented way to override the defaults and it
+ * means no `!important` anywhere in this file.
+ */
+
+/* ------------------------------------------------------------------ *
+ * Colour
+ * ------------------------------------------------------------------ */
+
+:root,
+::backdrop {
+  /* Surfaces, darkest to lightest. */
+  --miso-canvas: oklch(0.17 0.005 285);
+  --miso-surface: oklch(0.21 0.006 285);
+  --miso-raised: oklch(0.25 0.007 285);
+  --miso-line: oklch(0.32 0.008 285);
+  --miso-line-strong: oklch(0.42 0.009 285);
+
+  /* Text. */
+  --miso-ink: oklch(0.97 0.002 285);
+  --miso-ink-muted: oklch(0.75 0.006 285);
+  --miso-ink-faint: oklch(0.6 0.007 285);
+
+  /* Meaning. */
+  --miso-accent: oklch(0.79 0.17 65);
+  --miso-accent-ink: oklch(0.2 0.04 65);
+  --miso-accent-soft: oklch(0.3 0.06 65);
+
+  /* Starlight's greys, mapped onto the studio's surfaces. */
+  --sl-color-white: var(--miso-ink);
+  --sl-color-gray-1: oklch(0.92 0.003 285);
+  --sl-color-gray-2: var(--miso-ink-muted);
+  --sl-color-gray-3: var(--miso-ink-faint);
+  --sl-color-gray-4: var(--miso-line-strong);
+  --sl-color-gray-5: var(--miso-raised);
+  --sl-color-gray-6: var(--miso-surface);
+  --sl-color-black: var(--miso-canvas);
+
+  --sl-color-accent-low: var(--miso-accent-soft);
+  --sl-color-accent: var(--miso-accent);
+  --sl-color-accent-high: oklch(0.89 0.11 70);
+
+  --sl-color-text: var(--miso-ink-muted);
+  --sl-color-text-accent: var(--sl-color-accent-high);
+  --sl-color-text-invert: var(--miso-accent-ink);
+
+  --sl-color-bg: var(--miso-canvas);
+  --sl-color-bg-nav: color-mix(in oklch, var(--miso-canvas) 85%, transparent);
+  --sl-color-bg-sidebar: var(--miso-canvas);
+  --sl-color-bg-inline-code: var(--miso-raised);
+  --sl-color-bg-accent: var(--miso-accent);
+
+  --sl-color-hairline-light: var(--miso-line);
+  --sl-color-hairline: color-mix(in oklch, var(--miso-line) 70%, transparent);
+  --sl-color-hairline-shade: var(--miso-canvas);
+
+  /*
+   * Starlight leans on drop shadows for depth. A studio tool draws its panels
+   * with hairlines instead, so the shadows are reduced to almost nothing and
+   * borders do the work. This is the single biggest reason the site stops
+   * reading as a stock Starlight install.
+   */
+  --sl-shadow-sm: 0 1px 0 0 var(--sl-color-hairline-light);
+  --sl-shadow-md: 0 1px 0 0 var(--sl-color-hairline-light);
+  --sl-shadow-lg: 0 8px 24px oklch(0 0 0 / 0.45), 0 0 0 1px var(--sl-color-hairline-light);
+}
+
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+  /* Warm paper rather than white, to keep the same temperature as the dark side. */
+  --miso-canvas: oklch(0.985 0.003 85);
+  --miso-surface: oklch(0.965 0.004 85);
+  --miso-raised: oklch(0.925 0.005 85);
+  --miso-line: oklch(0.87 0.006 85);
+  --miso-line-strong: oklch(0.74 0.007 85);
+
+  --miso-ink: oklch(0.21 0.008 285);
+  --miso-ink-muted: oklch(0.38 0.008 285);
+  --miso-ink-faint: oklch(0.52 0.008 285);
+
+  /* The dark-mode amber fails contrast on paper, so light gets its own. */
+  --miso-accent: oklch(0.58 0.14 62);
+  --miso-accent-ink: oklch(0.99 0.01 85);
+  --miso-accent-soft: oklch(0.94 0.04 80);
+
+  --sl-color-white: var(--miso-ink);
+  --sl-color-gray-1: oklch(0.27 0.008 285);
+  --sl-color-gray-2: var(--miso-ink-muted);
+  --sl-color-gray-3: var(--miso-ink-faint);
+  --sl-color-gray-4: var(--miso-line-strong);
+  --sl-color-gray-5: var(--miso-line);
+  --sl-color-gray-6: var(--miso-surface);
+  --sl-color-gray-7: oklch(0.975 0.003 85);
+  --sl-color-black: var(--miso-canvas);
+
+  --sl-color-accent-low: var(--miso-accent-soft);
+  --sl-color-accent: var(--miso-accent);
+  --sl-color-accent-high: oklch(0.45 0.12 60);
+
+  --sl-color-text-invert: var(--miso-accent-ink);
+  --sl-color-bg-inline-code: var(--miso-raised);
+  --sl-shadow-lg: 0 8px 24px oklch(0.2 0.01 285 / 0.12), 0 0 0 1px var(--sl-color-hairline-light);
+}
+
+/* ------------------------------------------------------------------ *
+ * Type
+ * ------------------------------------------------------------------ */
+
+:root {
+  --sl-font: 'Public Sans Variable', ui-sans-serif, sans-serif;
+  --sl-font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  --miso-font-display: 'Space Grotesk Variable', ui-sans-serif, sans-serif;
+
+  /*
+   * A slightly larger measure than the default 45rem. These pages carry wide
+   * option tables that wrap badly at the stock width.
+   */
+  --sl-content-width: 49rem;
+  --sl-sidebar-width: 17.5rem;
+  --sl-nav-height: 4rem;
+  --sl-line-height: 1.7;
+  --sl-line-height-headings: 1.15;
+
+  --sl-text-h1: 2.6rem;
+  --sl-text-h2: 1.75rem;
+  --sl-text-h3: 1.3rem;
+  --sl-text-h4: 1.0625rem;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * Headings are the display face, set tight. Roman only: no italic display
+ * headings anywhere, emphasis comes from weight and colour.
+ */
+h1,
+h2,
+h3,
+h4,
+h5,
+.site-title,
+.hero-title {
+  font-family: var(--miso-font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-style: normal;
+}
+
+h1 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+/*
+ * A hairline under every h2 turns a long reference page into scannable
+ * sections without adding a box around anything.
+ */
+.sl-markdown-content h2 {
+  padding-block-end: 0.4rem;
+  border-block-end: 1px solid var(--sl-color-hairline-light);
+}
+
+.sl-markdown-content h2:not(:where(.not-content *)) {
+  margin-block-start: 2.75rem;
+}
+
+/* ------------------------------------------------------------------ *
+ * Chrome
+ * ------------------------------------------------------------------ */
+
+/*
+ * The header sits on a blurred translucent canvas with one hairline, instead
+ * of the default solid bar with a shadow under it.
+ */
+.header {
+  border-block-end: 1px solid var(--sl-color-hairline-light);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* The sidebar shares the page colour, separated by a rule rather than a fill. */
+#starlight__sidebar,
+.sidebar-pane {
+  border-inline-end: 1px solid var(--sl-color-hairline-light);
+  background-color: var(--sl-color-bg-sidebar);
+}
+
+/*
+ * Sidebar group labels: small, spaced capitals. This is the other change that
+ * most visibly separates the site from the default.
+ */
+.sidebar-content details > summary > .group-label > span,
+.sidebar-content > ul > li > span.large {
+  font-family: var(--miso-font-display);
+  font-size: var(--sl-text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+}
+
+/* Links in the sidebar lose the pill and gain a left marker when current. */
+.sidebar-content a {
+  border-radius: 0;
+  border-inline-start: 2px solid transparent;
+  padding-inline-start: 0.75rem;
+  font-size: var(--sl-text-sm);
+}
+
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  background-color: transparent;
+  border-inline-start-color: var(--miso-accent);
+  color: var(--sl-color-white);
+  font-weight: 600;
+}
+
+.sidebar-content a:hover,
+.sidebar-content a:focus {
+  background-color: transparent;
+  color: var(--sl-color-white);
+}
+
+/* Table of contents, same treatment. */
+starlight-toc a {
+  border-inline-start: 2px solid var(--sl-color-hairline-light);
+  border-radius: 0;
+}
+
+starlight-toc a[aria-current='true'] {
+  border-inline-start-color: var(--miso-accent);
+  color: var(--sl-color-white);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ *
+ * Content
+ * ------------------------------------------------------------------ */
+
+/* Square corners and a hairline on code, matching the studio's panels. */
+.sl-markdown-content :not(pre) > code:not(:where(.not-content *)) {
+  border: 1px solid var(--sl-color-hairline-light);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  font-size: 0.875em;
+}
+
+.expressive-code .frame pre,
+.sl-markdown-content pre:not(:where(.not-content *)) {
+  border-radius: 6px;
+}
+
+/* Tables read as data, not as decoration. */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: var(--sl-text-sm);
+}
+
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) {
+  border: 1px solid var(--sl-color-hairline-light);
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+}
+
+.sl-markdown-content th:not(:where(.not-content *)) {
+  background-color: var(--sl-color-gray-6);
+  font-family: var(--miso-font-display);
+  font-weight: 600;
+  font-size: var(--sl-text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-2);
+  white-space: nowrap;
+}
+
+/* Screenshots get the same hairline frame the app gives its own panels. */
+.sl-markdown-content img:not(:where(.not-content *)) {
+  border: 1px solid var(--sl-color-hairline-light);
+  border-radius: 6px;
+}
+
+/* ------------------------------------------------------------------ *
+ * States
+ * ------------------------------------------------------------------ */
+
+/*
+ * Focus is restyled, never removed. The studio is fully keyboard drivable and
+ * the documentation about it should be too.
+ */
+:focus-visible {
+  outline: 2px solid var(--miso-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background-color: var(--miso-accent);
+  color: var(--miso-accent-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Asides
+ * ------------------------------------------------------------------ */
+
+/*
+ * Starlight paints notes blue and tips purple. Neither belongs here.
+ *
+ * All four variants become the same bordered panel the rest of the site uses,
+ * with a coloured left edge carrying the only difference. Colour is never the
+ * sole signal: each aside keeps its title, so the type is readable without
+ * seeing the edge at all.
+ */
+.starlight-aside {
+  border: 1px solid var(--sl-color-hairline-light);
+  border-inline-start: 3px solid var(--aside-edge, var(--sl-color-gray-4));
+  border-radius: 6px;
+  background-color: var(--sl-color-gray-6);
+  padding: 1rem 1.25rem;
+}
+
+.starlight-aside--note {
+  --aside-edge: var(--sl-color-gray-4);
+}
+
+.starlight-aside--tip {
+  --aside-edge: var(--miso-accent);
+}
+
+.starlight-aside--caution {
+  --aside-edge: oklch(0.8 0.13 90);
+}
+
+.starlight-aside--danger {
+  --aside-edge: oklch(0.68 0.17 25);
+}
+
+.starlight-aside__title {
+  font-family: var(--miso-font-display);
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sl-color-white);
+}
+
+.starlight-aside__icon {
+  color: var(--aside-edge);
+}
+
+.starlight-aside a {
+  color: var(--sl-color-text-accent);
+}
+
+/* ------------------------------------------------------------------ *
+ * Cards
+ * ------------------------------------------------------------------ */
+
+/*
+ * Link cards lose the default fill and gain the accent on the edge that is
+ * being pointed at, so a grid of them reads as a list of destinations rather
+ * than as a row of decorative tiles.
+ */
+.sl-link-card {
+  border: 1px solid var(--sl-color-hairline-light);
+  border-radius: 6px;
+  box-shadow: none;
+  background-color: var(--sl-color-gray-6);
+  transition: border-color 150ms ease;
+}
+
+.sl-link-card:hover,
+.sl-link-card:focus-within {
+  background-color: var(--sl-color-gray-6);
+  border-color: var(--miso-accent);
+}
+
+.sl-link-card .title {
+  font-family: var(--miso-font-display);
+  letter-spacing: -0.01em;
+}
+
+.sl-link-card .icon {
+  color: var(--miso-accent);
+}
+
+/* ------------------------------------------------------------------ *
+ * Code blocks
+ * ------------------------------------------------------------------ */
+
+/*
+ * The terminal titlebar is fake window chrome: a rounded bar with three
+ * traffic light dots drawn above the code. It is hidden here rather than
+ * switched off in the config, because the frame element carries the block's
+ * padding and its copy button.
+ *
+ * Hiding the header leaves the code with two square top corners, so the radius
+ * and the top border are put back on the `pre` itself.
+ */
+.expressive-code .frame.is-terminal .header {
+  display: none;
+}
+
+.expressive-code .frame.is-terminal pre {
+  border-start-start-radius: 6px;
+  border-start-end-radius: 6px;
+  border-block-start: 1px solid var(--sl-color-hairline-light);
+}
+
+.expressive-code .frame {
+  box-shadow: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * Heading rules
+ * ------------------------------------------------------------------ */
+
+/*
+ * Starlight sizes headings to their text so the hover anchor link can sit
+ * beside them. That leaves the section rule stopping mid-line, so the width is
+ * put back and the anchor keeps its own space.
+ */
+.sl-markdown-content h2:not(:where(.not-content *)) {
+  display: block;
+  width: 100%;
+}

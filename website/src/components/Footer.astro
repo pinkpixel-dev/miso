@@ -1,0 +1,85 @@
+---
+/**
+ * The page footer.
+ *
+ * Starlight's default stacks the edit link, the last-updated line and the
+ * previous/next pagination. All three are kept, because they are useful, and a
+ * Pink Pixel line is added underneath with the links people actually go
+ * looking for.
+ */
+import EditLink from '@astrojs/starlight/components/EditLink.astro';
+import LastUpdated from '@astrojs/starlight/components/LastUpdated.astro';
+import Pagination from '@astrojs/starlight/components/Pagination.astro';
+---
+
+<footer class="sl-flex">
+  <div class="meta sl-flex">
+    <EditLink />
+    <LastUpdated />
+  </div>
+  <Pagination />
+
+  <div class="colophon">
+    <p class="made">Made with 💖 by <a href="https://pinkpixel.dev">Pink Pixel</a></p>
+    <nav aria-label="Project links">
+      <a href="https://github.com/pinkpixel-dev/miso">GitHub</a>
+      <a href="https://github.com/pinkpixel-dev/miso/blob/main/LICENSE">Apache 2.0</a>
+      <a href="https://github.com/pinkpixel-dev/miso/issues">Report a problem</a>
+      <a href="https://ko-fi.com/sizzlebop">Ko-fi</a>
+    </nav>
+  </div>
+</footer>
+
+<style>
+  footer {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .meta {
+    gap: 0.75rem 3rem;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-block: 3rem 0;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+  }
+
+  .meta > :global(p:only-child) {
+    margin-inline-start: auto;
+  }
+
+  .colophon {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-block-start: 1.5rem;
+    border-block-start: 1px solid var(--sl-color-hairline-light);
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+  }
+
+  .made {
+    margin: 0;
+  }
+
+  .colophon nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .colophon a {
+    color: var(--sl-color-gray-3);
+    text-decoration: none;
+    border-block-end: 1px solid transparent;
+  }
+
+  .colophon a:hover,
+  .colophon a:focus-visible {
+    color: var(--sl-color-white);
+    border-block-end-color: var(--miso-accent);
+  }
+</style>

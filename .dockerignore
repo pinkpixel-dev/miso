@@ -21,6 +21,9 @@ CLAUDE.md
 reference.png
 scripts
 
+# The documentation site is its own npm project and deploys separately.
+website
+
 # Tests do not run in the image.
 vitest.config.ts
 vitest.setup.ts

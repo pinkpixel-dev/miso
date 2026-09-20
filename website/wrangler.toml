@@ -1,0 +1,14 @@
+# Cloudflare Pages configuration for the Miso documentation site.
+#
+# The site is fully static, so there is no Worker and no adapter. Wrangler
+# uploads the built directory and serves it.
+#
+#   npm run build
+#   npx wrangler pages deploy
+#
+# `npm run deploy` does both. Change `name` if the Pages project is called
+# something else in your account.
+
+name = "miso-docs"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-09-20"

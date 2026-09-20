@@ -1,0 +1,221 @@
+---
+/**
+ * The landing hero.
+ *
+ * Deliberately not the stock splash layout, which centres everything in a
+ * full-height column. This is a two column split with the text on a left axis,
+ * a real screenshot on the right, and a strip of plain facts under both. The
+ * actions still come from the page's `hero.actions` frontmatter, so the
+ * content stays in the Markdown where it belongs.
+ */
+import { Image } from 'astro:assets';
+import shot from '../assets/screenshots/screenshot1.png';
+
+/*
+ * `entry` is absent on Starlight's built-in 404 route, which renders with no
+ * content entry at all. Everything below is read through optionals for that
+ * reason, and a page with no hero frontmatter renders nothing rather than an
+ * empty two column grid.
+ */
+const entry = Astro.locals.starlightRoute?.entry;
+const hero = entry?.data.hero;
+const { title = entry?.data.title ?? '', tagline, actions = [] } = hero ?? {};
+---
+
+{hero && (
+<div class="hero">
+  <div class="lede">
+    <h1 class="hero-title" set:html={title} />
+    {tagline && <p class="tagline" set:html={tagline} />}
+
+    {
+      actions.length > 0 && (
+        <div class="actions">
+          {actions.map(({ attrs, link, text, variant }) => (
+            <a href={link} class:list={['action', variant]} {...attrs}>
+              {text}
+            </a>
+          ))}
+        </div>
+      )
+    }
+
+    <div class="quickstart">
+      <span class="quickstart-label">Two containers, one command</span>
+      <code>docker compose up -d</code>
+    </div>
+  </div>
+
+  <div class="shot">
+    <Image src={shot} alt="The Miso project page, showing a song list, waveform and job queue" loading="eager" />
+  </div>
+</div>
+)}
+
+{hero && (
+<dl class="facts">
+  <div><dt>Model families</dt><dd>11</dd></div>
+  <div><dt>Studio tasks</dt><dd>14</dd></div>
+  <div><dt>Network calls</dt><dd>None</dd></div>
+  <div><dt>Licence</dt><dd>Apache 2.0</dd></div>
+</dl>
+)}
+
+<style>
+  .hero {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+    padding-block: 1rem 2rem;
+  }
+
+  .hero-title {
+    font-size: clamp(2.5rem, 7vw, 4rem);
+    line-height: 1.02;
+    margin: 0;
+    color: var(--sl-color-white);
+  }
+
+  .tagline {
+    font-size: var(--sl-text-lg);
+    color: var(--sl-color-gray-2);
+    max-width: 44ch;
+    margin-block: 1.25rem 0;
+    line-height: 1.6;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-block-start: 2rem;
+  }
+
+  /*
+   * Two button weights, both square-ish and bordered. No pill shapes, no
+   * gradients, and the label never wraps to a second line.
+   */
+  .action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1.1rem;
+    border-radius: 6px;
+    border: 1px solid var(--sl-color-hairline-light);
+    font-family: var(--miso-font-display);
+    font-weight: 600;
+    font-size: var(--sl-text-sm);
+    text-decoration: none;
+    white-space: nowrap;
+    color: var(--sl-color-white);
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+  }
+
+  .action.primary {
+    background-color: var(--miso-accent);
+    border-color: var(--miso-accent);
+    color: var(--miso-accent-ink);
+  }
+
+  .action.primary:hover,
+  .action.primary:focus-visible {
+    background-color: var(--sl-color-accent-high);
+    border-color: var(--sl-color-accent-high);
+  }
+
+  .action.secondary:hover,
+  .action.secondary:focus-visible,
+  .action.minimal:hover,
+  .action.minimal:focus-visible {
+    border-color: var(--miso-accent);
+  }
+
+  .quickstart {
+    margin-block-start: 2.25rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--sl-color-hairline-light);
+    border-radius: 6px;
+    background-color: var(--sl-color-gray-6);
+    max-width: 26rem;
+  }
+
+  .quickstart-label {
+    display: block;
+    font-size: var(--sl-text-2xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-3);
+    margin-block-end: 0.4rem;
+  }
+
+  .quickstart code {
+    font-family: var(--sl-font-mono);
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-white);
+  }
+
+  .shot {
+    display: none;
+  }
+
+  .shot img {
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--sl-color-hairline-light);
+    border-radius: 8px;
+  }
+
+  /*
+   * A plain data strip instead of the usual row of icon cards. Real numbers
+   * only, and every one of them is checkable in the repository.
+   */
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    margin: 2rem 0 0;
+    padding: 0;
+    background-color: var(--sl-color-hairline-light);
+    border: 1px solid var(--sl-color-hairline-light);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .facts > div {
+    background-color: var(--sl-color-bg);
+    padding: 1rem 1.25rem;
+  }
+
+  .facts dt {
+    font-size: var(--sl-text-2xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-3);
+  }
+
+  .facts dd {
+    margin: 0.35rem 0 0;
+    font-family: var(--miso-font-display);
+    font-size: var(--sl-text-2xl);
+    font-weight: 600;
+    color: var(--sl-color-white);
+  }
+
+  @media (min-width: 50rem) {
+    .facts {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 72rem) {
+    .hero {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: 3.5rem;
+      padding-block: 2rem 3rem;
+    }
+
+    .shot {
+      display: block;
+    }
+  }
+</style>

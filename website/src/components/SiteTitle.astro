@@ -1,0 +1,69 @@
+---
+/**
+ * The site title, with the Miso wordmark set in the display face and a version
+ * marker beside it.
+ *
+ * Starlight's default renders the configured logo and title. This keeps the
+ * logo, sets the title in Space Grotesk, and adds the "Docs" qualifier so the
+ * header says what this site is rather than only what the product is.
+ */
+import { Image } from 'astro:assets';
+import logo from '../assets/logo.png';
+
+const { siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+<a href={siteTitleHref} class="site-title">
+  <Image src={logo} alt="" width={30} height={30} loading="eager" densities={[1.5, 2]} />
+  <span class="wordmark">Miso</span>
+  <span class="qualifier">Docs</span>
+</a>
+
+<style>
+  .site-title {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    text-decoration: none;
+    color: var(--sl-color-white);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .site-title img {
+    border-radius: 5px;
+    flex-shrink: 0;
+  }
+
+  .wordmark {
+    font-family: var(--miso-font-display);
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: -0.02em;
+  }
+
+  /*
+   * A bordered tag rather than a coloured one. It has to sit beside the
+   * wordmark without competing with it, and the accent is reserved for
+   * current-state markers elsewhere in the chrome.
+   */
+  .qualifier {
+    font-family: var(--miso-font-display);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-3);
+    border: 1px solid var(--sl-color-hairline-light);
+    border-radius: 3px;
+    padding: 0.1rem 0.3rem;
+    line-height: 1;
+  }
+
+  /* The qualifier is the first thing to go when the header gets tight. */
+  @media (max-width: 30rem) {
+    .qualifier {
+      display: none;
+    }
+  }
+</style>
