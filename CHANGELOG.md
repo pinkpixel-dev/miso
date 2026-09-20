@@ -31,7 +31,11 @@ the music.
   song than write the prompt.
 - **No Instrumental for this one.** YuE2 refuses an empty lyric, so the vocal
   control does not offer it rather than letting you pick something that cannot
-  run.
+  run. Female and Male stay selectable: a model that always sings used to grey
+  out the whole section, which took the voice choice with it.
+- **The song ends where YuE2 decides.** The length limit now sends the model's
+  own default instead of a much lower one that was cutting songs off partway
+  through the arrangement.
 - The weights are CC-BY-NC-4.0, which is non-commercial.
 
 ### 🐛 Fixes

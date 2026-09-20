@@ -109,6 +109,15 @@ describe('generate.yue2', () => {
     expect(yue.fields.find((field) => field.name === 'lyrics')?.required).toBe(true);
   });
 
+  it('leaves the length to the model rather than capping it low', () => {
+    // 1200 at first, which is about 45 seconds and cut songs off
+    // mid-arrangement. The same prompt at 4000 ran to 55 seconds and stopped on
+    // its own, so the ceiling is the model's default and the song ends where
+    // YuE2 decides.
+    const request = yue.buildRequest(paramsFor(SONG), {});
+    expect((request.options as Record<string, unknown>).semantic_max_tokens).toBe(9000);
+  });
+
   it('has no length in seconds, because the model decides that', () => {
     // Every other generator takes a duration. YuE2 works its length out from
     // the lyrics, and the only control is where to stop.

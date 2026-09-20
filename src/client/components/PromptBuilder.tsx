@@ -1,7 +1,13 @@
 import { Eraser, Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { LyricsDraft, StudioState, StudioTask, TaskField } from '../../shared/types.ts';
-import { KEYS, VOCAL_MODES, compilePrompt, effectiveVocalMode, wantsLyrics } from '../lib/studio.ts';
+import {
+  KEYS,
+  compilePrompt,
+  effectiveVocalMode,
+  vocalModesFor,
+  wantsLyrics,
+} from '../lib/studio.ts';
 import { BuilderCard } from './BuilderCard.tsx';
 import { LyricsAssistant } from './LyricsAssistant.tsx';
 import { LyricsEditor } from './LyricsEditor.tsx';
@@ -189,10 +195,16 @@ export function PromptBuilder({
   const lyrics = lyricsField ? (values[lyricsField.name] ?? '') : '';
 
   // What the model can do wins over what the toggle says. The control stays on
-  // screen and locks rather than disappearing, because a section that vanishes
-  // when the model changes moves the rest of the form and answers nobody's
-  // question about where the vocals went. See DOCS/MEMORY.md.
-  const vocalsLocked = task.vocals !== 'both';
+  // screen rather than disappearing, because a section that vanishes when the
+  // model changes moves the rest of the form and answers nobody's question
+  // about where the vocals went. See DOCS/MEMORY.md.
+  //
+  // It offers what the family supports and locks only when that leaves one
+  // choice, which is the instrumental-only case. A family that always sings
+  // drops Instrumental and keeps Female and Male usable: locking on anything
+  // but `both` took those with it.
+  const vocalModes = vocalModesFor(task.vocals);
+  const vocalsLocked = vocalModes.length <= 1;
   const vocalMode = effectiveVocalMode(builder, task.vocals);
   const vocalsHint =
     task.vocals === 'never'
@@ -304,7 +316,7 @@ export function PromptBuilder({
           <SegmentedControl
             label="Vocals"
             name="vocal-mode"
-            options={VOCAL_MODES}
+            options={vocalModes}
             value={vocalMode}
             disabled={vocalsLocked}
             hint={vocalsHint}

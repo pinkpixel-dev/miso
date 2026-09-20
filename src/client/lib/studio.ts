@@ -64,6 +64,26 @@ export const VOCAL_MODES: { value: VocalMode; label: string }[] = [
   { value: 'instrumental', label: 'Instrumental' },
 ];
 
+/**
+ * The vocal modes a family actually offers.
+ *
+ * A family that always sings drops Instrumental rather than showing it greyed
+ * out beside the two that work. The control was disabled outright for those,
+ * which also took Female and Male with it: YuE2 always sings, and the whole
+ * section came up with a not-allowed cursor on it and no way to choose a voice.
+ * Reported on 2026-09-20.
+ *
+ * An instrumental-only family keeps the single entry and the control locks,
+ * which is the phase 4.5 decision in DOCS/MEMORY.md. There is nothing to choose
+ * between, and a section that disappears when the model changes moves the rest
+ * of the form and answers nobody's question about where the vocals went.
+ */
+export function vocalModesFor(vocals: VocalSupport): { value: VocalMode; label: string }[] {
+  if (vocals === 'never') return VOCAL_MODES.filter((mode) => mode.value === 'instrumental');
+  if (vocals === 'required') return VOCAL_MODES.filter((mode) => mode.value !== 'instrumental');
+  return VOCAL_MODES;
+}
+
 /** The phrase each vocal mode contributes to the prompt. */
 const VOCAL_PHRASES: Record<VocalMode, string> = {
   female: 'female vocals',

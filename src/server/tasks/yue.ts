@@ -139,8 +139,12 @@ export const yue2: TaskDefinition = {
       min: 200,
       max: 9000,
       step: 100,
-      default: 1200,
-      help: 'The ceiling on how long the song runs. There is no length in seconds: YuE2 decides that from your lyrics, and this is the stop.',
+      // The model's own default, so the song ends where YuE2 decides rather
+      // than where Miso does. It was 1200 at first, which is about 45 seconds
+      // and cut songs off mid-arrangement: the same prompt at 4000 ran to 55
+      // seconds and stopped on its own. Measured on 2026-09-20.
+      default: 9000,
+      help: 'The ceiling on how long the song runs, not a target. There is no length in seconds: YuE2 ends the song when it is done, and this only stops a runaway. Lower it to cut songs short on purpose.',
     },
     {
       name: 'guidanceScale',

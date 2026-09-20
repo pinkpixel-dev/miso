@@ -766,6 +766,47 @@ This is a task returning a take **and** an artifact, which nothing did before. `
 to hang the file off. A generated song has no source, so the score hangs off the take instead.
 With `cot=off` no artifact comes back at all, which is an ordinary outcome and not a failure.
 
+### The lyrics are read, and the Q8 vocals are still poor
+
+Investigated on 2026-09-20 after a song came back with music and unintelligible singing rather
+than the words it was given.
+
+The lyrics reach the model. Two runs at seed 555 with the same style and different words came
+back different, and at different lengths, 41.8 s against 52.76 s. A field that was accepted and
+ignored would have returned the same audio twice.
+
+The planner writes real vocals. The ABC from a `cot=full` run carries intro, verse and chorus
+sections with 38 note characters on the Vocal voice against 24 rests, so the plan is a song
+with singing in it.
+
+What is wrong is how the vocal renders. Separating the output with BS-RoFormer and measuring
+the vocals stem:
+
+| Source | Vocals stem zcr | Vocals stem level |
+|---|---:|---:|
+| ACE-Step song, for reference | 1908 | 1374 |
+| YuE2 Q8, `guidance_scale` default | 7961 | 1327 |
+| YuE2 Q8, `guidance_scale` 1.5 | 12808 | 1241 |
+
+Similar level, four to seven times the zero-crossing rate. There is energy where the vocal
+should be and it is noise-like rather than tonal, which is what "singing but not words" sounds
+like. Raising the guidance made it worse, so that is not the lever.
+
+The untested suspect is the Q8 package. `docs/models/yue2.md` puts parity at `>= 0.9999` with
+bf16 and `>= 0.995` with q8_0, "which accumulates more error over long prefixes", and the
+quantization section of the upstream README says non-fp32 output showed noticeably weaker
+similarity to the fp32 reference and that even output length can shift. A sung line is the long
+prefix case. `yue2_main_bf16` is 7.26 GB and was never installed, so this is a hypothesis with
+evidence behind it rather than a measurement.
+
+### Length is the model's decision, not the ceiling's
+
+`semantic_max_tokens` is a stop, not a target. At 1200 a song ran 44 s and was still
+mid-arrangement. The same prompt at 4000 ran 54.96 s and ended on its own, so raising the
+ceiling further changes nothing for a short lyric. `generate.yue2` sends the model's own
+default of 9000 for that reason: 1200 was a probe value that became a form default and was
+quietly cutting songs off.
+
 ### Two packages into one folder, and they cannot race
 
 A working YuE2 needs a model package and a decoder package. All five write the same four

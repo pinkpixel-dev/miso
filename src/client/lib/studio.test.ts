@@ -6,6 +6,7 @@ import {
   compilePrompt,
   effectiveVocalMode,
   supportsGuided,
+  vocalModesFor,
   wantsLyrics,
 } from './studio.ts';
 
@@ -178,6 +179,32 @@ describe('compile, per family', () => {
     for (const family of ['ace_step', 'minimax_music3', 'heartmula', 'stable_audio']) {
       expect(compile(EMPTY_STUDIO, family).prompt).toBe('');
       expect(compile(EMPTY_STUDIO, family).params).toEqual({});
+    }
+  });
+});
+
+describe('vocalModesFor', () => {
+  it('drops Instrumental for a family that always sings', () => {
+    // Reported on 2026-09-20: the control was disabled outright for these, so
+    // Female and Male went with it and there was no way to choose a voice.
+    expect(vocalModesFor('required').map((mode) => mode.value)).toEqual(['female', 'male']);
+  });
+
+  it('leaves only Instrumental for a family that cannot sing', () => {
+    expect(vocalModesFor('never').map((mode) => mode.value)).toEqual(['instrumental']);
+  });
+
+  it('offers everything to a family that does both', () => {
+    expect(vocalModesFor('both').map((mode) => mode.value)).toEqual([
+      'female',
+      'male',
+      'instrumental',
+    ]);
+  });
+
+  it('always offers something to choose, so the control is never empty', () => {
+    for (const support of ['both', 'required', 'never'] as const) {
+      expect(vocalModesFor(support).length).toBeGreaterThan(0);
     }
   });
 });
