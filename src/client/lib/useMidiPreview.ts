@@ -11,11 +11,19 @@ import { noteFrequency, notesFrom, previewDuration, typicalPolyphony, voiceGain 
  * triangle wave per note. It is meant to answer "did it get the notes right",
  * not to be listened to for pleasure.
  *
- * Every note is scheduled up front rather than in a rolling window. The Web
- * Audio clock does the timing, which is accurate in a way a JavaScript timer is
- * not, and an ordinary transcription is a few hundred notes. A very long one is
- * a few thousand short-lived nodes, which browsers handle, and the alternative
- * is a scheduler loop that can drift.
+ * Notes go to the audio clock a couple of seconds at a time rather than all
+ * at once. Scheduling the whole piece up front is what this used to do, and it
+ * does not work: an oscillator that has not reached its start time is still in
+ * the graph and is still processed every render quantum, so a 7298 note
+ * transcription meant 14598 live nodes for the whole four minutes. Ten seconds
+ * of that graph measured at 0.42 times realtime, against a deadline the audio
+ * thread has to meet, so every callback underran and the preview went silent
+ * after the first buffer. See `/DOCS/ERRORS.md`.
+ *
+ * The window keeps the live voice count near the polyphony rather than near
+ * the length, so the cost is flat however long the piece runs. The Web Audio
+ * clock still times every note it has been handed, which means the refill only
+ * has to be punctual to within the window, never to within a note.
  *
  * Pausing and seeking both work by throwing the graph away and scheduling what
  * is left from the new position, which is why `notesFrom` exists. Nothing is
@@ -30,6 +38,24 @@ const RELEASE_SECONDS = 0.06;
 
 /** A breath before the first note, so scheduling is never in the past. */
 const LEAD_SECONDS = 0.06;
+
+/**
+ * How far ahead notes are handed out, and how often that is topped up.
+ *
+ * The refill has to beat the window or a gap opens. Half a second against two
+ * leaves margin for the one second Chrome clamps timers to in a background
+ * tab, so a preview left playing behind another tab does not stutter.
+ */
+const WINDOW_SECONDS = 2;
+const REFILL_MS = 500;
+
+/** A note that is scheduled right now, and what it takes to let go of it. */
+interface Voice {
+  oscillator: OscillatorNode;
+  envelope: GainNode;
+  /** Context time the oscillator stops at, after which this can be dropped. */
+  stopAt: number;
+}
 
 export interface MidiPreview {
   playing: boolean;
@@ -50,8 +76,15 @@ export function useMidiPreview(notes: MidiNote[]): MidiPreview {
 
   const contextRef = useRef<AudioContext | undefined>(undefined);
   const masterRef = useRef<GainNode | undefined>(undefined);
-  const voicesRef = useRef<OscillatorNode[]>([]);
+  const limiterRef = useRef<DynamicsCompressorNode | undefined>(undefined);
+  const voicesRef = useRef<Voice[]>([]);
   const frameRef = useRef<number | undefined>(undefined);
+  const timerRef = useRef<number | undefined>(undefined);
+  /** What this run has left to schedule, and how far down it the window is. */
+  const pendingRef = useRef<MidiNote[]>([]);
+  const nextRef = useRef(0);
+  /** Context time of this run's position zero, which note times are added to. */
+  const beginRef = useRef(0);
   /**
    * The context time at which this run's position zero was, or would have
    * been. Position is then one subtraction away whatever the run started from,
@@ -60,12 +93,20 @@ export function useMidiPreview(notes: MidiNote[]): MidiPreview {
   const originRef = useRef(0);
   const positionRef = useRef(0);
 
-  const duration = previewDuration(notes);
-  const available = notes.length > 0;
+  // The window walks the notes in order and stops at the first one past its
+  // horizon, so they have to be in order. They arrive sorted; one pass here
+  // costs little and means the walk does not rest on that staying true.
+  const ordered = useMemo(
+    () => [...notes].sort((left, right) => left.start - right.start),
+    [notes],
+  );
+
+  const duration = previewDuration(ordered);
+  const available = ordered.length > 0;
 
   // The level is a sweep over every note, so it is worth not repeating it on
   // each play, pause and seek of the same transcription.
-  const level = useMemo(() => voiceGain(typicalPolyphony(notes)), [notes]);
+  const level = useMemo(() => voiceGain(typicalPolyphony(ordered)), [ordered]);
 
   const setBoth = useCallback((seconds: number) => {
     positionRef.current = seconds;
@@ -77,32 +118,111 @@ export function useMidiPreview(notes: MidiNote[]): MidiPreview {
    *
    * Two steps, in this order for a reason. Disconnecting the one node
    * everything runs through is what guarantees the silence: it is a single
-   * call, and it cannot half succeed the way a loop over several thousand
-   * oscillators can.
+   * call, and it cannot half succeed the way a loop over the live voices can.
    *
    * The loop that follows is about memory rather than sound. A disconnected
    * oscillator is inaudible but stays alive until the stop time it was given,
-   * which on a long transcription is minutes away, and seeking builds a whole
-   * new set. Stopping them hands them back now. It runs after the disconnect
-   * so that one throwing cannot leave anything sounding.
+   * and a held note can be seconds away. Stopping and unhooking hands it back
+   * now. The loop runs after the disconnect so that one throwing cannot leave
+   * anything sounding.
+   *
+   * Clearing the refill is the third thing, and it is not optional: a timer
+   * left running would keep handing notes to a graph that is meant to be off.
    */
   const silence = useCallback(() => {
     if (frameRef.current !== undefined) cancelAnimationFrame(frameRef.current);
     frameRef.current = undefined;
+    if (timerRef.current !== undefined) clearInterval(timerRef.current);
+    timerRef.current = undefined;
 
     masterRef.current?.disconnect();
     masterRef.current = undefined;
+    limiterRef.current?.disconnect();
+    limiterRef.current = undefined;
 
     for (const voice of voicesRef.current) {
       try {
-        voice.stop();
+        voice.oscillator.stop();
       } catch {
-        // Already finished, which is the ordinary case for everything that
-        // played before the seek. Nothing to do about it and nothing wrong.
+        // Already finished, which is the ordinary case for a voice the window
+        // has not pruned yet. Nothing to do about it and nothing wrong.
       }
+      voice.oscillator.disconnect();
+      voice.envelope.disconnect();
     }
     voicesRef.current = [];
+
+    // Nothing left to hand out. Without this the next refill would carry on
+    // from the middle of the run that was just stopped.
+    pendingRef.current = [];
+    nextRef.current = 0;
   }, []);
+
+  /**
+   * Hands out the notes that begin inside the window, then drops what is done.
+   *
+   * It walks rather than filters. The notes are in order, so the first one
+   * past the horizon ends the pass and the next refill picks up from there,
+   * which is what keeps this cheap enough to run twice a second. Sweeping the
+   * whole list every time would be the cost the window exists to avoid.
+   *
+   * Pruning matters as much as scheduling. A voice past its stop time is
+   * silent, but it is still a node in the graph until it is unhooked, and
+   * leaving them to pile up would rebuild the problem the window solves.
+   */
+  const refill = useCallback(() => {
+    const context = contextRef.current;
+    const master = masterRef.current;
+    if (!context || !master) return;
+
+    const horizon = context.currentTime + WINDOW_SECONDS;
+    const begin = beginRef.current;
+    const pending = pendingRef.current;
+
+    while (nextRef.current < pending.length) {
+      const note = pending[nextRef.current];
+      // The loop bound already rules this out. The index signature does not
+      // know that, and a break is cheaper than asserting at it.
+      if (note === undefined) break;
+      const startAtTime = begin + note.start;
+      if (startAtTime >= horizon) break;
+      nextRef.current += 1;
+
+      const oscillator = context.createOscillator();
+      const envelope = context.createGain();
+
+      oscillator.type = 'triangle';
+      oscillator.frequency.value = noteFrequency(note.pitch);
+
+      // A note the model gave no length is still worth hearing, so anything
+      // that would be instantaneous gets a short fixed tap instead of nothing.
+      const endAt = Math.max(startAtTime + 0.05, begin + note.end);
+      const stopAt = endAt + 0.01;
+
+      envelope.gain.setValueAtTime(0, startAtTime);
+      envelope.gain.linearRampToValueAtTime(level, startAtTime + ATTACK_SECONDS);
+      envelope.gain.setValueAtTime(
+        level,
+        Math.max(startAtTime + ATTACK_SECONDS, endAt - RELEASE_SECONDS),
+      );
+      envelope.gain.linearRampToValueAtTime(0, endAt);
+
+      oscillator.connect(envelope);
+      envelope.connect(master);
+      oscillator.start(startAtTime);
+      oscillator.stop(stopAt);
+
+      voicesRef.current.push({ oscillator, envelope, stopAt });
+    }
+
+    const now = context.currentTime;
+    voicesRef.current = voicesRef.current.filter((voice) => {
+      if (voice.stopAt > now) return true;
+      voice.oscillator.disconnect();
+      voice.envelope.disconnect();
+      return false;
+    });
+  }, [level]);
 
   const startAt = useCallback(
     (from: number) => {
@@ -136,40 +256,22 @@ export function useMidiPreview(notes: MidiNote[]): MidiPreview {
       master.connect(limiter);
       limiter.connect(context.destination);
       masterRef.current = master;
+      limiterRef.current = limiter;
 
       const begin = context.currentTime + LEAD_SECONDS;
+      beginRef.current = begin;
       originRef.current = begin - from;
 
-      const voices: OscillatorNode[] = [];
+      // Everything from here on, for the window to hand out as it goes.
+      pendingRef.current = notesFrom(ordered, from);
+      nextRef.current = 0;
+      voicesRef.current = [];
 
-      for (const note of notesFrom(notes, from)) {
-        const oscillator = context.createOscillator();
-        const envelope = context.createGain();
+      // The first pass runs now rather than on the first tick of the timer,
+      // so the opening notes are scheduled before LEAD_SECONDS is spent.
+      refill();
+      timerRef.current = window.setInterval(refill, REFILL_MS);
 
-        oscillator.type = 'triangle';
-        oscillator.frequency.value = noteFrequency(note.pitch);
-
-        const startAtTime = begin + note.start;
-        // A note the model gave no length is still worth hearing, so anything
-        // that would be instantaneous gets a short fixed tap instead of nothing.
-        const endAt = Math.max(startAtTime + 0.05, begin + note.end);
-
-        envelope.gain.setValueAtTime(0, startAtTime);
-        envelope.gain.linearRampToValueAtTime(level, startAtTime + ATTACK_SECONDS);
-        envelope.gain.setValueAtTime(
-          level,
-          Math.max(startAtTime + ATTACK_SECONDS, endAt - RELEASE_SECONDS),
-        );
-        envelope.gain.linearRampToValueAtTime(0, endAt);
-
-        oscillator.connect(envelope);
-        envelope.connect(master);
-        oscillator.start(startAtTime);
-        oscillator.stop(endAt + 0.01);
-        voices.push(oscillator);
-      }
-
-      voicesRef.current = voices;
       setBoth(from);
       setPlaying(true);
 
@@ -191,7 +293,7 @@ export function useMidiPreview(notes: MidiNote[]): MidiPreview {
       };
       frameRef.current = requestAnimationFrame(tick);
     },
-    [available, duration, level, notes, setBoth, silence],
+    [available, duration, ordered, refill, setBoth, silence],
   );
 
   const play = useCallback(() => {
@@ -221,7 +323,9 @@ export function useMidiPreview(notes: MidiNote[]): MidiPreview {
   useEffect(
     () => () => {
       if (frameRef.current !== undefined) cancelAnimationFrame(frameRef.current);
+      if (timerRef.current !== undefined) clearInterval(timerRef.current);
       masterRef.current?.disconnect();
+      limiterRef.current?.disconnect();
       void contextRef.current?.close();
       contextRef.current = undefined;
     },
@@ -234,7 +338,7 @@ export function useMidiPreview(notes: MidiNote[]): MidiPreview {
     silence();
     setPlaying(false);
     setBoth(0);
-  }, [notes, setBoth, silence]);
+  }, [ordered, setBoth, silence]);
 
   return { playing, position, duration, available, play, pause, seek };
 }
