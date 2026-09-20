@@ -47,6 +47,19 @@ export function gainToDecibels(gain: number): number {
   return gain < SILENT ? Number.NEGATIVE_INFINITY : 20 * Math.log10(gain);
 }
 
+/**
+ * Where the peak would land after a gain, without applying it.
+ *
+ * The page puts this next to the gain box, so somebody can see a change would
+ * clip before making it. Gain is one multiplication over every sample, so the
+ * peak moves by exactly the same factor and the audio does not have to be
+ * touched to find out. Tested against actually applying the gain, because a
+ * prediction that drifts from the result is worse than no prediction.
+ */
+export function peakAfterGain(peak: number, decibels: number): number {
+  return peak * decibelsToGain(decibels);
+}
+
 /** The loudest sample anywhere in the audio, which is what clipping is about. */
 export function peakOf(channels: Float32Array[]): number {
   let highest = 0;

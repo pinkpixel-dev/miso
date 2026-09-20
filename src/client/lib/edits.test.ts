@@ -11,6 +11,7 @@ import {
   gain,
   gainToDecibels,
   normalize,
+  peakAfterGain,
   peakOf,
   trim,
   type Edit,
@@ -209,6 +210,32 @@ describe('normalize', () => {
     const out = normalize(tone, -6);
     // Same wave, one factor quieter. The ratio between any two samples holds.
     expect(out[0]![10]! / out[0]![20]!).toBeCloseTo(tone[0]![10]! / tone[0]![20]!, 4);
+  });
+});
+
+describe('peakAfterGain', () => {
+  it('agrees with actually applying the gain', () => {
+    // The whole point of the prediction is that it matches the result. If these
+    // two ever disagree, the warning beside the gain box is lying.
+    const source = [sine(100, RATE, 1)];
+    const before = peakOf(source);
+
+    for (const decibels of [-12, -6, -0.5, 0, 3, 6, 12]) {
+      expect(peakAfterGain(before, decibels)).toBeCloseTo(peakOf(gain(source, decibels)), 5);
+    }
+  });
+
+  it('predicts clipping before it happens', () => {
+    const quiet = gain([sine(100, RATE, 1)], -6);
+    const peakNow = peakOf(quiet);
+
+    expect(peakAfterGain(peakNow, 3)).toBeLessThan(1);
+    expect(peakAfterGain(peakNow, 12)).toBeGreaterThan(1);
+    expect(peakOf(gain(quiet, 12))).toBeGreaterThan(1);
+  });
+
+  it('leaves silence silent whatever the gain', () => {
+    expect(peakAfterGain(0, 24)).toBe(0);
   });
 });
 

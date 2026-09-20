@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { CutControls } from '../components/workbench/CutControls.tsx';
 import { EditChain } from '../components/workbench/EditChain.tsx';
+import { LevelControls } from '../components/workbench/LevelControls.tsx';
 import { SaveControls } from '../components/workbench/SaveControls.tsx';
 import { SourceFacts } from '../components/workbench/SourceFacts.tsx';
 import { SourcePanel } from '../components/workbench/SourcePanel.tsx';
@@ -170,6 +171,15 @@ export function ToolsRoute() {
                   workbench.pushEdit({ kind: 'trim', start: region.start, end: region.end })
                 }
                 onSplit={() => void workbench.splitAt(playhead)}
+              />
+            </div>
+
+            <div className="border-t border-line pt-5">
+              <LevelControls
+                peak={workbench.renderedPeak}
+                duration={renderedDuration}
+                busy={workbench.saving !== undefined}
+                onApply={workbench.pushEdit}
               />
             </div>
 
