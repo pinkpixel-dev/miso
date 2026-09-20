@@ -62,7 +62,7 @@ services:
     restart: unless-stopped
 
   miso:
-    image: ghcr.io/pinkpixel-dev/miso:1.3.0
+    image: ghcr.io/pinkpixel-dev/miso:1.4.0
     # Building from a checkout instead of pulling:
     # build: .
     environment:
