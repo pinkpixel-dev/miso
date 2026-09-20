@@ -18,6 +18,16 @@ this file, so the earlier history lives in the git log.
 - Added a limiter in front of the output. The level is set from what is
   sounding 95 percent of the time, and this is what the other 5 percent costs
   instead of clipping.
+- **Fixed a long transcription that played for a moment and then went silent.**
+  The preview built an oscillator for every note the moment you pressed play,
+  and a note that has not started yet still costs the audio thread work on
+  every render quantum. A 7298 note transcription held 14598 live nodes for its
+  whole four minutes, which takes more than twice realtime to render, so the
+  audio thread missed every deadline after the first one. Notes now go out
+  about two seconds at a time and each one is released once it has finished.
+  The same transcription runs 99 voices at once instead of 7298.
+- Pressing play on a long transcription no longer freezes the page for most of
+  a second while its notes are scheduled.
 
 ### 🎛️ Transport
 
