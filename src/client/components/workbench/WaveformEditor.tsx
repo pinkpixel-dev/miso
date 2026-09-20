@@ -36,7 +36,7 @@ export function WaveformEditor({
   duration,
   region,
   onRegion,
-  onPlayhead,
+  onCutPoint,
   onBeforePlay,
 }: {
   /** The rendered audio, with every edit already applied. */
@@ -45,8 +45,14 @@ export function WaveformEditor({
   duration: number;
   region: Region;
   onRegion: (region: Region) => void;
-  /** Where the play head is, which is what a split cuts at. */
-  onPlayhead: (seconds: number) => void;
+  /**
+   * Where somebody put the cursor, which is what a split cuts at.
+   *
+   * Only a deliberate click or drag reports here, never playback. A cut point
+   * that crept along with the play head could not be typed into, and would
+   * wander off the moment you auditioned the track before cutting it.
+   */
+  onCutPoint: (seconds: number) => void;
   /** Called before this player starts, so the dock can get out of the way. */
   onBeforePlay: () => void;
 }) {
@@ -65,8 +71,8 @@ export function WaveformEditor({
   wanted.current = region;
   const report = useRef(onRegion);
   report.current = onRegion;
-  const reportPlayhead = useRef(onPlayhead);
-  reportPlayhead.current = onPlayhead;
+  const reportCutPoint = useRef(onCutPoint);
+  reportCutPoint.current = onCutPoint;
 
   // Built once. Nothing in here changes for the life of the container.
   useEffect(() => {
@@ -98,8 +104,9 @@ export function WaveformEditor({
     instance.on('play', () => setPlaying(true));
     instance.on('pause', () => setPlaying(false));
     instance.on('finish', () => setPlaying(false));
-    instance.on('timeupdate', (time: number) => reportPlayhead.current(time));
-    instance.on('interaction', (time: number) => reportPlayhead.current(time));
+    // Interaction only. `timeupdate` fires several times a second during
+    // playback, and a cut point moving on its own is not a cut point.
+    instance.on('interaction', (time: number) => reportCutPoint.current(time));
     instance.on('error', (cause) => {
       setError(cause instanceof Error ? cause.message : String(cause));
       setReady(false);

@@ -3,6 +3,42 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.26.0 - September 19, 2026
+
+### 🎛️ Audio workbench
+
+- New page at `/projects/:id/tools`, reachable from the project tool row and from the import
+  zone. It is the first tool in Miso with no model behind it: nothing queues, nothing waits on
+  a GPU, and the service only hears about the work when you save.
+- Convert MP3, M4A, FLAC or WAV to 16-bit PCM WAV at 44.1 kHz or 48 kHz. This is what makes an
+  imported MP3 usable for stem separation, which refuses anything that is not 44.1 kHz.
+- Work from a file on the disk or from a take already in the project. A file dropped here is
+  not uploaded until you choose to save the result.
+- Trim to a region, and split at a cut point into two takes.
+- Fade in and fade out, each linear or exponential, gain in decibels, and peak normalize to a
+  ceiling that defaults to -1 dB.
+- Undo, and a numbered list of what is currently applied. The source is never modified, so
+  undo re-renders from it rather than keeping a copy per step.
+- The page says what the file actually is on the way in, including the sample rate, which is
+  the thing that decides whether a model will accept it.
+- Clipping is said before it happens. The peak a gain would leave is shown beside the gain box,
+  in words and in a pill rather than in colour alone.
+
+### 🐛 Fixes
+
+- Reading a take into the browser no longer fails with "Failed to fetch". A whole file request
+  is refused by some browser extensions, so stored audio is now read in 4 MB byte ranges, the
+  same way the dock already streams it. See `DOCS/ERRORS.md`.
+
+### 🧹 Maintenance
+
+- The WAV writer and the sample rate converter moved to `src/shared/`, so the browser and the
+  service write the same file through the same code. The WAV reader stayed on the service,
+  where it is the only caller.
+- `RegionControls` moved out of `components/remix/`, now that two pages place a region.
+- No new dependency. `music-metadata` was already installed and is now also used in the
+  browser, loaded dynamically so it stays out of the main bundle.
+
 ## 0.25.0 - September 19, 2026
 
 ### 📦 Models

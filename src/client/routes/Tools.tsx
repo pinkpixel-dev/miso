@@ -46,17 +46,20 @@ export function ToolsRoute() {
   // audio rather than the source, so both start again when the chain changes
   // the length underneath them.
   //
+  // The cut point is set by clicking the waveform or by typing, never by
+  // playback, so auditioning a track before cutting it does not move the cut.
+  //
   // The whole track, deliberately, rather than the middle third `defaultRegion`
   // gives the remix page. There the region marks a section to work on, and a
   // sensible guess helps. Here it marks what to keep, so anything less than all
   // of it is the page proposing to throw two thirds of the track away before
   // anybody has asked for anything.
   const [region, setRegion] = useState<Region>({ start: 0, end: 0 });
-  const [playhead, setPlayhead] = useState(0);
+  const [cutPoint, setCutPoint] = useState(0);
 
   useEffect(() => {
     setRegion({ start: 0, end: renderedDuration });
-    setPlayhead(0);
+    setCutPoint(0);
   }, [renderedDuration]);
 
   // Arriving here follows a link, and a client side route change leaves focus
@@ -151,7 +154,7 @@ export function ToolsRoute() {
                 duration={renderedDuration}
                 region={region}
                 onRegion={setRegion}
-                onPlayhead={setPlayhead}
+                onCutPoint={setCutPoint}
                 onBeforePlay={() => {
                   // The dock and this editor are two players on one page.
                   // Only one of them should be making noise.
@@ -164,13 +167,14 @@ export function ToolsRoute() {
               <CutControls
                 region={region}
                 duration={renderedDuration}
-                playhead={playhead}
+                cutPoint={cutPoint}
                 busy={workbench.saving !== undefined}
                 onRegion={setRegion}
+                onCutPoint={setCutPoint}
                 onTrim={() =>
                   workbench.pushEdit({ kind: 'trim', start: region.start, end: region.end })
                 }
-                onSplit={() => void workbench.splitAt(playhead)}
+                onSplit={() => void workbench.splitAt(cutPoint)}
               />
             </div>
 

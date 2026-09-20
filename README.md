@@ -8,13 +8,14 @@ Miso runs on [audio.cpp](https://github.com/0xShug0/audio.cpp), a C++ inference 
 audio models. Miso is the studio around it: projects that persist, a history of every take,
 and a record of exactly how each clip was made so you can change one thing and try again.
 
-> **Early days.** Phases 1 through 6 of the [roadmap](DOCS/ROADMAP.md) are done. Miso installs
-> models, holds your projects and audio, generates music
+> **Early days.** Phases 1 through 6 of the [roadmap](DOCS/ROADMAP.md) are done, and so is
+> phase 7.5. Miso installs models, holds your projects and audio, generates music
 > with ACE-Step from a guided prompt builder with lyrics written for you if you want them,
 > repaints a section of a track, covers a take, holds any two takes against each other,
-> splits a song into stems you can mix, export and put back together, and sings a vocal stem
-> again in another voice so you can swap it back over the music. What is left is the smaller
-> finishing tools, and packaging Miso so somebody else can run it.
+> splits a song into stems you can mix, export and put back together, sings a vocal stem
+> again in another voice so you can swap it back over the music, and now converts, trims,
+> fades and levels audio in the browser without touching a model. What is left is packaging
+> Miso so somebody else can run it.
 
 ## Why it exists
 
@@ -124,6 +125,41 @@ A few things worth knowing:
 - None of this needs audio.cpp. Projects, imports, playback, and export all work with the
   server stopped. Only the Models screen needs it.
 - Settings has a Storage section showing what each project is using.
+
+### Fixing up audio before you use it
+
+Press **Audio tools** in the row at the top of a project, and you get a page for the boring
+but necessary stuff: converting a file, cutting off dead air, and fixing a track that is too
+quiet.
+
+It is worth knowing about for one specific reason. Stem separation refuses anything that is
+not 44.1 kHz, so an mp3 you imported will not split. This page is how you fix that. Drop the
+mp3 in, pick 44.1 kHz, save it into the project, and separation will take the result.
+
+Nothing here uses a model and nothing goes into the queue. It all happens in your browser and
+finishes immediately. The only thing that reaches Miso is the file you save at the end, which
+lands as an ordinary take you can use anywhere.
+
+You can work from a file on your disk or from a take already in the project. A file you drop
+here is **not** uploaded until you choose to save it, so you can convert something and throw
+it away without leaving anything behind.
+
+What you can do to it:
+
+- **Convert** to 16-bit WAV at 44.1 kHz or 48 kHz. 44.1 is what separation and voice
+  conversion need, 48 is what generation writes.
+- **Trim** to a region. Drag on the waveform, or type the start and end in seconds.
+- **Split** at a point, which saves both halves as two takes.
+- **Fade in and out**, either a straight line or a curve.
+- **Gain** in decibels, and **normalize** to bring a quiet track up.
+
+Everything except split can be undone, and the page keeps a numbered list of what you have
+applied so far. Split is the exception because it writes two takes into the project straight
+away, and the button says so before you press it.
+
+The page tells you the real sample rate of whatever you opened, which is usually the thing you
+actually wanted to know. It also warns you before a gain change would clip, rather than after
+you have saved a distorted file.
 
 ### 4. Get some models
 
@@ -304,6 +340,8 @@ cannot show it back to you.
 - [DOCS/ROADMAP.md](DOCS/ROADMAP.md) is the build order and checklist
 - [DOCS/ERRORS.md](DOCS/ERRORS.md) records problems already solved, worth reading before
   debugging something that looks new
+- [DOCS/RELEASE.md](DOCS/RELEASE.md) is what changed in the current release, and what to know
+  before upgrading
 
 ## License
 
