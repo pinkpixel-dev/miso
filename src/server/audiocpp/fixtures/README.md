@@ -841,6 +841,15 @@ same seed and the same melody A through a queued `generate.yue2` job produced a 
 take of 39.718 s, matching the direct run to the millisecond, which is what says the score
 reached the model unchanged.
 
+**Confirmed by listening, and this is the part the numbers do not cover.** Melody A was
+`c4c4g4g4|a4a4g8|f4f4e4e4|d4d4c8` in C, which is Twinkle Twinkle Little Star. The take sings
+that tune. Everything above proves the score changes the output, which a model treating it as a
+vague hint would also do. Only the ear separates followed from read, and it is followed.
+
+That distinction is what the cover work rests on. A faithful consumer means the accuracy risk in
+a cover sits entirely in getting a melody out of a recording, not in what YuE2 does with it
+afterwards.
+
 ### Two packages into one folder, and they cannot race
 
 A working YuE2 needs a model package and a decoder package. All five write the same four
