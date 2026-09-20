@@ -3,6 +3,64 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 1.0.0 - September 20, 2026
+
+First public release. Miso now starts as a stack rather than as two servers you
+wire together by hand, which was the last thing standing between it and somebody
+else running it.
+
+### 📦 Install
+
+- **Miso and audio.cpp start together.** `docker compose up -d` brings up both
+  containers, with project data and model weights in their own volumes. Miso is
+  the only service with a published port, because audio.cpp's management
+  interface asks nobody for a password.
+- **A preflight check that catches the failure that looks like success.**
+  `./scripts/preflight.sh` compares the UVM device major number on the host with
+  the one inside a container. A broken NVIDIA container setup otherwise starts
+  fine, passes `nvidia-smi`, and quietly runs everything on the processor.
+- **Existing model directories work.** `MISO_MODELS_DIR` points the stack at
+  weights you already downloaded instead of fetching them again, which on this
+  machine is 39 GB not moved twice.
+- **The audio.cpp image is one variable.** `AUDIOCPP_TAG` selects CUDA 12, CUDA
+  13, Vulkan or CPU. CUDA 12 is the default because it runs on older drivers.
+- Added `GET /api/health`, which reports the running version and whether the
+  database opened. It never probes audio.cpp, so a slow GPU box cannot get Miso
+  restarted.
+
+### 🐛 Fixes
+
+- **A job no longer fails on a source file you can see in your library.**
+  audio.cpp stages uploads into a directory it makes per server start and has no
+  delete route, while Miso's cache is keyed by the server address, which does not
+  change across a restart. Every restart stranded every remembered path. A
+  failure naming a reused path now drops that entry and uploads the file again.
+
+### ⌨️ Keyboard
+
+- Space plays and pauses, Ctrl or Cmd with Enter generates without leaving the
+  prompt box, and `?` lists everything. The play shortcut leaves Space alone
+  when the focused control already uses it, so buttons keep working.
+- Compare's existing F key moved into the same table, so the list cannot
+  describe a shortcut that no longer exists.
+
+### 🆕 First run
+
+- A fresh install now says what to download. The Start screen names one model
+  rather than listing the catalog, and says nothing while the catalog is still
+  scanning or the backend is unreachable.
+
+### 💾 Storage
+
+- Settings now reports what the installed model weights come to, beside what the
+  projects use. It reported 6 MB of projects on a machine holding 41 GB of
+  weights before, which answered the wrong question.
+
+### 📖 Documentation
+
+- `README.md` rewritten around the stack, with troubleshooting for the GPU traps,
+  where the disk goes, and a section on running from source.
+
 ## 0.30.0 - September 20, 2026
 
 ### 🐛 MIDI preview

@@ -8,14 +8,17 @@ Miso runs on [audio.cpp](https://github.com/0xShug0/audio.cpp), a C++ inference 
 audio models. Miso is the studio around it: projects that persist, a history of every take,
 and a record of exactly how each clip was made so you can change one thing and try again.
 
-> **Early days.** Phases 1 through 6 of the [roadmap](DOCS/ROADMAP.md) are done, and so is
-> phase 7.5. Miso installs models, holds your projects and audio, generates music
-> with ACE-Step from a guided prompt builder with lyrics written for you if you want them,
-> repaints a section of a track, covers a take, holds any two takes against each other,
-> splits a song into stems you can mix, export and put back together, sings a vocal stem
-> again in another voice so you can swap it back over the music, and now converts, trims,
-> fades and levels audio in the browser without touching a model. What is left is packaging
-> Miso so somebody else can run it.
+<!-- TODO: screenshot of a project open, with a waveform loaded and the queue visible. -->
+
+> **Where this is at.** This is the first public release. Miso installs models, keeps your
+> projects and audio, generates with ACE-Step from a guided prompt builder with lyrics
+> written for you if you want them, repaints a section of a track, covers a take, holds any
+> two takes against each other, splits a song into stems you can mix and export, sings a
+> vocal stem again in another voice, transcribes a take to MIDI, makes sound effects, and
+> converts, trims, fades and levels audio in the browser without touching a model.
+>
+> I have run it on one machine, a laptop with a 16 GB RTX 4090. Other cards and other
+> drivers are untested, so if something breaks on yours I would like to hear about it.
 
 ## Why it exists
 
@@ -34,66 +37,87 @@ this runtime exposes that as a timeline edit.
 - **A desktop or workstation with an NVIDIA GPU.** These are diffusion and transformer
   models. A 16 GB card runs everything comfortably in Q8. Less will limit which models you
   can load.
-- **Docker**, with the NVIDIA container toolkit for GPU access. This is the primary
-  deployment path. You can also build audio.cpp yourself if you prefer.
-- **Node 22 or newer**, for the current source setup. The planned Compose stack will include
-  Miso's Node runtime.
+- **Docker**, with the [NVIDIA container toolkit](https://github.com/NVIDIA/nvidia-container-toolkit)
+  for GPU access.
 - **Disk.** Models are large. ACE-Step is around 6 GB and MiniMax Music 3 is around 13 GB.
+  A full set of everything Miso can use runs past 40 GB.
+- **Node 22 or newer**, only if you want to run Miso from source. The stack does not need it.
+
+Miso runs without a GPU, on the `full-cpu` image. Generation then takes minutes per take
+instead of seconds, so it is a way to look around rather than a way to work.
 
 ## Getting started
 
-The steps below are the current source setup. The planned release install is one Docker
-Compose stack containing Miso and audio.cpp on the same machine. It will keep project
-data and downloaded models in separate persistent volumes. Until that stack is built, start
-audio.cpp in Docker and run Miso through Node.
+Two containers, Miso and audio.cpp, started together by Docker Compose. Miso is the only one
+with a published port. audio.cpp stays on the internal network, which matters because its
+management interface asks nobody for a password.
 
-### 1. Start an audio.cpp server
-
-```bash
-docker run -d --name miso-audiocpp --runtime=nvidia \
-  -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all \
-  -v ./models:/app/models -p 8080:8080 \
-  ghcr.io/0xshug0/audio.cpp:full-cuda13 \
-  server --ui --ui-management --host 0.0.0.0 --port 8080 --backend cuda
-```
-
-Two parts of that command are not optional.
-
-Use `--runtime=nvidia`, **not** `--gpus all`. With `--gpus all` the container starts and
-`nvidia-smi` works inside it, so everything looks correct, while CUDA silently fails and
-falls back to the processor. The cause is a device node major number mismatch, and it is
-written up in [DOCS/ERRORS.md](DOCS/ERRORS.md).
-
-Keep `--ui-management`. Without it Miso cannot browse or download models, upload audio, or
-load a model to run. It can only check that the server is alive.
-
-Check it worked:
+### 1. Check the machine first
 
 ```bash
-curl http://127.0.0.1:8080/health
+git clone https://github.com/pinkpixel-dev/miso.git
+cd miso
+./scripts/preflight.sh
 ```
 
-You want `"backend":"cuda"` in the response. If it says `cpu`, the GPU is not reaching the
-container.
+This checks six things, and the last one is the reason it exists. A broken NVIDIA container
+setup does not announce itself. The container starts, `nvidia-smi` works inside it, and CUDA
+falls back to the processor. Generation still produces a song, just minutes later than it
+would on the card, and nothing in either log says why.
 
-### 2. Run Miso
+The script compares the UVM device major number on the host with the one inside a container,
+which is where that difference shows up. It pulls a 5 MB busybox image to do it.
+
+If a check fails, fix it before going on. The stack will start either way.
+
+### 2. Start the stack
 
 ```bash
-npm install
-npm run dev
+docker compose up -d
 ```
 
-The app is at <http://127.0.0.1:5170>. Open Settings, confirm the server URL, and press Test
-connection.
+Open <http://127.0.0.1:5171>.
 
-For a production run, build first and let the service serve everything from one port:
+The first start pulls two images and takes a while. The audio.cpp image is several
+gigabytes on its own.
+
+Miso ships no models, so the first screen tells you to download one and names which. That is
+step 4 below, and nothing can be generated until it finishes.
+
+Check the stack is up and on the GPU:
 
 ```bash
-npm run build
-npm start
+docker compose ps
+docker compose logs audiocpp
 ```
 
-That puts the whole app on <http://127.0.0.1:5171>.
+You want `ggml_cuda_init: found 1 CUDA devices` in the audio.cpp log, naming your card. That
+line only appears once a model has actually loaded, so it will not be there until after your
+first generate. `"backend":"cuda"` on its own is the flag it was asked for, not proof the
+device came up.
+
+### If you already have models on disk
+
+Anyone who has run audio.cpp outside Docker has the weights already. Point the stack at them
+instead of downloading everything again:
+
+```bash
+MISO_MODELS_DIR=/path/to/models docker compose up -d
+```
+
+The directory must be writable by uid 1000, which is the user audio.cpp runs as. If Docker
+created it for you as root, installs fail with `could not create package staging directory`.
+
+### If your driver is older, or you have no NVIDIA card
+
+The image tag is one variable:
+
+```bash
+AUDIOCPP_TAG=full-cuda13 docker compose up -d
+AUDIOCPP_TAG=full-cpu docker compose up -d
+```
+
+CUDA 12 is the default because it runs on older drivers. `full-vulkan` also exists.
 
 ### 3. Make a project and import a song
 
@@ -133,7 +157,8 @@ A few things worth knowing:
   browser you are on will work it out and save it for every other device.
 - None of this needs audio.cpp. Projects, imports, playback, and export all work with the
   server stopped. Only the Models screen needs it.
-- Settings has a Storage section showing what each project is using.
+- Settings has a Storage section showing what each project is using, and what the
+  installed models come to.
 
 ### Fixing up audio before you use it
 
@@ -193,6 +218,9 @@ user audio.cpp runs as. If Docker created it for you as root, installs fail with
 
 ### 5. Write a song
 
+<!-- TODO: screenshot of the Generate panel in guided mode, with chips picked, the built
+     prompt visible underneath, and lyrics in the editor. -->
+
 Open a project and use the Generate panel.
 
 Guided mode is the default. Give the song a title, pick style and mood chips, choose a vocal
@@ -244,26 +272,102 @@ items work in any project, and saving over a name replaces it.
 
 ## Coming back to it
 
-You only do the setup above once. After that, starting everything again is two commands.
-
-The container already exists, so start it rather than running `docker run` a second time.
-Running it again fails because the name is taken, and if you work around that with a new
-name you end up with two containers fighting over port 8080.
+You only do the setup once. After that it is one command each way.
 
 ```bash
-docker start miso-audiocpp
+docker compose up -d
+docker compose down
+```
+
+`down` stops both containers and leaves your projects and models alone. They live in Docker
+volumes, not in the containers.
+
+### Stack commands
+
+| Command | What it does |
+|---|---|
+| `docker compose up -d` | Starts both containers |
+| `docker compose down` | Stops and removes both, keeping the volumes |
+| `docker compose ps` | Shows what is running and whether Miso is healthy |
+| `docker compose logs -f audiocpp` | Follows the audio.cpp log, useful when a model fails to load |
+| `docker compose logs -f miso` | Follows Miso's own log |
+| `docker compose pull` | Fetches newer images |
+
+Miso answers `GET /api/health` with its version and whether the database opened. Docker uses
+it for the health check, and you can read it yourself:
+
+```bash
+curl http://127.0.0.1:5171/api/health
+```
+
+## Keyboard shortcuts
+
+Press `?` anywhere for the list. Space plays and pauses, Ctrl or Cmd with Enter generates
+without leaving the prompt box, and F flips between takes on the Compare screen.
+
+Nothing fires while you are typing, apart from generate, which is meant to.
+
+<!-- TODO: screenshot of the Stems screen with a separated take and the stem faders. -->
+
+## Where the disk goes
+
+Models are almost all of it. On my machine the weights come to about 41 GB and everything I
+have actually made is about 1 GB. If you are looking for space, look at the models first.
+
+Settings has a Storage section that shows both: what each project is using, and what the
+installed weights come to. Remove a model from the Models screen, which tells you how much
+it frees before you confirm.
+
+Two volumes hold everything:
+
+| Volume | Holds |
+|---|---|
+| `miso_miso-data` | The database, your projects, and every take |
+| `miso_models` | Downloaded model weights |
+
+To throw away a model download that went wrong, use the Models screen. To start completely
+over, including every project:
+
+```bash
+docker compose down -v
+```
+
+That deletes both volumes and cannot be undone.
+
+## Running from source
+
+For working on Miso itself. You still need an audio.cpp server, so either leave the stack
+running and point Miso at it, or start one yourself:
+
+```bash
+docker run -d --name miso-audiocpp --runtime=nvidia \
+  -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all \
+  -v ./models:/app/models -p 8080:8080 \
+  ghcr.io/0xshug0/audio.cpp:full-cuda12 \
+  server --ui --ui-management --host 0.0.0.0 --port 8080 --backend cuda
+```
+
+Two parts of that command are not optional.
+
+Use `--runtime=nvidia`, **not** `--gpus all`. With `--gpus all` the container starts and
+`nvidia-smi` works inside it, so everything looks correct, while CUDA silently fails and
+falls back to the processor. The cause is a device node major number mismatch.
+
+Keep `--ui-management`. Without it Miso cannot browse or download models, upload audio, or
+load a model to run. It can only check that the server is alive.
+
+Then:
+
+```bash
+npm install
 npm run dev
 ```
 
-Then open <http://127.0.0.1:5170>.
+The app is at <http://127.0.0.1:5170>. Open Settings, confirm the server URL, and press Test
+connection.
 
-Check the server is actually up and on the GPU:
-
-```bash
-curl http://127.0.0.1:8080/health
-```
-
-You want `"backend":"cuda"` in the response.
+Do not run this at the same time as the stack. Both want port 5171, and the second one to
+start cannot bind it.
 
 ### Every command
 
@@ -276,50 +380,60 @@ You want `"backend":"cuda"` in the response.
 | `npm run typecheck` | Type checks without emitting anything |
 | `npm run vendor:specs` | Re-copies the vendored model specs from audio.cpp |
 
-Use `npm run dev` while you are working on Miso. Use `npm run build` and `npm start` when you
-want the single-port version, which is also the one to point a phone at.
+## If something is not working
 
-### Container commands
+**Generation is slow and the log never says `ggml_cuda_init`.** The GPU is not reaching the
+container. Run `./scripts/preflight.sh`. The usual cause is `--gpus all` in place of
+`--runtime=nvidia`, or a missing NVIDIA container toolkit.
 
-| Command | What it does |
-|---|---|
-| `docker start miso-audiocpp` | Starts the server again |
-| `docker stop miso-audiocpp` | Stops it |
-| `docker logs -f miso-audiocpp` | Follows its output, useful when a model fails to load |
-| `docker ps` | Shows whether it is running |
+**Docker is using the `desktop-linux` context.** Docker Desktop on Linux runs in a VM and
+cannot pass a GPU through at all, however the host is set up. Switch to the system daemon:
 
-Miso itself stops with Ctrl-C in the terminal running it. The container keeps running until
-you stop it, which is usually what you want, since model loads are slow.
+```bash
+docker context use default
+```
 
-### If something is not working
+**The Models screen says management is switched off.** audio.cpp was started without
+`--ui-management`. The stack passes it already, so this only happens on a server you started
+yourself.
 
-Miso not loading at all usually means `npm run dev` is not running, or something else took
-port 5170.
+**The Models screen is unhappy while everything else works.** audio.cpp is down or
+unreachable. That split is on purpose: the library never calls audio.cpp, so projects,
+imports, playback, and export keep working with the server stopped. Check Settings and press
+Test connection.
 
-The Models screen complaining while the Library works fine means audio.cpp is down or
-unreachable. That split is by design: the library never calls audio.cpp, so projects,
-imports, playback, and export keep working with the server stopped. Check Settings, press
-Test connection, and start the container if it is not up.
+**Changing `MISO_BACKEND_URL` did nothing.** It seeds the address the first time Miso starts
+with an empty database. After that the value in Settings wins. Change it in Settings.
 
-`"backend":"cpu"` in the health response means the GPU is not reaching the container. That is
-almost always `--gpus all` instead of `--runtime=nvidia`, written up in
-[DOCS/ERRORS.md](DOCS/ERRORS.md).
+**A job failed naming a file path you never chose.** The backend restarted and left the
+uploaded source behind. Miso re-uploads and retries once on its own, so run the job again.
 
-## Optional remote backend
+**Nothing loads on 5171.** Either the stack is not up, or something else took the port.
+`npm run dev` takes the same one.
 
-The normal installation keeps Miso and audio.cpp together on one GPU desktop or workstation.
-Miso still supports a remote audio.cpp server and never assumes a shared filesystem. Audio
-goes to the server over HTTP, and results come back the same way.
+## Remote backend
 
-This is useful when the GPU is in another computer or in a GPU-capable NAS. A CPU-only NAS
-is not a recommended inference host. Set the audio.cpp address in Settings when you need
-this arrangement.
+The normal installation keeps Miso and audio.cpp together on one GPU machine. Miso also works
+with audio.cpp on a different computer and never assumes a shared filesystem. Audio goes to
+the server over HTTP and results come back the same way.
+
+This is useful when the GPU is in another computer or a GPU-capable NAS. A CPU-only NAS is
+not a recommended inference host.
+
+Run Miso on its own and give it the address:
+
+```bash
+MISO_BACKEND_URL=http://gpu-box.local:8080 docker compose up -d miso
+```
+
+Every source track then crosses the network once per job, so a slow link shows up most on
+stem separation and voice conversion.
 
 ## How it fits together
 
 Three processes, and only one of them is Miso's own.
 
-- **audio.cpp server.** Runs the models. Docker or native.
+- **audio.cpp server.** Runs the models. Its own container in the stack.
 - **Miso service.** Node and Hono, with SQLite for projects and a directory for audio. It
   owns the job queue, model residency, and every large payload. It also serves the client in
   production.
@@ -334,24 +448,16 @@ which can run to hundreds of megabytes, out of the browser.
 | Variable | Default | What it does |
 |---|---|---|
 | `MISO_PORT` | `5171` | Port the Miso service listens on |
-| `MISO_HOST` | `127.0.0.1` | Interface it binds to |
-| `MISO_DATA_DIR` | `./data` | Where the database and audio assets live |
-| `MISO_BACKEND_URL` | `http://127.0.0.1:8080` | audio.cpp address used before you set one |
+| `MISO_HOST` | `127.0.0.1`, and `0.0.0.0` in the container | Interface it binds to |
+| `MISO_DATA_DIR` | `./data`, and `/data` in the container | Where the database and audio assets live |
+| `MISO_BACKEND_URL` | `http://127.0.0.1:8080` | audio.cpp address, used only before Settings has one |
+| `MISO_MODELS_DIR` | the `models` volume | Compose only. A models directory on the host to use instead |
+| `AUDIOCPP_TAG` | `full-cuda12` | Compose only. Which audio.cpp image to run |
 
 The lyrics assistant is configured in Settings rather than through the environment. Your API
 key is stored in Miso's database under `MISO_DATA_DIR` and is sent only to the endpoint you
 configured. It is never returned to the browser, so Settings tells you a key is stored but
 cannot show it back to you.
-
-## Project docs
-
-- [DOCS/OVERVIEW.md](DOCS/OVERVIEW.md) is the technical reference for how Miso works today
-- [DOCS/PLAN.md](DOCS/PLAN.md) covers the design and why each decision was made
-- [DOCS/ROADMAP.md](DOCS/ROADMAP.md) is the build order and checklist
-- [DOCS/ERRORS.md](DOCS/ERRORS.md) records problems already solved, worth reading before
-  debugging something that looks new
-- [DOCS/RELEASE.md](DOCS/RELEASE.md) is what changed in the current release, and what to know
-  before upgrading
 
 ## License
 
@@ -360,8 +466,8 @@ Apache 2.0. See [LICENSE](LICENSE).
 One dependency carries a different licence and is worth naming. MP3 export uses
 [@breezystack/lamejs](https://www.npmjs.com/package/@breezystack/lamejs), which is LGPL-3.0,
 because every JavaScript MP3 encoder is a LAME derivative. It is a separate, unmodified package
-pulled in through npm and loaded only when you actually export an MP3. Since you run Miso from
-source, you can replace or remove it yourself.
+pulled in through npm and loaded only when you actually export an MP3. The source is here and
+the dependency is not bundled into anything, so you can replace or remove it yourself.
 
 ---
 
