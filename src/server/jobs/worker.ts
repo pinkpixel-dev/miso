@@ -18,7 +18,13 @@ import { readSettings } from '../db/settings.ts';
 import { resampleChannels } from '../../shared/resample.ts';
 import { assetPath } from '../library/storage.ts';
 import { readWav, writeWav } from '../library/wav.ts';
-import { findTask, validateParams, type TaskDefinition } from '../tasks/registry.ts';
+import {
+  findTask,
+  roleIsRequired,
+  serverTaskOf,
+  validateParams,
+  type TaskDefinition,
+} from '../tasks/registry.ts';
 import { ensureLoaded } from './residency.ts';
 import { storeArtifacts, storeResult } from './results.ts';
 import type { Asset, Job } from '../../shared/types.ts';
@@ -109,9 +115,16 @@ function backoffFor(attempts: number): number {
 export function labelFor(job: Job, task: TaskDefinition, sourceLabel?: string): string {
   if (job.title !== undefined && job.title.trim() !== '') return job.title.trim();
 
-  const prompt = job.params.prompt;
-  if (typeof prompt === 'string' && prompt.trim() !== '') {
-    const line = prompt.trim().split('\n')[0] ?? '';
+  // The prompt first, then the lyrics. Almost every generator has a prompt and
+  // it wins, so this changed nothing for any of them. `generate.sing` has no
+  // prompt at all: it is given words and a voice, and the words are what the
+  // take is. Without this every sung take in a project is called "Sing lyrics
+  // in a voice", which is the same problem the source rule below solves for
+  // separation.
+  for (const key of ['prompt', 'lyrics']) {
+    const written = job.params[key];
+    if (typeof written !== 'string' || written.trim() === '') continue;
+    const line = written.trim().split('\n')[0] ?? '';
     return line.length > 60 ? `${line.slice(0, 57)}...` : line;
   }
 
@@ -253,7 +266,13 @@ async function stageInputs(
 
   for (const role of task.inputRoles) {
     const input = inputs.find((entry) => entry.role === role);
-    if (!input) return { ok: false, message: `This job has no ${role} to work from.` };
+    if (!input) {
+      // An optional role that was left out is how a task says which of two
+      // routes it wants. Nothing is staged for it, and `buildRequest` reads the
+      // gap in `staged` the same way.
+      if (!roleIsRequired(task, role)) continue;
+      return { ok: false, message: `This job has no ${role} to work from.` };
+    }
 
     const asset = readAsset(db(), input.assetId);
     if (!asset) return { ok: false, message: `The ${role} this job used is no longer in the library.` };
@@ -379,7 +398,9 @@ async function runOne(job: Job): Promise<number> {
     return 0;
   }
 
-  const loaded = await ensureLoaded(baseUrl, task, job.modelId);
+  // Resolved from what staging actually put there, not from the params, and
+  // after staging for exactly that reason.
+  const loaded = await ensureLoaded(baseUrl, task, job.modelId, serverTaskOf(task, staged.staged));
   if (!loaded.ok) {
     setJobState(db(), job.id, 'failed', loaded.message);
     return 0;

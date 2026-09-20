@@ -56,7 +56,7 @@ describe('ensureLoaded', () => {
   it('does nothing when the model it needs is already loaded', async () => {
     const calls = backend([{ id: registrationId(ace), loaded: true }]);
 
-    expect(await ensureLoaded('http://backend', task, ace)).toEqual({ ok: true });
+    expect(await ensureLoaded('http://backend', task, ace, 'gen')).toEqual({ ok: true });
     expect(calls.map((call) => call.path)).toEqual(['/v1/models']);
   });
 
@@ -70,7 +70,7 @@ describe('ensureLoaded', () => {
       { id: registrationId(ace), loaded: false },
     ]);
 
-    expect(await ensureLoaded('http://backend', task, ace)).toEqual({ ok: true });
+    expect(await ensureLoaded('http://backend', task, ace, 'gen')).toEqual({ ok: true });
 
     const unloads = calls.filter((call) => call.path === '/v1/models/unload');
     expect(unloads.map((call) => (call.body as { id: string }).id)).toEqual(['someone-elses-ace-step']);
@@ -84,13 +84,13 @@ describe('ensureLoaded', () => {
   it('leaves a registration that is already unloaded alone', async () => {
     const calls = backend([{ id: 'idle-model', loaded: false }]);
 
-    await ensureLoaded('http://backend', task, ace);
+    await ensureLoaded('http://backend', task, ace, 'gen');
     expect(calls.some((call) => call.path === '/v1/models/unload')).toBe(false);
   });
 
   it('loads with the variant subdirectory and the session options the task needs', async () => {
     const calls = backend([]);
-    await ensureLoaded('http://backend', task, ace);
+    await ensureLoaded('http://backend', task, ace, 'gen');
 
     const load = calls.find((call) => call.path === '/v1/models/load')?.body as Record<string, unknown>;
     expect(load).toMatchObject({
@@ -117,9 +117,35 @@ describe('ensureLoaded', () => {
       }),
     );
 
-    expect(await ensureLoaded('http://backend', task, ace)).toMatchObject({
+    expect(await ensureLoaded('http://backend', task, ace, 'gen')).toMatchObject({
       ok: false,
       reason: 'not_installed',
     });
+  });
+});
+
+describe('ensureLoaded and the registration kind', () => {
+  /**
+   * The registration id is per package, so one package held under two kinds is
+   * the same id twice. Vevo2 is the first family that needs both: its singing
+   * routes are split across `svc` and `tts`, and a request naming a route the
+   * loaded kind does not carry is refused after staging, where it looks like
+   * the job was working.
+   */
+  it('loads again when the loaded model is registered under another kind', async () => {
+    const calls = backend([{ id: registrationId(ace), loaded: true }]);
+
+    expect(await ensureLoaded('http://backend', task, ace, 'tts')).toEqual({ ok: true });
+
+    const load = calls.find((call) => call.path === '/v1/models/load');
+    expect(load).toBeDefined();
+    expect((load?.body as { task: string }).task).toBe('tts');
+  });
+
+  it('still does nothing when the kind already matches', async () => {
+    const calls = backend([{ id: registrationId(ace), loaded: true }]);
+
+    expect(await ensureLoaded('http://backend', task, ace, 'gen')).toEqual({ ok: true });
+    expect(calls.map((call) => call.path)).toEqual(['/v1/models']);
   });
 });

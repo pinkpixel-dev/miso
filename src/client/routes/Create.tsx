@@ -21,7 +21,7 @@ import { useStudio } from '../lib/useStudio.ts';
  * is the list this form writes into rather than everything in the project.
  */
 export function CreateRoute() {
-  const { project, loading, error, tasks, jobs, allJobs, catalog, catalogLoading, submit } =
+  const { project, loading, error, tasks, jobs, allJobs, assets, catalog, catalogLoading, submit } =
     useStudio();
 
   /*
@@ -113,6 +113,7 @@ export function CreateRoute() {
       <GeneratePanel
         tasks={tasks}
         jobs={jobs}
+        assets={assets}
         catalog={catalog}
         catalogLoading={catalogLoading}
         prefill={prefill}

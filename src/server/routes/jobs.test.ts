@@ -73,10 +73,15 @@ describe('GET /api/tasks', () => {
     const response = await app().request('/api/tasks');
     const tasks = (await response.json()) as StudioTask[];
 
+    // The same two rules the pages themselves read: a `source` role sends a
+    // task to the remix page, anything else without a surface goes to the
+    // create column. Split on `inputRoles.length` until 2026-09-20, when
+    // `generate.sing` arrived reading a voice and no source. Under the old rule
+    // it would have matched neither filter and vanished from the UI.
     const sound = tasks.filter((task) => task.surface === 'sound');
     const rest = tasks.filter((task) => task.surface === undefined);
-    const generators = rest.filter((task) => task.inputRoles.length === 0);
-    const remixes = rest.filter((task) => task.inputRoles.length > 0);
+    const generators = rest.filter((task) => !task.inputRoles.includes('source'));
+    const remixes = rest.filter((task) => task.inputRoles.includes('source'));
 
     expect(generators.length + remixes.length + sound.length).toBe(tasks.length);
 
@@ -89,8 +94,33 @@ describe('GET /api/tasks', () => {
       'voice.vevo2',
     ]);
 
+    expect(generators.map((task) => task.id).sort()).toEqual([
+      'generate.heartmula',
+      'generate.minimax',
+      'generate.sing',
+      'generate.stableaudio',
+      'generate.text2music',
+    ]);
+
     // Neither of these makes a song, and one of them does not make audio.
     expect(sound.map((task) => task.id).sort()).toEqual(['analyze.midi', 'generate.sfx']);
+  });
+
+  it('only asks for a track the create column can offer', async () => {
+    // A create-column task that reads a track is fine, and one that reads a
+    // `source` is not: the source is the take a page opened on, and the create
+    // column has not opened on one. This is the rule that would silently put a
+    // task on two pages.
+    const response = await app().request('/api/tasks');
+    const tasks = (await response.json()) as StudioTask[];
+
+    const sing = tasks.find((task) => task.id === 'generate.sing');
+    expect(sing?.inputRoles).toEqual(['voiceRef', 'prosodyRef']);
+    expect(sing?.optionalInputRoles).toEqual(['prosodyRef']);
+    // Every role it draws a picker for has something to call it on screen.
+    for (const role of sing?.inputRoles ?? []) {
+      expect(sing?.inputRoleLabels?.[role]?.label).toBeTruthy();
+    }
   });
 
   /**

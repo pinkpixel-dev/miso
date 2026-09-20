@@ -2,6 +2,7 @@ import { Plus, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type {
+  Asset,
   Catalog,
   CatalogPackage,
   Job,
@@ -20,6 +21,7 @@ import { ConfirmDialog } from './Dialog.tsx';
 import { PromptBuilder } from './PromptBuilder.tsx';
 import { PromptSuggestionDialog } from './PromptSuggestionDialog.tsx';
 import { SavedPrompts } from './SavedPrompts.tsx';
+import { InputRoleFields, missingRequiredRole, roleInputs } from './InputRoleFields.tsx';
 import { PlainField } from './TaskFields.tsx';
 import { Button, IconButton, Panel, SegmentedControl } from './ui.tsx';
 
@@ -100,6 +102,7 @@ function describeEstimate(seconds: number | undefined): string {
 export function GeneratePanel({
   tasks,
   jobs,
+  assets,
   catalog,
   catalogLoading,
   prefill,
@@ -108,6 +111,8 @@ export function GeneratePanel({
 }: {
   tasks: StudioTask[];
   jobs: Job[];
+  /** The project's own tracks, for a task that sings in a voice from one. */
+  assets: Asset[];
   catalog: Catalog | undefined;
   catalogLoading: boolean;
   /** What a past job says this form should start from, when one was named. */
@@ -121,10 +126,13 @@ export function GeneratePanel({
     title?: string;
     studio?: StudioState;
     originalPrompt?: string;
+    inputs?: { assetId: string; role: string }[];
   }) => Promise<boolean>;
 }) {
   const [modelId, setModelId] = useState<string | undefined>();
   const [values, setValues] = useState<Values>({});
+  /** The track chosen for each role this task reads, by role name. */
+  const [roleAssets, setRoleAssets] = useState<Record<string, string>>({});
   const [title, setTitle] = useState('');
   const [builder, setBuilder] = useState<StudioState>(EMPTY_STUDIO);
   const [mode, setMode] = useState<Mode>('guided');
@@ -168,15 +176,21 @@ export function GeneratePanel({
     setSuggesting(false);
   }, [seedId]);
 
-  // Only the tasks that write a track from nothing. A remix route runs on the
-  // same families and draws its fields the same way, so without this filter
-  // every one of them turns up in the model list as though it were another
-  // model to generate with. The remix tools have their own page.
-  // No input roles means it generates from nothing, which is what a song is.
-  // `surface` is the exception: sound effects generate from nothing too and
-  // belong on the sound page instead.
+  // Only the tasks that write a new track. A remix route runs on the same
+  // families and draws its fields the same way, so without this filter every
+  // one of them turns up in the model list as though it were another model to
+  // generate with. The remix tools have their own page.
+  //
+  // The test is a `source` role rather than no roles at all. Those were the
+  // same thing until `generate.sing` arrived: it reads a voice to sing in and
+  // optionally a melody to follow, and neither is a take being worked on, so
+  // what it makes is a new track rather than a version of an old one.
+  // `remixTasks` filters on the same role from the other side, so nothing lands
+  // on both pages or on neither. `surface` is the exception: sound effects
+  // write a new track too and belong on the sound page instead.
   const generators = useMemo(
-    () => tasks.filter((task) => task.inputRoles.length === 0 && task.surface === undefined),
+    () =>
+      tasks.filter((task) => !task.inputRoles.includes('source') && task.surface === undefined),
     [tasks],
   );
   const choices = useMemo(() => modelChoices(catalog, generators), [catalog, generators]);
@@ -260,7 +274,7 @@ export function GeneratePanel({
     const built = compiled?.params[field.name];
     if (built !== undefined) return built === '';
     return (fieldValues[field.name] ?? '').trim() === '';
-  });
+  }) || missingRequiredRole(task, roleAssets);
 
   // Whether starting again would lose anything. Boxes are compared against the
   // task's own defaults rather than against empty, because a length that still
@@ -330,6 +344,9 @@ export function GeneratePanel({
       // the expansion carries with it rather than being recompiled from the
       // family that happens to be selected now.
       originalPrompt: enhanced !== undefined && !stale ? enhanced.original : undefined,
+      // Empty for every task that writes a song from nothing, which is all of
+      // them but one.
+      inputs: roleInputs(task, roleAssets),
     });
     setSubmitting(false);
 
@@ -521,6 +538,12 @@ export function GeneratePanel({
           }
         >
           <div className="flex flex-col gap-5">
+            <InputRoleFields
+              task={task}
+              assets={assets}
+              values={roleAssets}
+              onChange={(role, assetId) => setRoleAssets({ ...roleAssets, [role]: assetId })}
+            />
             {plainFields.map((field) => (
               <PlainField
                 key={field.name}

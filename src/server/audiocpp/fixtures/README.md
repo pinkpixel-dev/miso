@@ -532,20 +532,60 @@ Both refused rather than swallowed. Two conversions of one stem against two diff
 references also measured apart from each other and from the source, so the reference is doing
 work rather than being accepted and ignored.
 
-### Eleven routes, one of them built
+### Eleven routes, three of them built
 
-The error above is the route list. `voice.vevo2` runs `style_preserved_svc` and nothing else.
+The error above is the route list. All seven singing routes were run on 2026-09-20. Every one
+answers at 24 kHz mono.
 
-`humming_to_singing` was probed the same day and works: a prosody reference, a voice reference
-and `target_text`, no source audio at all, 9.8 seconds, and the output ran 7.92 seconds from an
-8 second prosody reference. So the length follows the melody it was given. It is not built,
-because it makes a vocal that did not exist before rather than remixing a take, and the remix
-page is the wrong place for that.
+| Route | Kind | Reads | Time | Output |
+|---|---|---|---|---|
+| `style_preserved_svc` | svc | source + voice | 11.3 s | 20 s, matches the source |
+| `style_converted_svc` | svc | source + voice + text | 23.0 s | 20 s, matches the source |
+| `singing_style_conversion` | svc | source + voice + text | 19.5 s | **16.48 s from a 20 s source** |
+| `humming_to_singing` | svc | melody + voice + text | 9.8 s | 7.92 s, follows the melody |
+| `instrument_to_singing` | svc | melody + voice + text | 5.9 s | 7.92 s, follows the melody |
+| `text_to_singing` | **tts** | voice + text | 4.5 s | 6.72 s, follows the words |
+| `svs` | **tts** | voice + text | 3.4 s | 3.12 s |
+
+Three are built. `voice.vevo2` runs `style_preserved_svc`. `generate.sing` runs
+`text_to_singing` when it is given no melody and `humming_to_singing` when it is.
+
+What each one is not built for:
+
+- `svs` takes the same inputs as `text_to_singing` and returned less from them. One of the two
+  is enough.
+- `instrument_to_singing` returned 7.92 seconds from the same reference as
+  `humming_to_singing`, which is what upstream means by the two sharing a melody path. Two
+  names for one path is not a choice worth putting on a form.
+- `singing_style_conversion` does not preserve source length. A conversion that comes back
+  shorter than the stem it converted cannot be mixed with that stem's siblings, which is most
+  of what a conversion is for here.
+- `style_converted_svc` works and preserves length. It is left out because it doubles the
+  conversion form for a second way to do the thing the first way already does.
+
+### The route decides the task kind, and one task needs both
+
+`text_to_singing` under a registration loaded as `svc`:
+
+```
+Vevo2 route text_to_singing is not valid for task svc
+```
+
+This is the trap behind `generate.sing`, which reaches a `tts` route and an `svc` route from
+one form. A registration id in Miso is per package, so both routes want `miso:vevo2_q8_0`
+registered two different ways. `ensureLoaded` used to return early on any id that was already
+loaded, which would have sent the second route to a registration held for the first and failed
+after staging, where the job looks like it is working. It now compares the loaded kind as well
+and loads again over the same id when they differ, which reconfigures rather than failing.
+
+Length follows the words when there is no melody and the melody when there is one. `max_tokens`
+is the ceiling on the first of those, and the default of 500 stops at about 7 seconds. 28 words
+at 1500 gave 19.28 seconds in 11.4 seconds of compute.
 
 ### Still unknown
 
-- Whether the other nine routes work here. Only `style_preserved_svc` and
-  `humming_to_singing` were run.
+- The four speech routes. `zero_shot_tts`, `style_preserved_vc`, `style_converted_vc` and
+  `editing` were never run, because Miso has nothing to do with speech.
 - How wall time scales past 20 seconds.
 - Whether `audio_chunk_duration_sec` helps on a long stem. It is the one Vevo2 option that is a
   request option rather than a flag, so it is also the one that would have to travel nested.

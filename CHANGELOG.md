@@ -3,6 +3,46 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 1.2.0 - September 20, 2026
+
+Vevo2 can now write the vocal instead of only converting one. Give it lyrics
+and a voice to borrow, and it sings them. Hand it a melody as well and it sings
+them to that.
+
+### 🎤 Singing
+
+- **Sing your lyrics in a voice you pick.** A new tool on the create page. Write
+  the words, choose any track in the project to take the voice from, and it
+  writes its own melody. The take is named after your first line.
+- **Or give it a tune to follow.** Add a second track as a melody, hummed or
+  played, and it sings the words to that instead. Length follows the melody.
+- **Length follows your words** when there is no melody, so the length limit on
+  the form is what stops a long lyric short. It sits on the form rather than in
+  the advanced drawer, because the model's own default stops at about seven
+  seconds and that is shorter than most first attempts.
+- 24 kHz mono out, like the conversion tool.
+
+### 🐛 Fixes
+
+- **A take with no prompt is named after its lyrics.** Only the new singing tool
+  has no prompt, so nothing that was already named changed name, but without
+  this every sung take in a project carried the same name and could not be told
+  apart.
+
+### 🧱 Internals
+
+- The create column now offers every task that does not read a source, rather
+  than only tasks that read nothing at all. Singing reads a voice and writes a
+  new track, and under the old rule it would have appeared on no page at all.
+- A task can reach routes that live under different backend task kinds. Vevo2
+  splits singing from lyrics and singing from a melody across `tts` and `svc`,
+  and Miso now registers the model under whichever one the run needs instead of
+  sending a request the loaded kind would refuse.
+- A task can mark an input track optional. Leaving the melody out is how the
+  singing tool asks for the route that writes its own.
+- The track pickers are one component shared by the create page and the remix
+  page.
+
 ## 1.1.0 - September 20, 2026
 
 Vevo2 joins the voice conversion tools. It sings a vocal stem in the voice of

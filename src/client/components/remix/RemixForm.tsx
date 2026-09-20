@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import type { Asset, Catalog, Job, StudioTask } from '../../../shared/types.ts';
 import { buildLabel, installedPackages } from '../../lib/models.ts';
 import type { Region } from '../../lib/region.ts';
-import { extraInputRoles, REGION_FIELDS } from '../../lib/remixTasks.ts';
+import { REGION_FIELDS } from '../../lib/remixTasks.ts';
 import { estimateSeconds } from '../../lib/useJobs.ts';
 import { BuilderCard } from '../BuilderCard.tsx';
+import { InputRoleFields, missingRequiredRole, roleInputs } from '../InputRoleFields.tsx';
 import { PlainField } from '../TaskFields.tsx';
 import { Button } from '../ui.tsx';
 
@@ -103,17 +104,11 @@ export function RemixForm({
     (field) => field.advanced && !REGION_FIELDS.has(field.name),
   );
 
-  const extraRoles = extraInputRoles(task);
-  // Anything but the take being worked on. Converting a vocal into its own
-  // voice is a long way to round-trip a file.
-  const candidates = assets.filter((entry) => entry.id !== asset.id);
-
   const missingField = task.fields.some((field) => {
     if (!field.required || REGION_FIELDS.has(field.name)) return false;
     return (values[field.name] ?? '').trim() === '';
   });
-  const missingRole = extraRoles.some((role) => (roleAssets[role] ?? '') === '');
-  const missing = missingField || missingRole;
+  const missing = missingField || missingRequiredRole(task, roleAssets);
 
   const setValue = (name: string, value: string) => {
     setValues({ ...values, [name]: value });
@@ -150,10 +145,7 @@ export function RemixForm({
       taskId: task.id,
       modelId: chosen.id,
       params,
-      inputs: [
-        { assetId: asset.id, role: 'source' },
-        ...extraRoles.map((role) => ({ assetId: roleAssets[role] ?? '', role })),
-      ],
+      inputs: [{ assetId: asset.id, role: 'source' }, ...roleInputs(task, roleAssets)],
     });
 
     setSubmitting(false);
@@ -190,46 +182,20 @@ export function RemixForm({
       </p>
 
       {/*
-        A picker per role past the source, labelled by the task rather than by
-        this file. Drawn above the fields because it is an input rather than a
-        setting: the run is "this take, in that voice", and the voice belongs
-        next to the model it is handed to.
+        Drawn above the fields because it is an input rather than a setting: the
+        run is "this take, in that voice", and the voice belongs next to the
+        model it is handed to.
       */}
-      {extraRoles.map((role) => {
-        const copy = task.inputRoleLabels?.[role];
-        const helpId = `remix-role-${role}-help`;
-        return (
-          <div key={role} className="flex flex-col gap-1.5">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-ink">{copy?.label ?? role}</span>
-              <select
-                value={roleAssets[role] ?? ''}
-                disabled={candidates.length === 0}
-                aria-describedby={copy?.help ? helpId : undefined}
-                onChange={(event) => {
-                  setRoleAssets({ ...roleAssets, [role]: event.target.value });
-                  setQueued(false);
-                }}
-                className="min-h-9 w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink transition-colors duration-150 hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                <option value="">
-                  {candidates.length === 0 ? 'No other track in this project' : 'Choose a track'}
-                </option>
-                {candidates.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {copy?.help ? (
-              <p id={helpId} className="text-xs text-ink-faint">
-                {copy.help}
-              </p>
-            ) : null}
-          </div>
-        );
-      })}
+      <InputRoleFields
+        task={task}
+        assets={assets}
+        exclude={asset.id}
+        values={roleAssets}
+        onChange={(role, assetId) => {
+          setRoleAssets({ ...roleAssets, [role]: assetId });
+          setQueued(false);
+        }}
+      />
 
       <div className="flex flex-col gap-5">
         {plainFields.map((field) => (

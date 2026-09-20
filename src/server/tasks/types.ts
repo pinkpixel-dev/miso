@@ -13,6 +13,14 @@ import type { SpecPackage } from '../catalog/parse.ts';
  * recorded in DOCS/ERRORS.md. `serverTask` below is always the runtime kind.
  */
 
+/**
+ * A runtime task kind for /v1/models/load, never a spec's task word.
+ *
+ * The backend accepts fourteen and lists them in the error when it is sent one
+ * it does not know. These are the six Miso asks for.
+ */
+export type ServerTaskKind = 'gen' | 'sep' | 'vc' | 'svc' | 'tts' | 'midi';
+
 export type ParamValue = string | number;
 
 export interface TaskParams {
@@ -95,8 +103,16 @@ export interface TaskDefinition {
    * name. Vevo2 registers separately under each, and the route names it
    * accepts differ: loading it as `vc` and then asking for
    * `style_preserved_svc` is refused.
+   *
+   * A function when one task reaches routes that live under different kinds.
+   * `generate.sing` is the only one: Vevo2 puts `text_to_singing` under `tts`
+   * and `humming_to_singing` under `svc`, and asking for the first under an
+   * `svc` registration answers `Vevo2 route text_to_singing is not valid for
+   * task svc`. It is given the staged inputs rather than the params, because
+   * what decides the route there is whether a melody was handed over, and that
+   * is an input.
    */
-  serverTask: 'gen' | 'sep' | 'vc' | 'svc' | 'midi';
+  serverTask: ServerTaskKind | ((staged: Record<string, string>) => ServerTaskKind);
   /**
    * The audio.cpp route inside that task kind, for a family that has routes.
    *
@@ -149,6 +165,16 @@ export interface TaskDefinition {
    * is the thing that knows what it is asking for.
    */
   inputRoleLabels?: Record<string, { label: string; help: string }>;
+  /**
+   * Roles from `inputRoles` a job may leave out.
+   *
+   * Every other role is required, and the job route refuses a job missing one
+   * before anything queues. `generate.sing` needs this because its melody is
+   * the difference between two routes rather than between a valid request and
+   * an invalid one: hand it a melody and it sings that, leave it out and it
+   * makes its own.
+   */
+  optionalInputRoles?: string[];
   /**
    * The sample rate this task's source audio must arrive at.
    *

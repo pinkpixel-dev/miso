@@ -5,9 +5,9 @@ import { minimax } from './minimax.ts';
 import { transcribe } from './muscriptor.ts';
 import { separate } from './separate.ts';
 import { stableAudio, stableAudioSfx } from './stableaudio.ts';
-import { vevoSvc } from './vevo.ts';
+import { vevoSing, vevoSvc } from './vevo.ts';
 import { rvc } from './voice.ts';
-import type { TaskDefinition, TaskParams } from './types.ts';
+import type { ServerTaskKind, TaskDefinition, TaskParams } from './types.ts';
 
 /**
  * What Miso can ask audio.cpp to do.
@@ -23,14 +23,14 @@ import type { TaskDefinition, TaskParams } from './types.ts';
  * caller.
  */
 
-export type { ParamField, ParamValue, TaskDefinition, TaskParams } from './types.ts';
+export type { ParamField, ParamValue, ServerTaskKind, TaskDefinition, TaskParams } from './types.ts';
 
 /**
  * Order matters here. The project page lists its derived sections in registry
  * order, so this is also the order the tools appear in beside a take.
  */
 const tasks = new Map<string, TaskDefinition>(
-  [text2music, minimax, heartmula, stableAudio, stableAudioSfx, repaint, cover, coverNoFsq, separate, rvc, vevoSvc, transcribe].map(
+  [text2music, minimax, heartmula, stableAudio, stableAudioSfx, repaint, cover, coverNoFsq, separate, rvc, vevoSvc, vevoSing, transcribe].map(
     (task) => [
       task.id,
       task,
@@ -120,6 +120,31 @@ export function validateParams(task: TaskDefinition, raw: unknown): ParamResult 
  * `family` is one string on every generation task and a list on separation.
  * Both spellings are answered here so no task module has to care.
  */
+/**
+ * The runtime task kind to register this task's model under.
+ *
+ * Almost every task names one and it never varies. `generate.sing` works it out
+ * from whether a melody was staged, because Vevo2 keeps the two routes it needs
+ * under different kinds. Called after staging and before loading, so the
+ * registration matches the route the request is about to name.
+ */
+export function serverTaskOf(
+  task: TaskDefinition,
+  staged: Record<string, string>,
+): ServerTaskKind {
+  return typeof task.serverTask === 'function' ? task.serverTask(staged) : task.serverTask;
+}
+
+/**
+ * Whether this role has to be present for the task to run.
+ *
+ * Everything in `inputRoles` is required unless the task says otherwise, so a
+ * task that forgets to declare an optional role gets the safe answer.
+ */
+export function roleIsRequired(task: TaskDefinition, role: string): boolean {
+  return !(task.optionalInputRoles ?? []).includes(role);
+}
+
 export function familiesOf(task: TaskDefinition): string[] {
   return Array.isArray(task.family) ? task.family : [task.family];
 }

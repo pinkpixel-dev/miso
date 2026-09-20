@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findTask, validateParams } from './registry.ts';
+import { findTask, roleIsRequired, serverTaskOf, validateParams } from './registry.ts';
 
 const vevo = findTask('voice.vevo2');
 if (!vevo) throw new Error('voice.vevo2 is missing from the registry');
@@ -97,5 +97,100 @@ describe('voice.vevo2', () => {
     // result are the stem and the voice, and both are inputs rather than
     // fields.
     expect(vevo.fields.every((field) => field.advanced === true)).toBe(true);
+  });
+});
+
+const sing = findTask('generate.sing');
+if (!sing) throw new Error('generate.sing is missing from the registry');
+
+function singParams(raw: Record<string, unknown>) {
+  const result = validateParams(sing!, raw);
+  if (!result.ok) throw new Error(`validateParams refused this: ${result.error}`);
+  return result.value;
+}
+
+const WORDS = { lyrics: 'We follow the light across the water' };
+
+describe('generate.sing', () => {
+  it('reads a voice and an optional melody, and no source', () => {
+    // No `source` is what puts it on the create column rather than the remix
+    // page. Both pages split on that role.
+    expect(sing.inputRoles).toEqual(['voiceRef', 'prosodyRef']);
+    expect(sing.inputRoles).not.toContain('source');
+    expect(roleIsRequired(sing, 'voiceRef')).toBe(true);
+    expect(roleIsRequired(sing, 'prosodyRef')).toBe(false);
+  });
+
+  it('sings from the words alone when no melody was staged', () => {
+    const request = sing.buildRequest(singParams(WORDS), { voiceRef: '/staged/singer.wav' });
+
+    expect(request.task_route).toBe('text_to_singing');
+    expect(request.voice_ref).toBe('/staged/singer.wav');
+    expect(request.target_text).toBe(WORDS.lyrics);
+    expect(request.prosody_ref).toBeUndefined();
+  });
+
+  it('follows a melody when one was staged', () => {
+    const request = sing.buildRequest(singParams(WORDS), {
+      voiceRef: '/staged/singer.wav',
+      prosodyRef: '/staged/melody.wav',
+    });
+
+    expect(request.task_route).toBe('humming_to_singing');
+    expect(request.prosody_ref).toBe('/staged/melody.wav');
+  });
+
+  it('registers under the task kind its route actually lives in', () => {
+    // The trap this exists for. Vevo2 splits the two routes across `tts` and
+    // `svc`, and asking for text_to_singing under an svc registration answers
+    // `Vevo2 route text_to_singing is not valid for task svc`, after staging,
+    // where the job looks like it is working.
+    expect(serverTaskOf(sing, { voiceRef: '/staged/singer.wav' })).toBe('tts');
+    expect(
+      serverTaskOf(sing, { voiceRef: '/staged/singer.wav', prosodyRef: '/staged/melody.wav' }),
+    ).toBe('svc');
+  });
+
+  it('picks the kind and the route off the same fact', () => {
+    // If these two ever read different things, a job stages fine, loads the
+    // wrong kind, and fails on a route name. Both read `staged`.
+    const staged = { voiceRef: '/staged/singer.wav', prosodyRef: '/staged/melody.wav' };
+    const withMelody = sing.buildRequest(singParams(WORDS), staged);
+    const without = sing.buildRequest(singParams(WORDS), { voiceRef: '/staged/singer.wav' });
+
+    expect([serverTaskOf(sing, staged), withMelody.task_route]).toEqual([
+      'svc',
+      'humming_to_singing',
+    ]);
+    expect([serverTaskOf(sing, { voiceRef: '/x.wav' }), without.task_route]).toEqual([
+      'tts',
+      'text_to_singing',
+    ]);
+  });
+
+  it('requires the words', () => {
+    const result = validateParams(sing, {});
+    expect(result.ok).toBe(false);
+  });
+
+  it('sends a length ceiling, because the default stops short', () => {
+    // 500 tokens is about seven seconds, which is shorter than most first
+    // attempts. Measured on 2026-09-20: 28 words at 1500 gave 19.28 seconds.
+    const request = sing.buildRequest(singParams(WORDS), { voiceRef: '/staged/singer.wav' });
+    expect(request.max_tokens).toBe(1500);
+  });
+
+  it('offers no guided builder', () => {
+    // The builder compiles a description of a song. This task takes words to
+    // sing and a voice to sing them in, and neither is that.
+    expect(sing.guidedPrompt).toBe(false);
+  });
+
+  it('sends everything flat', () => {
+    const request = sing.buildRequest(singParams({ ...WORDS, seed: 7 }), {
+      voiceRef: '/staged/singer.wav',
+    });
+    expect(request.options).toBeUndefined();
+    expect(request.seed).toBe(7);
   });
 });

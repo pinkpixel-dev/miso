@@ -16,6 +16,7 @@ import {
   findTask,
   listTasks,
   packageRunsTask,
+  roleIsRequired,
   taskPackageIds,
   validateParams,
 } from '../tasks/registry.ts';
@@ -44,6 +45,7 @@ jobRoutes.get('/tasks', (c) =>
       packageIds: taskPackageIds(task),
       inputRoles: task.inputRoles,
       inputRoleLabels: task.inputRoleLabels,
+      optionalInputRoles: task.optionalInputRoles,
       fields: task.fields,
     })),
   ),
@@ -141,6 +143,10 @@ jobRoutes.post('/projects/:id/jobs', async (c) => {
   // nothing to work from.
   for (const role of task.inputRoles) {
     if (sources.has(role)) continue;
+    // An optional role left out is a choice rather than an omission. Sing
+    // without a melody writes its own, and refusing that here would make the
+    // only way to reach the route impossible to ask for.
+    if (!roleIsRequired(task, role)) continue;
     return c.json<ApiError>(
       {
         error: `${task.label} needs a ${role} track to work from`,

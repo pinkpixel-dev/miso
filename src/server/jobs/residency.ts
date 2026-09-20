@@ -7,7 +7,7 @@ import {
   type ManagementResult,
 } from '../audiocpp/client.ts';
 import { findPackage } from '../catalog/registry.ts';
-import type { TaskDefinition } from '../tasks/registry.ts';
+import type { ServerTaskKind, TaskDefinition } from '../tasks/registry.ts';
 
 /**
  * Which model is in GPU memory, and what it costs to change that.
@@ -59,6 +59,12 @@ export async function ensureLoaded(
   baseUrl: string,
   task: TaskDefinition,
   packageId: string,
+  /**
+   * The runtime kind to register under, already resolved from the staged
+   * inputs. Passed in rather than read off the task, because one task can
+   * reach routes that live under different kinds.
+   */
+  serverTask: ServerTaskKind,
 ): Promise<ResidencyResult> {
   const found = findPackage(packageId);
   if (!found) {
@@ -71,7 +77,14 @@ export async function ensureLoaded(
   if (!registered.ok) return failed(registered);
 
   const existing = registered.value.find((model) => model.id === id);
-  if (existing?.loaded) return { ok: true };
+  // Loaded is not enough. A registration id is per package, and the kind it was
+  // registered under is what decides which routes the backend will accept. Both
+  // of Vevo2's singing routes run on one package: returning early on a
+  // registration held under `svc` would send `text_to_singing` to it and get
+  // `Vevo2 route text_to_singing is not valid for task svc`, after staging, at
+  // the point where the job looks like it is working. Loading again over the
+  // same id reconfigures it rather than failing.
+  if (existing?.loaded && existing.task === serverTask) return { ok: true };
 
   // Everything else goes first. One model at a time is the only arrangement
   // that fits on a single consumer card, and the backend keeps a model resident
@@ -105,7 +118,7 @@ export async function ensureLoaded(
     id,
     family: found.spec.family,
     path,
-    task: task.serverTask,
+    task: serverTask,
     sessionOptions: task.sessionOptions?.(found.pkg),
   });
 

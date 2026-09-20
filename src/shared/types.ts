@@ -553,5 +553,10 @@ export interface StudioTask {
    * "voiceRef" means a voice.
    */
   inputRoleLabels?: Record<string, { label: string; help: string }>;
+  /**
+   * Roles from `inputRoles` that a job may leave out. Every other one is
+   * required, and the form will not let a job be queued without it.
+   */
+  optionalInputRoles?: string[];
   fields: TaskField[];
 }

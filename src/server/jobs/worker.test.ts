@@ -176,3 +176,33 @@ describe('whether a failed job is worth staging again', () => {
     expect(staleStagedPaths(REUSED, `could not open WAV input: ${live}`)).toEqual([]);
   });
 });
+
+describe('labelFor and the lyrics fallback', () => {
+  const sing = findTask('generate.sing');
+
+  it('names a sung take after its first line', () => {
+    // It has no prompt and no source, so without this every sung take in a
+    // project carries the task label and they cannot be told apart.
+    const named = job({
+      taskId: sing!.id,
+      params: { lyrics: 'We follow the light\nacross the water' },
+    });
+    expect(labelFor(named, sing!)).toBe('We follow the light');
+  });
+
+  it('still prefers a title over the words', () => {
+    const named = job({ taskId: sing!.id, title: 'Chorus idea', params: { lyrics: 'anything' } });
+    expect(labelFor(named, sing!)).toBe('Chorus idea');
+  });
+
+  it('leaves a task that has both alone', () => {
+    // HeartMuLa takes a prompt and lyrics. The prompt still wins, so nothing
+    // that was already named changed name.
+    const heartmula = findTask('generate.heartmula');
+    const named = job({
+      taskId: heartmula!.id,
+      params: { prompt: 'upbeat summer anthem', lyrics: 'dancing on the edge' },
+    });
+    expect(labelFor(named, heartmula!)).toBe('upbeat summer anthem');
+  });
+});
