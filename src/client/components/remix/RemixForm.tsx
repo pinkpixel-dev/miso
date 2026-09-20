@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import type { Asset, Catalog, Job, StudioTask } from '../../../shared/types.ts';
 import { buildLabel, installedPackages } from '../../lib/models.ts';
 import type { Region } from '../../lib/region.ts';
-import { REGION_FIELDS } from '../../lib/remixTasks.ts';
+import { extraInputRoles, REGION_FIELDS } from '../../lib/remixTasks.ts';
 import { estimateSeconds } from '../../lib/useJobs.ts';
 import { BuilderCard } from '../BuilderCard.tsx';
 import { PlainField } from '../TaskFields.tsx';
@@ -50,6 +50,7 @@ function describeEstimate(seconds: number | undefined): string {
 export function RemixForm({
   task,
   asset,
+  assets,
   region,
   catalog,
   jobs,
@@ -57,6 +58,13 @@ export function RemixForm({
 }: {
   task: StudioTask;
   asset: Asset;
+  /**
+   * Every track in this project, for a task that reads a second one.
+   *
+   * Only `extraInputRoles` tasks touch this. The source is the take the page
+   * opened on and is never picked here.
+   */
+  assets: Asset[];
   /**
    * The editor's current region. Only read for a task that asks for one: the
    * loop below writes it into the params by field name, so a task without
@@ -75,6 +83,14 @@ export function RemixForm({
   const packages = useMemo(() => installedPackages(catalog, task), [catalog, task]);
   const [modelId, setModelId] = useState<string | undefined>();
   const [values, setValues] = useState<Values>(() => initialValues(task));
+  /**
+   * The track chosen for each role past the source, by role name.
+   *
+   * Seeded empty rather than with the first candidate. A voice to copy is the
+   * whole point of the run, and defaulting it would let somebody queue a
+   * conversion into whichever track happened to sort first.
+   */
+  const [roleAssets, setRoleAssets] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [queued, setQueued] = useState(false);
 
@@ -87,10 +103,17 @@ export function RemixForm({
     (field) => field.advanced && !REGION_FIELDS.has(field.name),
   );
 
-  const missing = task.fields.some((field) => {
+  const extraRoles = extraInputRoles(task);
+  // Anything but the take being worked on. Converting a vocal into its own
+  // voice is a long way to round-trip a file.
+  const candidates = assets.filter((entry) => entry.id !== asset.id);
+
+  const missingField = task.fields.some((field) => {
     if (!field.required || REGION_FIELDS.has(field.name)) return false;
     return (values[field.name] ?? '').trim() === '';
   });
+  const missingRole = extraRoles.some((role) => (roleAssets[role] ?? '') === '');
+  const missing = missingField || missingRole;
 
   const setValue = (name: string, value: string) => {
     setValues({ ...values, [name]: value });
@@ -127,7 +150,10 @@ export function RemixForm({
       taskId: task.id,
       modelId: chosen.id,
       params,
-      inputs: [{ assetId: asset.id, role: 'source' }],
+      inputs: [
+        { assetId: asset.id, role: 'source' },
+        ...extraRoles.map((role) => ({ assetId: roleAssets[role] ?? '', role })),
+      ],
     });
 
     setSubmitting(false);
@@ -162,6 +188,48 @@ export function RemixForm({
       <p className="-mt-3 text-xs text-ink-faint">
         {describeEstimate(chosen ? estimateSeconds(jobs, task.id, chosen.id) : undefined)}
       </p>
+
+      {/*
+        A picker per role past the source, labelled by the task rather than by
+        this file. Drawn above the fields because it is an input rather than a
+        setting: the run is "this take, in that voice", and the voice belongs
+        next to the model it is handed to.
+      */}
+      {extraRoles.map((role) => {
+        const copy = task.inputRoleLabels?.[role];
+        const helpId = `remix-role-${role}-help`;
+        return (
+          <div key={role} className="flex flex-col gap-1.5">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-ink">{copy?.label ?? role}</span>
+              <select
+                value={roleAssets[role] ?? ''}
+                disabled={candidates.length === 0}
+                aria-describedby={copy?.help ? helpId : undefined}
+                onChange={(event) => {
+                  setRoleAssets({ ...roleAssets, [role]: event.target.value });
+                  setQueued(false);
+                }}
+                className="min-h-9 w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink transition-colors duration-150 hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <option value="">
+                  {candidates.length === 0 ? 'No other track in this project' : 'Choose a track'}
+                </option>
+                {candidates.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {copy?.help ? (
+              <p id={helpId} className="text-xs text-ink-faint">
+                {copy.help}
+              </p>
+            ) : null}
+          </div>
+        );
+      })}
 
       <div className="flex flex-col gap-5">
         {plainFields.map((field) => (

@@ -17,7 +17,7 @@ and a record of exactly how each clip was made so you can change one thing and t
   <img src="screenshots/screenshot1.png" alt="Miso Project page" width="85%">
 </p>
 
-This is the first public release. Miso installs models, keeps your projects and audio, generates with ACE-Step from a guided prompt builder with lyrics written for you if you want them, repaints a section of a track, covers a take, holds any two takes against each other, splits a song into stems you can mix and export, sings a vocal stem again in another voice, transcribes a take to MIDI, makes sound effects, and converts, trims, fades and levels audio in the browser without touching a model.
+This is the first public release. Miso installs models, keeps your projects and audio, generates with ACE-Step from a guided prompt builder with lyrics written for you if you want them, repaints a section of a track, covers a take, holds any two takes against each other, splits a song into stems you can mix and export, sings a vocal stem again in one of four packaged voices or in the voice of any other track you have, transcribes a take to MIDI, makes sound effects, and converts, trims, fades and levels audio in the browser without touching a model.
 
 I have run this on one machine, a laptop with a 16 GB RTX 4090. Other cards and other drivers are untested, so if something breaks on yours I would like to hear about it.
 

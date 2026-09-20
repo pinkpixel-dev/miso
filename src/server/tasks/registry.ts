@@ -5,6 +5,7 @@ import { minimax } from './minimax.ts';
 import { transcribe } from './muscriptor.ts';
 import { separate } from './separate.ts';
 import { stableAudio, stableAudioSfx } from './stableaudio.ts';
+import { vevoSvc } from './vevo.ts';
 import { rvc } from './voice.ts';
 import type { TaskDefinition, TaskParams } from './types.ts';
 
@@ -29,7 +30,7 @@ export type { ParamField, ParamValue, TaskDefinition, TaskParams } from './types
  * order, so this is also the order the tools appear in beside a take.
  */
 const tasks = new Map<string, TaskDefinition>(
-  [text2music, minimax, heartmula, stableAudio, stableAudioSfx, repaint, cover, coverNoFsq, separate, rvc, transcribe].map(
+  [text2music, minimax, heartmula, stableAudio, stableAudioSfx, repaint, cover, coverNoFsq, separate, rvc, vevoSvc, transcribe].map(
     (task) => [
       task.id,
       task,

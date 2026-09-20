@@ -544,5 +544,14 @@ export interface StudioTask {
    * to generate with.
    */
   inputRoles: string[];
+  /**
+   * What each role past `source` is called on screen, and one line on what it
+   * is for. Absent on every task that reads only a source.
+   *
+   * The remix form draws a picker per entry, so a task that asks for a second
+   * track arrives with its own labels rather than the page knowing that
+   * "voiceRef" means a voice.
+   */
+  inputRoleLabels?: Record<string, { label: string; help: string }>;
   fields: TaskField[];
 }

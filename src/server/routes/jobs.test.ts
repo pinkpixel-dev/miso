@@ -86,6 +86,7 @@ describe('GET /api/tasks', () => {
       'remix.repaint',
       'stems.separate',
       'voice.rvc',
+      'voice.vevo2',
     ]);
 
     // Neither of these makes a song, and one of them does not make audio.

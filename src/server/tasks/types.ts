@@ -88,10 +88,15 @@ export interface TaskDefinition {
    * The backend accepts fourteen: vad, asr, diar, sep, gen, tts, clon, vc, s2s,
    * align, vdes, spk, svc and midi. It lists them in the error when you send
    * one it does not know, which is how that list was found on 2026-09-19. Only
-   * the four Miso runs are here, because this union is what Miso uses rather
+   * the five Miso runs are here, because this union is what Miso uses rather
    * than what the server would accept.
+   *
+   * `svc` is singing voice conversion, and it is not `vc` with a different
+   * name. Vevo2 registers separately under each, and the route names it
+   * accepts differ: loading it as `vc` and then asking for
+   * `style_preserved_svc` is refused.
    */
-  serverTask: 'gen' | 'sep' | 'vc' | 'midi';
+  serverTask: 'gen' | 'sep' | 'vc' | 'svc' | 'midi';
   /**
    * The audio.cpp route inside that task kind, for a family that has routes.
    *
@@ -131,6 +136,19 @@ export interface TaskDefinition {
    * the backend gave back. Empty for a task that generates from nothing.
    */
   inputRoles: string[];
+  /**
+   * What each role past `source` is called on screen, and one line on what it
+   * is for.
+   *
+   * `source` needs no entry: every page that offers a task already opened on
+   * the take it reads, so the source is what you came in on rather than
+   * something to pick. A second role is different. Vevo2 is handed a vocal and
+   * a voice to sing it in, and "voiceRef" is not a label.
+   *
+   * Kept beside the roles rather than in a map in the browser, because the task
+   * is the thing that knows what it is asking for.
+   */
+  inputRoleLabels?: Record<string, { label: string; help: string }>;
   /**
    * The sample rate this task's source audio must arrive at.
    *

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { StudioTask, TaskField } from '../../shared/types.ts';
-import { chooseTask, hasRegion, remixTasks, REGION_FIELDS } from './remixTasks.ts';
+import { chooseTask, extraInputRoles, hasRegion, remixTasks, REGION_FIELDS } from './remixTasks.ts';
 
 function field(name: string): TaskField {
   return { name, label: name, kind: 'text', required: false };
@@ -105,5 +105,25 @@ describe('REGION_FIELDS', () => {
   /** One definition, read by the form and by hasRegion. */
   it('names both ends of a region', () => {
     expect([...REGION_FIELDS].sort()).toEqual(['regionEnd', 'regionStart']);
+  });
+});
+
+describe('extraInputRoles', () => {
+  const VEVO = task('voice.vevo2', ['source', 'voiceRef']);
+
+  it('leaves the source out, because the page opened on it', () => {
+    expect(extraInputRoles(VEVO)).toEqual(['voiceRef']);
+  });
+
+  it('is empty for every task that reads one track', () => {
+    expect(extraInputRoles(REPAINT)).toEqual([]);
+    expect(extraInputRoles(GENERATE)).toEqual([]);
+  });
+
+  it('keeps the order the task listed them in', () => {
+    // So a route that adds a third role draws a third picker in the order it
+    // asked for them, rather than in whatever order a filter happened to run.
+    const three = task('voice.someday', ['source', 'voiceRef', 'prosodyRef']);
+    expect(extraInputRoles(three)).toEqual(['voiceRef', 'prosodyRef']);
   });
 });

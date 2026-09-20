@@ -39,6 +39,18 @@ export function remixTasks(tasks: StudioTask[]): StudioTask[] {
 }
 
 /**
+ * The roles this task reads past the source, in the order it lists them.
+ *
+ * The source is the take the page opened on, so it is never picked. Anything
+ * else is, and until Vevo2 arrived on 2026-09-20 nothing had a second role at
+ * all. Read off `inputRoles` rather than off the task id, so a route that adds
+ * a third one draws a third picker without touching this file.
+ */
+export function extraInputRoles(task: StudioTask): string[] {
+  return task.inputRoles.filter((role) => role !== 'source');
+}
+
+/**
  * Whether this task wants the waveform and the region controls.
  *
  * Read off the fields rather than off the task id, so a route added later is

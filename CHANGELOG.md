@@ -3,6 +3,35 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 1.1.0 - September 20, 2026
+
+Vevo2 joins the voice conversion tools. It sings a vocal stem in the voice of
+any other track in your project rather than in one of the four voices that ship
+with RVC, which is the first time the voice has been yours to choose.
+
+### 🎤 Voices
+
+- **Sing a stem in any voice you have.** The new tool takes a vocal stem and a
+  second track to copy the voice from, and hands back a stem that sits beside
+  the ones it was converted from. Both tracks come out of the project, so a
+  voice you import once can be reused and compared across runs.
+- **It answers at 24 kHz mono**, where RVC answers at 40 kHz. That is the trade:
+  RVC keeps more of the top end, Vevo2 lets you pick the singer. Both tools stay
+  on the remix page and the summary on each one says which is which.
+- **Seeds work.** The same seed and the same two tracks return the same audio, so
+  a result you liked comes back.
+- Added `vevo2` to the Models screen. The recommended package is 3.24 GB.
+
+### 🧱 Internals
+
+- Vendored model specs moved from audio.cpp `05f9c5d` to `9ba8841`. Every spec
+  already vendored was identical at both commits, so nothing but Vevo2 changed.
+- A task can now read more than one track. It names the extra roles and what to
+  call them, and the remix form draws a picker for each one from the project's
+  own tracks.
+- `svc` joined the runtime task kinds Miso uses. Vevo2 registers separately
+  under `vc` and `svc`, and the singing routes are only on the second.
+
 ## 1.0.0 - September 20, 2026
 
 First public release. Miso now starts as a stack rather than as two servers you

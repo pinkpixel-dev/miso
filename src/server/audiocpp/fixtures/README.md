@@ -484,6 +484,73 @@ inaudible.
 - Whether a user RVC checkpoint works. `voice_model_path` and `retrieval_index_path` were never
   sent, because Miso has no way to put a non-audio file on the backend.
 
+## Vevo2, probed and kept
+
+Measured on 2026-09-20 against `ghcr.io/0xshug0/audio.cpp:full-cuda12`, package `vevo2_q8_0`,
+3.24 GB installed. The source was a 20 second separated vocal stem at 44.1 kHz and the
+reference was an 8 second vocal from a different singer. Both were generated with ACE-Step and
+separated with BS-RoFormer, so this probe needs no material that is not already in the repo.
+
+Registered with `task: "svc"`. That is not `vc` with a different name, and it confirms what the
+Seed-VC line under "Still unknown" above guessed at: the singing routes want their own task
+kind. Loading Vevo2 as `vc` and then asking for `style_preserved_svc` is refused.
+
+### It answers at 24 kHz
+
+| Model | Output | 20 seconds in | Same input twice |
+|---|---|---|---|
+| Vevo2 | 24 kHz mono | 11.3 to 11.6 s | identical, with a seed pinned |
+
+Put next to the three in the table above, Vevo2 sits between Seed-VC and RVC on rate and beats
+both on the other two columns. It is three times faster than Seed-VC and it repeats, which
+Seed-VC never did. 24 kHz still means nothing above 12 kHz, and resampling does not bring that
+back. `voice.vevo2` converts the result to its source's rate on the way out for the same reason
+`voice.rvc` does, which restores the rate and not the content.
+
+Two runs at `seed` 99 returned byte for byte identical audio. With no seed, every run differs.
+
+### Both fields are read, and both are flat
+
+`task_route` and `voice_ref` are CLI flags upstream, so both travel at the top level beside
+`audio`. Nothing this task sends belongs under `options`. That is the opposite of RVC, and the
+rule that tells them apart is in DOCS/ERRORS.md.
+
+Checked the only way that proves anything, by sending a value the model cannot know:
+
+```
+task_route=definitely_not_a_route
+  -> invalid Vevo2 route: definitely_not_a_route (expected zero_shot_tts,
+     text_to_singing, svs, style_preserved_vc, style_preserved_svc,
+     style_converted_vc, style_converted_svc, editing,
+     singing_style_conversion, humming_to_singing, or instrument_to_singing)
+
+voice_ref=/tmp/audiocpp-ui-.../does-not-exist.wav
+  -> could not open WAV input: /tmp/audiocpp-ui-.../does-not-exist.wav
+```
+
+Both refused rather than swallowed. Two conversions of one stem against two different
+references also measured apart from each other and from the source, so the reference is doing
+work rather than being accepted and ignored.
+
+### Eleven routes, one of them built
+
+The error above is the route list. `voice.vevo2` runs `style_preserved_svc` and nothing else.
+
+`humming_to_singing` was probed the same day and works: a prosody reference, a voice reference
+and `target_text`, no source audio at all, 9.8 seconds, and the output ran 7.92 seconds from an
+8 second prosody reference. So the length follows the melody it was given. It is not built,
+because it makes a vocal that did not exist before rather than remixing a take, and the remix
+page is the wrong place for that.
+
+### Still unknown
+
+- Whether the other nine routes work here. Only `style_preserved_svc` and
+  `humming_to_singing` were run.
+- How wall time scales past 20 seconds.
+- Whether `audio_chunk_duration_sec` helps on a long stem. It is the one Vevo2 option that is a
+  request option rather than a flag, so it is also the one that would have to travel nested.
+- What the F16 and original-dtype packages sound like against Q8. Only Q8 was installed.
+
 ## AudioSR, probed and then dropped
 
 Confirmed on 2026-09-19 against the same image, using `probe:audiosr` registered with
@@ -593,9 +660,9 @@ unsupported task: not_a_real_task (expected vad, asr, diar, sep, gen, tts,
 clon, vc, s2s, align, vdes, spk, svc, or midi)
 ```
 
-Fourteen, where Miso's `serverTask` union carries the four it uses. Worth
+Fourteen, where Miso's `serverTask` union carries the five it uses. Worth
 knowing because AudioSR was registered as `s2s` all along, and nothing in Miso
-said so.
+said so. `svc` joined the union on 2026-09-20 with Vevo2.
 
 ## MuScriptor, transcription to MIDI
 

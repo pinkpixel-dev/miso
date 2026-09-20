@@ -43,6 +43,7 @@ jobRoutes.get('/tasks', (c) =>
       vocals: task.vocals,
       packageIds: taskPackageIds(task),
       inputRoles: task.inputRoles,
+      inputRoleLabels: task.inputRoleLabels,
       fields: task.fields,
     })),
   ),

@@ -274,6 +274,7 @@ export function RemixRoute() {
                     key={task.id}
                     task={task}
                     asset={asset}
+                    assets={assets}
                     region={region}
                     catalog={catalog}
                     jobs={jobs}

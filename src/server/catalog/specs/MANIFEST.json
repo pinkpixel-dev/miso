@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/0xShug0/audio.cpp.git",
-  "commit": "05f9c5d6e26b6a06d7d29f0c8142a1c8951d9598",
-  "vendoredAt": "2026-09-09T10:08:23.964Z",
+  "commit": "9ba884179826c3b33dd305185b5f94c79175a03d",
+  "vendoredAt": "2026-09-20T15:29:05.140Z",
   "files": [
     {
       "name": "ace_step.json",
@@ -34,6 +34,10 @@
     {
       "name": "rvc.json",
       "sha256": "f60ff8e6c7ed4e8f7c38c9b5c9c16e5cf010bb8c3574bba1f91aa99334399e9d"
+    },
+    {
+      "name": "vevo2.json",
+      "sha256": "f5aeccafbdf7f0246d980972727b59a38439d385243625a810485096e6b81fe1"
     },
     {
       "name": "muscriptor.json",

@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const REPOSITORY = 'https://github.com/0xShug0/audio.cpp.git';
 
 // Pin. Bump deliberately, re-run this script, and re-run the parser tests.
-const COMMIT = process.env.AUDIOCPP_COMMIT ?? '05f9c5d6e26b6a06d7d29f0c8142a1c8951d9598';
+const COMMIT = process.env.AUDIOCPP_COMMIT ?? '9ba884179826c3b33dd305185b5f94c79175a03d';
 
 // The music families, corrected against a real directory listing of
 // model_specs/ upstream (see task-2-report.md for what changed from the
@@ -39,6 +39,10 @@ const COMMIT = process.env.AUDIOCPP_COMMIT ?? '05f9c5d6e26b6a06d7d29f0c8142a1c89
 //
 // Adding one back means putting it here and re-running this script, which needs
 // network access to the pinned commit.
+//
+// Vevo2 joined on 2026-09-20, with `voice.vevo2` behind it the same day. The
+// pin moved from 05f9c5d to 9ba8841 to reach it, and every spec already here
+// was byte for byte identical at both commits, so nothing else moved with it.
 const FAMILIES = [
   'ace_step',
   'minimax_music3',
@@ -48,6 +52,7 @@ const FAMILIES = [
   'bs_roformer',
   'mel_band_roformer',
   'rvc',
+  'vevo2',
   'muscriptor',
 ];
 
