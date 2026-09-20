@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ACCEPTED_FORMATS, MAX_ASSET_BYTES } from '../../shared/limits.ts';
 import type { ImportProgress } from '../lib/useProject.ts';
 
@@ -13,9 +14,19 @@ import type { ImportProgress } from '../lib/useProject.ts';
 export function ImportDropZone({
   onFile,
   importing,
+  workbenchTo,
 }: {
   onFile: (file: File) => void;
   importing: ImportProgress | undefined;
+  /**
+   * Where the workbench is, when this zone is somewhere that can offer it.
+   *
+   * Importing and converting are the same gesture with different endings, and
+   * the difference only matters once: an mp3 imported here stays an mp3, and
+   * separation will refuse it. Saying so at the point somebody is about to drop
+   * one is the only place the warning is useful.
+   */
+  workbenchTo?: string;
 }) {
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -85,6 +96,15 @@ export function ImportDropZone({
       <p className="text-xs text-ink-faint">
         Or drag one here. {formats} up to {limit}.
       </p>
+
+      {workbenchTo === undefined ? null : (
+        <Link
+          to={workbenchTo}
+          className="rounded-sm text-xs text-ink-muted underline underline-offset-4 transition-colors duration-150 hover:text-ink hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          Convert or trim it first
+        </Link>
+      )}
 
       <input
         ref={input}

@@ -21,6 +21,15 @@ export const REMIX_PATH = '/projects/:id/remix';
 /** One separation's stems, keyed by the job that made them. */
 export const STEMS_PATH = '/projects/:id/stems/:jobId';
 
+/**
+ * The audio workbench, which is the one tool page with no model behind it.
+ *
+ * Project scoped like the other tool routes, because what it saves has to land
+ * in a project, but it is deliberately not under `remix`. Everything on that
+ * page queues a job and waits on a GPU. Nothing here does.
+ */
+export const TOOLS_PATH = '/projects/:id/tools';
+
 /** The app level screens, which are not scoped to a project. */
 export const LIBRARY_PATH = '/library';
 export const COMPARE_PATH = '/compare';
@@ -47,7 +56,9 @@ export function projectIdFrom(pathname: string): string | undefined {
  * page drop it, for two different reasons.
  *
  * The project page and the remix page carry their own list of takes, so keeping
- * the column would put the same list on screen twice.
+ * the column would put the same list on screen twice. The workbench is the same
+ * case: it picks what to work on itself, and it needs the width for a waveform
+ * you are placing a boundary on to the tenth of a second.
  *
  * The library, Compare, Models and Settings are app level and have nothing to do with
  * whichever project happens to be open, so a project's takes beside them
@@ -67,6 +78,7 @@ export function projectIdFrom(pathname: string): string | undefined {
 export function wantsFullWidth(pathname: string): boolean {
   if (matchPath({ path: REMIX_PATH, end: false }, pathname) !== null) return true;
   if (matchPath({ path: STEMS_PATH, end: true }, pathname) !== null) return true;
+  if (matchPath({ path: TOOLS_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: LIBRARY_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: COMPARE_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: MODELS_PATH, end: true }, pathname) !== null) return true;
@@ -123,6 +135,20 @@ export function createPath(projectId: string, fromJobId?: string): string {
  */
 export function stemsPath(projectId: string, jobId: string): string {
   return `/projects/${encodeURIComponent(projectId)}/stems/${encodeURIComponent(jobId)}`;
+}
+
+/**
+ * The workbench, optionally opened on a take that is already in the project.
+ *
+ * The take is in the address for the same reason it is on the remix route: a
+ * take's own detail panel can link straight here with it loaded, and the
+ * address then says what is being edited. Without one the page asks for
+ * something to work on, and a file dropped from disk never gets an id at all
+ * until it is saved.
+ */
+export function toolsPath(projectId: string, assetId?: string): string {
+  const base = `/projects/${encodeURIComponent(projectId)}/tools`;
+  return assetId === undefined ? base : `${base}?take=${encodeURIComponent(assetId)}`;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { AudioLines, Pencil, Plus, Scissors } from 'lucide-react';
+import { AudioLines, Pencil, Plus, Scissors, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,7 +9,7 @@ import { JobList } from '../components/JobList.tsx';
 import { TakeSections } from '../components/project/TakeSections.tsx';
 import { TakeDetailPanel } from '../components/shell/TakeDetailPanel.tsx';
 import { IconButton, Panel, cx } from '../components/ui.tsx';
-import { SEPARATE_TASK_ID, createPath, remixPath } from '../lib/routes.ts';
+import { SEPARATE_TASK_ID, createPath, remixPath, toolsPath } from '../lib/routes.ts';
 import { findProducingJob } from '../lib/takeDetails.ts';
 import { groupTakes } from '../lib/takeGroups.ts';
 import { usePlayer } from '../lib/usePlayer.ts';
@@ -221,6 +221,16 @@ export function ProjectRoute() {
                 Split into stems
               </Link>
             )}
+            {/*
+              Always offered, unlike the tools above it. The others need a take
+              to work from, and this one takes a file straight off the disk, so
+              an empty project is exactly when it is useful: it is how an mp3
+              becomes something separation will accept.
+            */}
+            <Link to={toolsPath(projectId)} className={toolLink}>
+              <SlidersHorizontal aria-hidden="true" className="h-4 w-4 shrink-0" />
+              Audio tools
+            </Link>
           </nav>
         </div>
 
@@ -239,7 +249,11 @@ export function ProjectRoute() {
           and the import zone sit in the same column so the page has one edge.
         */}
         <div className="flex max-w-3xl flex-col gap-8">
-          <ImportDropZone onFile={importFile} importing={importing} />
+          <ImportDropZone
+              onFile={importFile}
+              importing={importing}
+              workbenchTo={toolsPath(projectId)}
+            />
 
           {assets.length === 0 ? (
             <Panel title="Nothing here yet">

@@ -14,7 +14,7 @@ import {
   setJobState,
 } from '../db/jobs.ts';
 import { readSettings } from '../db/settings.ts';
-import { resampleChannels } from '../library/resample.ts';
+import { resampleChannels } from '../../shared/resample.ts';
 import { assetPath } from '../library/storage.ts';
 import { readWav, writeWav } from '../library/wav.ts';
 import { findTask, validateParams, type TaskDefinition } from '../tasks/registry.ts';

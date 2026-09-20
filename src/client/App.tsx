@@ -9,6 +9,7 @@ import { RemixRoute } from './routes/Remix.tsx';
 import { SettingsRoute } from './routes/Settings.tsx';
 import { StartRoute } from './routes/Start.tsx';
 import { StemsRoute } from './routes/Stems.tsx';
+import { ToolsRoute } from './routes/Tools.tsx';
 
 export function App() {
   return (
@@ -36,6 +37,12 @@ export function App() {
             since stems came out of one take and a take lives in one project.
           */}
           <Route path="projects/:id/stems/:jobId" element={<StemsRoute />} />
+          {/*
+            The workbench. Project scoped because what it saves lands in a
+            project, but deliberately not under remix: nothing here queues a
+            job or waits on a model.
+          */}
+          <Route path="projects/:id/tools" element={<ToolsRoute />} />
           {/*
             App level, like models and settings. The library is every project's
             takes, so it belongs to none of them, and compare holds two takes

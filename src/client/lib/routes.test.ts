@@ -7,6 +7,7 @@ import {
   SEPARATE_TASK_ID,
   remixPath,
   stemsPath,
+  toolsPath,
   wantsFullWidth,
 } from './routes.ts';
 
@@ -35,6 +36,24 @@ describe('projectIdFrom', () => {
   });
 });
 
+describe('toolsPath', () => {
+  it('points at the workbench for a project', () => {
+    expect(toolsPath('abc')).toBe('/projects/abc/tools');
+  });
+
+  it('carries a take when one is named', () => {
+    expect(toolsPath('abc', 'take-1')).toBe('/projects/abc/tools?take=take-1');
+  });
+
+  it('encodes both, so an id with a slash in it cannot change the route', () => {
+    expect(toolsPath('a/b', 'x y')).toBe('/projects/a%2Fb/tools?take=x%20y');
+  });
+
+  it('is inside its project, so the studio keeps the project open', () => {
+    expect(projectIdFrom(toolsPath('abc'))).toBe('abc');
+  });
+});
+
 describe('wantsFullWidth', () => {
   it('is true on the remix page, with or without a source', () => {
     expect(wantsFullWidth('/projects/abc/remix')).toBe(true);
@@ -43,6 +62,10 @@ describe('wantsFullWidth', () => {
 
   it('is true on the stems page, which carries several waveforms of its own', () => {
     expect(wantsFullWidth('/projects/abc/stems/job-1')).toBe(true);
+  });
+
+  it('is true on the workbench, which picks what it works on itself', () => {
+    expect(wantsFullWidth('/projects/abc/tools')).toBe(true);
   });
 
   it('is true on the project page, which carries its own list of takes', () => {

@@ -10,7 +10,7 @@ import { SourcePicker } from '../components/remix/SourcePicker.tsx';
 import { Button, Panel, SegmentedControl } from '../components/ui.tsx';
 import { defaultRegion, type Region } from '../lib/region.ts';
 import { chooseTask, hasRegion, remixTasks } from '../lib/remixTasks.ts';
-import { projectPath } from '../lib/routes.ts';
+import { projectPath, toolsPath } from '../lib/routes.ts';
 import { usePlayer } from '../lib/usePlayer.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
@@ -167,7 +167,11 @@ export function RemixRoute() {
               only way to bring in a track to work from is to leave the page,
               import it somewhere else, and come back.
             */}
-            <ImportDropZone onFile={importFile} importing={importing} />
+            <ImportDropZone
+              onFile={importFile}
+              importing={importing}
+              workbenchTo={toolsPath(routeProjectId ?? projectId ?? '')}
+            />
 
             <SourcePicker
               projectId={routeProjectId ?? projectId ?? ''}

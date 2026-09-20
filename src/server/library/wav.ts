@@ -11,7 +11,13 @@
  * Peaks wants them to draw a picture. Resampling wants them to write a new
  * file. Both want the same chunk walk, and one copy of it is easier to trust
  * than two.
+ *
+ * The writing half now lives in `shared/wav.ts`, because the workbench writes
+ * the same WAV from the browser. What is left here is the reading half and a
+ * wrapper that keeps the `Buffer` return this side was built around.
  */
+
+import { writeWav as sharedWriteWav } from '../../shared/wav.ts';
 
 /** WAVE_FORMAT_PCM and WAVE_FORMAT_IEEE_FLOAT, the two audio.cpp writes. */
 const PCM = 1;
@@ -139,43 +145,14 @@ export function readWav(bytes: Buffer): WavAudio | undefined {
 }
 
 /**
- * Writes 16 bit PCM, which is what every take in the library already is.
+ * The shared writer, handed back as a `Buffer`.
  *
- * Rounding rather than truncating, and clamping at both ends: a resampled
- * sample can land a hair outside -1 to 1 where the original never did, and
- * letting that wrap turns a loud moment into a click.
+ * The writer itself moved to `shared/wav.ts` so the workbench can use it, and
+ * it returns a `Uint8Array` there because `Buffer` is Node only. This wraps
+ * that same memory rather than copying it, so every caller on this side keeps
+ * the `Buffer` it already expected.
  */
 export function writeWav(channels: Float32Array[], sampleRate: number): Buffer {
-  const count = channels.length;
-  if (count === 0) throw new Error('A WAV needs at least one channel');
-
-  const frames = channels[0]!.length;
-  const bytesPerSample = 2;
-  const dataBytes = frames * count * bytesPerSample;
-  const out = Buffer.alloc(44 + dataBytes);
-
-  out.write('RIFF', 0, 'ascii');
-  out.writeUInt32LE(36 + dataBytes, 4);
-  out.write('WAVE', 8, 'ascii');
-  out.write('fmt ', 12, 'ascii');
-  out.writeUInt32LE(16, 16);
-  out.writeUInt16LE(PCM, 20);
-  out.writeUInt16LE(count, 22);
-  out.writeUInt32LE(sampleRate, 24);
-  out.writeUInt32LE(sampleRate * count * bytesPerSample, 28);
-  out.writeUInt16LE(count * bytesPerSample, 32);
-  out.writeUInt16LE(16, 34);
-  out.write('data', 36, 'ascii');
-  out.writeUInt32LE(dataBytes, 40);
-
-  let at = 44;
-  for (let frame = 0; frame < frames; frame += 1) {
-    for (let c = 0; c < count; c += 1) {
-      const value = Math.round((channels[c]![frame] ?? 0) * 32768);
-      out.writeInt16LE(Math.max(-32768, Math.min(32767, value)), at);
-      at += bytesPerSample;
-    }
-  }
-
-  return out;
+  const bytes = sharedWriteWav(channels, sampleRate);
+  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
