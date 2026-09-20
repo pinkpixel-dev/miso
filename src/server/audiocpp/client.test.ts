@@ -251,9 +251,44 @@ describe('fetchRegisteredModels', () => {
 });
 
 describe('readTaskResult', () => {
+  it('reads a transcription, which has artifacts and no audio at all', () => {
+    // The real shape, from MuScriptor on 2026-09-19. See fixtures/README.md.
+    const result = readTaskResult({
+      text: '[{"type":"start","pitch":60,"start_time":0.5,"index":0,"instrument":"acoustic_piano"}]',
+      language: 'midi-json',
+      artifacts: [
+        {
+          id: 'result',
+          kind: 'midi',
+          payload: 'TVRoZAAAAAY=',
+          meta: { extension: 'mid', format: 'midi', mime: 'audio/midi' },
+        },
+      ],
+      timing: { wall_ms: 1906.85 },
+    });
+
+    expect(result.audio).toBe('');
+    expect(result.language).toBe('midi-json');
+    expect(result.artifacts).toEqual([
+      { id: 'result', kind: 'midi', payload: 'TVRoZAAAAAY=', extension: 'mid', mime: 'audio/midi' },
+    ]);
+  });
+
+  it('still refuses a result with neither audio nor artifacts', () => {
+    expect(() => readTaskResult({ timing: { wall_ms: 1 } })).toThrow(/no audio/);
+  });
+
   it('reads a single audio result', () => {
     const result = readTaskResult({ audio: 'AAA=', sample_rate: 48000, channels: 2 });
-    expect(result).toEqual({ audio: 'AAA=', sampleRate: 48000, channels: 2, namedOutputs: [] });
+    expect(result).toEqual({
+      audio: 'AAA=',
+      sampleRate: 48000,
+      channels: 2,
+      namedOutputs: [],
+      artifacts: [],
+      text: undefined,
+      language: undefined,
+    });
   });
 
   it('reads the named outputs a separation returns', () => {

@@ -7,6 +7,7 @@ import type {
   Job,
   LibraryTake,
   LyricsDraft,
+  MidiArtifact,
   Project,
   ProjectDetail,
   PromptSuggestion,
@@ -183,6 +184,17 @@ export const api = {
   deleteSaved: (id: string) =>
     request<SavedPrompt[]>(`/saved/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
+  /** Every transcription in a project, newest first, with its notes. */
+  getMidi: (projectId: string) =>
+    request<MidiArtifact[]>(`/projects/${encodeURIComponent(projectId)}/midi`),
+
+  /** Answers with what is left, the same way deleting a saved prompt does. */
+  deleteMidi: (projectId: string, midiId: string) =>
+    request<MidiArtifact[]>(
+      `/projects/${encodeURIComponent(projectId)}/midi/${encodeURIComponent(midiId)}`,
+      { method: 'DELETE' },
+    ),
+
   /** Frees every model on the backend, for when the GPU is wanted elsewhere. */
   unloadModels: () => request<{ unloaded: boolean }>('/backend/unload', { method: 'POST' }),
 };
@@ -197,6 +209,11 @@ export function audioUrl(projectId: string, assetId: string): string {
 
 export function downloadUrl(projectId: string, assetId: string): string {
   return `/api/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/download`;
+}
+
+/** A transcription's MIDI file, for a download link. */
+export function midiDownloadUrl(projectId: string, midiId: string): string {
+  return `/api/projects/${encodeURIComponent(projectId)}/midi/${encodeURIComponent(midiId)}/download`;
 }
 
 /** Every take one job produced, in one zip. Separation is what this is for. */

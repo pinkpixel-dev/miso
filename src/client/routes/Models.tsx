@@ -150,7 +150,7 @@ export function Models() {
       <div className="flex flex-col gap-4">
         {catalog.families.map((family) => (
           <ModelCard
-            key={family.family}
+            key={family.id}
             family={family}
             disabled={unavailable}
             onInstall={(id) => void act(() => api.installPackage(id))}

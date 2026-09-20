@@ -39,6 +39,7 @@ function job(
 
 function task(id: string, inputRoles: string[]): StudioTask {
   return {
+    guidedPrompt: true,
     id,
     label: id,
     shortLabel: id,

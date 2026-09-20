@@ -19,7 +19,7 @@ import { assetPath } from '../library/storage.ts';
 import { readWav, writeWav } from '../library/wav.ts';
 import { findTask, validateParams, type TaskDefinition } from '../tasks/registry.ts';
 import { ensureLoaded } from './residency.ts';
-import { storeResult } from './results.ts';
+import { storeArtifacts, storeResult } from './results.ts';
 import type { Asset, Job } from '../../shared/types.ts';
 
 /**
@@ -129,20 +129,46 @@ export function conversionRate(task: TaskDefinition, asset: Asset): number | und
 async function convertForTask(
   asset: Asset,
   path: string,
-  rate: number,
+  rate: number | undefined,
+  leadInSeconds: number,
 ): Promise<{ ok: true; bytes: Buffer } | { ok: false; message: string }> {
   const audio = readWav(await readFile(path));
 
   if (!audio) {
+    const need =
+      rate === undefined
+        ? 'This tool needs to put a moment of silence in front of the audio'
+        : `This tool needs audio at ${rate / 1000} kHz`;
     return {
       ok: false,
       message:
-        `This tool needs audio at ${rate / 1000} kHz and ${asset.label} is ${asset.format}, ` +
+        `${need} and ${asset.label} is ${asset.format}, ` +
         'which Miso cannot convert on its own. Only WAV takes can be used here for now.',
     };
   }
 
-  return { ok: true, bytes: writeWav(resampleChannels(audio.channels, audio.sampleRate, rate), rate) };
+  const atRate =
+    rate === undefined ? audio : { channels: resampleChannels(audio.channels, audio.sampleRate, rate), sampleRate: rate };
+
+  const padded = leadInSeconds > 0 ? withLeadIn(atRate.channels, atRate.sampleRate, leadInSeconds) : atRate.channels;
+
+  return { ok: true, bytes: Buffer.from(writeWav(padded, atRate.sampleRate)) };
+}
+
+/**
+ * The same audio with silence in front of it.
+ *
+ * MuScriptor drops a note that starts at t=0, and a clip trimmed in the
+ * workbench starts on an onset by design. The silence is taken back off the
+ * note times when the result is stored, so nothing downstream sees it.
+ */
+function withLeadIn(channels: Float32Array[], sampleRate: number, seconds: number): Float32Array[] {
+  const pad = Math.round(sampleRate * seconds);
+  return channels.map((channel) => {
+    const out = new Float32Array(pad + channel.length);
+    out.set(channel, pad);
+    return out;
+  });
 }
 
 /**
@@ -197,7 +223,14 @@ async function stageInputs(
     // would be silent and wrong.
     const rate = conversionRate(task, asset);
 
-    if (rate === undefined) {
+    // Transcription needs silence in front of its source, which is the second
+    // reason a task cannot be handed the take as it sits. Both reasons skip the
+    // cache, because the cache is keyed by asset and backend and cannot tell a
+    // modified copy from the original.
+    const leadIn = role === 'source' ? (task.inputLeadInSeconds ?? 0) : 0;
+    const asStored = rate === undefined && leadIn === 0;
+
+    if (asStored) {
       const cached = readStagedPath(db(), input.assetId, baseUrl);
       if (cached) {
         staged[role] = cached;
@@ -208,10 +241,10 @@ async function stageInputs(
     const path = assetPath(asset.projectId, asset.id, asset.format);
     let body: ReadableStream<Uint8Array> | Uint8Array;
 
-    if (rate === undefined) {
+    if (asStored) {
       body = Readable.toWeb(createReadStream(path)) as ReadableStream<Uint8Array>;
     } else {
-      const converted = await convertForTask(asset, path, rate);
+      const converted = await convertForTask(asset, path, rate, leadIn);
       if (!converted.ok) return { ok: false, message: converted.message };
       // The bytes themselves, not a stream around them. See stageAudio: a
       // buffer sent as one chunk is refused once it passes eight megabytes,
@@ -222,7 +255,7 @@ async function stageInputs(
     const uploaded = await stageAudio(baseUrl, body, asset.filename);
     if (!uploaded.ok) return { ok: false, message: uploaded.message };
 
-    if (rate === undefined) recordStagedPath(db(), input.assetId, baseUrl, uploaded.value);
+    if (asStored) recordStagedPath(db(), input.assetId, baseUrl, uploaded.value);
     staged[role] = uploaded.value;
   }
 
@@ -326,17 +359,37 @@ async function runOne(job: Job): Promise<number> {
   }
 
   try {
-    await storeResult(
-      db(),
-      {
-        projectId: job.projectId,
-        jobId: job.id,
-        label: labelFor(job, task, staged.sourceLabel),
-        singleKind: task.resultKind,
-        sampleRate: task.matchesSourceSampleRate ? staged.sourceSampleRate : undefined,
-      },
-      result.value,
-    );
+    if (task.produces === 'artifact') {
+      // Transcription writes a MIDI file and note events, not a take. The
+      // source is the take it read, which the artifact hangs off so deleting
+      // the take takes its transcriptions with it.
+      const sourceAssetId = listJobInputs(db(), job.id).find((entry) => entry.role === 'source')?.assetId;
+      if (sourceAssetId === undefined) throw new Error('This job has no source to hang its result off.');
+
+      await storeArtifacts(
+        db(),
+        {
+          projectId: job.projectId,
+          jobId: job.id,
+          sourceAssetId,
+          label: labelFor(job, task, staged.sourceLabel),
+          leadInSeconds: task.inputLeadInSeconds,
+        },
+        result.value,
+      );
+    } else {
+      await storeResult(
+        db(),
+        {
+          projectId: job.projectId,
+          jobId: job.id,
+          label: labelFor(job, task, staged.sourceLabel),
+          singleKind: task.resultKind,
+          sampleRate: task.matchesSourceSampleRate ? staged.sourceSampleRate : undefined,
+        },
+        result.value,
+      );
+    }
     setJobState(db(), job.id, 'complete');
   } catch (error) {
     setJobState(

@@ -2,8 +2,9 @@ import { findPackage, loadSpecs } from '../catalog/registry.ts';
 import { cover, coverNoFsq, repaint, text2music } from './acestep.ts';
 import { heartmula } from './heartmula.ts';
 import { minimax } from './minimax.ts';
+import { transcribe } from './muscriptor.ts';
 import { separate } from './separate.ts';
-import { stableAudio } from './stableaudio.ts';
+import { stableAudio, stableAudioSfx } from './stableaudio.ts';
 import { rvc } from './voice.ts';
 import type { TaskDefinition, TaskParams } from './types.ts';
 
@@ -28,10 +29,12 @@ export type { ParamField, ParamValue, TaskDefinition, TaskParams } from './types
  * order, so this is also the order the tools appear in beside a take.
  */
 const tasks = new Map<string, TaskDefinition>(
-  [text2music, minimax, heartmula, stableAudio, repaint, cover, coverNoFsq, separate, rvc].map((task) => [
-    task.id,
-    task,
-  ]),
+  [text2music, minimax, heartmula, stableAudio, stableAudioSfx, repaint, cover, coverNoFsq, separate, rvc, transcribe].map(
+    (task) => [
+      task.id,
+      task,
+    ],
+  ),
 );
 
 export function listTasks(): TaskDefinition[] {

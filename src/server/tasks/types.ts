@@ -81,11 +81,17 @@ export interface TaskDefinition {
   /**
    * Runtime task kind for /v1/models/load, never the spec's task word.
    *
-   * `sep` is separation and `vc` is voice conversion. Sending a spec word here
-   * is rejected outright, which cost a phase 0 debugging session recorded in
-   * DOCS/ERRORS.md.
+   * `sep` is separation, `vc` is voice conversion and `midi` is transcription.
+   * Sending a spec word here is rejected outright, which cost a phase 0
+   * debugging session recorded in DOCS/ERRORS.md.
+   *
+   * The backend accepts fourteen: vad, asr, diar, sep, gen, tts, clon, vc, s2s,
+   * align, vdes, spk, svc and midi. It lists them in the error when you send
+   * one it does not know, which is how that list was found on 2026-09-19. Only
+   * the four Miso runs are here, because this union is what Miso uses rather
+   * than what the server would accept.
    */
-  serverTask: 'gen' | 'sep' | 'vc';
+  serverTask: 'gen' | 'sep' | 'vc' | 'midi';
   /**
    * The audio.cpp route inside that task kind, for a family that has routes.
    *
@@ -171,6 +177,48 @@ export interface TaskDefinition {
    * out accepts all of them.
    */
   acceptsPackage?(packageId: string): boolean;
+  /**
+   * Whether the guided prompt builder is offered for this task.
+   *
+   * The builder writes songs. It asks for a genre, a mood and a voice, and
+   * compiles them into a caption the family understands. Stable Audio's SFX
+   * task runs on a family the builder knows, so without this it would offer to
+   * describe a door slam as dreamy lo-fi with female vocals.
+   *
+   * Left out by every task the builder suits, which is every song generator.
+   */
+  guidedPrompt?: boolean;
+  /**
+   * Where the studio offers this task, when `inputRoles` would put it in the
+   * wrong place.
+   *
+   * By default a task with no input roles goes on the create form and a task
+   * reading a source goes on the remix picker, which needs no declaration and
+   * means a route added later lands somewhere sensible on its own. Sound
+   * effects and transcription both go to the sound page instead: neither makes
+   * a song, and transcription does not even make audio. Decided on 2026-09-19.
+   */
+  surface?: 'sound';
+  /**
+   * Silence to put in front of the source before the task sees it, in seconds.
+   *
+   * MuScriptor drops a note that starts at t=0. A probe of a synthesized scale
+   * returned seven of its eight notes, and the same file with one second of
+   * silence in front returned all eight. That matters most for a clip trimmed
+   * in the workbench, where a cut lands exactly on an onset by design.
+   *
+   * The offset is taken back off the returned times, so what is stored lines up
+   * with the source. Left out by every task that reads what it is given.
+   */
+  inputLeadInSeconds?: number;
+  /**
+   * What a finished job leaves behind, when it is not audio.
+   *
+   * Transcription writes a MIDI file and note events, which are not a take and
+   * do not belong in the takes column. `storeResult` reads this to decide which
+   * of the two storage paths a result takes.
+   */
+  produces?: 'artifact';
   fields: ParamField[];
   /**
    * A check across several params at once, for what a single field cannot say.

@@ -171,7 +171,13 @@ export function GeneratePanel({
   // same families and draws its fields the same way, so without this filter
   // every one of them turns up in the model list as though it were another
   // model to generate with. The remix tools have their own page.
-  const generators = useMemo(() => tasks.filter((task) => task.inputRoles.length === 0), [tasks]);
+  // No input roles means it generates from nothing, which is what a song is.
+  // `surface` is the exception: sound effects generate from nothing too and
+  // belong on the sound page instead.
+  const generators = useMemo(
+    () => tasks.filter((task) => task.inputRoles.length === 0 && task.surface === undefined),
+    [tasks],
+  );
   const choices = useMemo(() => modelChoices(catalog, generators), [catalog, generators]);
 
   // The chosen model decides the task, rather than the task deciding which
@@ -192,8 +198,10 @@ export function GeneratePanel({
   }
 
   // A family with no compilation rules has no guided mode to offer, so the
-  // switch disappears rather than sitting there doing nothing.
-  const guidedAvailable = supportsGuided(task.families[0] ?? '');
+  // switch disappears rather than sitting there doing nothing. A task can also
+  // refuse it on a family that has them, which is how sound effects avoid being
+  // asked for a genre and a vocal style.
+  const guidedAvailable = task.guidedPrompt && supportsGuided(task.families[0] ?? '');
   const guided = guidedAvailable && mode === 'guided';
 
   const setValue = (name: string, value: string) => setValues({ ...fieldValues, [name]: value });

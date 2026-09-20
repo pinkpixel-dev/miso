@@ -346,13 +346,45 @@ export interface RegisteredModel {
   path: string;
 }
 
+/**
+ * A non-audio file a task produced, such as a transcription's MIDI.
+ *
+ * `payload` is base64, the same as audio, and `extension` and `mime` come from
+ * the server's own `meta` rather than being guessed from `kind`. MuScriptor is
+ * the only task that returns one today and it returns exactly one, with the id
+ * `result` and the kind `midi`.
+ */
+export interface TaskArtifact {
+  id: string;
+  kind: string;
+  payload: string;
+  extension: string | undefined;
+  mime: string | undefined;
+}
+
 export interface TaskResult {
-  /** Base64 PCM16 WAV, exactly as the server sent it. */
+  /**
+   * Base64 PCM16 WAV, exactly as the server sent it.
+   *
+   * Empty for a task that produced artifacts instead. Transcription answers
+   * with note events and a MIDI file and no audio at all, so a caller reading
+   * this has to know which kind of task it ran. `storeResult` does, because the
+   * task tells it.
+   */
   audio: string;
   sampleRate: number | undefined;
   channels: number | undefined;
   /** Named outputs, for the stem routes in phase 6. Empty for a single result. */
   namedOutputs: { id: string; audio: string }[];
+  /** Files that are not audio. Empty for every task that returns a track. */
+  artifacts: TaskArtifact[];
+  /**
+   * The server's own text output, which is not a transcript in the speech
+   * sense. Transcription puts its note events here as a JSON string, described
+   * by `language` as `midi-json`.
+   */
+  text: string | undefined;
+  language: string | undefined;
 }
 
 /**
@@ -585,13 +617,39 @@ export function readTaskResult(body: unknown): TaskResult {
     return id && audio ? [{ id, audio }] : [];
   });
 
+  const rawArtifacts = Array.isArray(root.artifacts) ? root.artifacts : [];
+  const artifacts = rawArtifacts.flatMap((entry) => {
+    const row = (entry ?? {}) as Record<string, unknown>;
+    const payload = str(row.payload);
+    if (!payload) return [];
+    const meta = (row.meta ?? {}) as Record<string, unknown>;
+    return [
+      {
+        id: str(row.id) ?? 'result',
+        kind: str(row.kind) ?? '',
+        payload,
+        extension: str(meta.extension),
+        mime: str(meta.mime),
+      },
+    ];
+  });
+
   const audio = str(root.audio) ?? namedOutputs[0]?.audio;
-  if (!audio) throw new Error('The server finished the task but returned no audio');
+
+  // A task returns audio or it returns artifacts. Transcription returns only
+  // artifacts, so demanding audio here refused a perfectly good MIDI file.
+  // Neither is still an error, and it is the same error it always was.
+  if (!audio && artifacts.length === 0) {
+    throw new Error('The server finished the task but returned no audio');
+  }
 
   return {
-    audio,
+    audio: audio ?? '',
     sampleRate: num(root.sample_rate),
     channels: num(root.channels),
     namedOutputs,
+    artifacts,
+    text: str(root.text),
+    language: str(root.language),
   };
 }

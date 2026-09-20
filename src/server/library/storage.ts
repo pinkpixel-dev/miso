@@ -30,6 +30,22 @@ export function assetPath(projectId: string, assetId: string, format: AssetForma
   return join(projectDir(projectId), `${assetId}.${format}`);
 }
 
+/**
+ * Where a transcription's MIDI file lives.
+ *
+ * The same directory as the project's audio, named by the artifact's own id.
+ * Artifact ids and asset ids are both UUIDs from the same generator, so they
+ * cannot collide, and removing the project still takes everything with it in
+ * one directory removal.
+ */
+export function midiPath(projectId: string, artifactId: string): string {
+  return join(projectDir(projectId), `${artifactId}.mid`);
+}
+
+export async function removeMidi(projectId: string, artifactId: string): Promise<void> {
+  await unlinkIfPresent(midiPath(projectId, artifactId));
+}
+
 /** A name no finished asset can ever have, because asset ids are UUIDs. */
 export function tempPath(projectId: string): string {
   return join(projectDir(projectId), `${TEMP_PREFIX}${randomUUID()}`);

@@ -34,6 +34,10 @@
     {
       "name": "rvc.json",
       "sha256": "f60ff8e6c7ed4e8f7c38c9b5c9c16e5cf010bb8c3574bba1f91aa99334399e9d"
+    },
+    {
+      "name": "muscriptor.json",
+      "sha256": "eaf507e8b6af24da022c5583b2e77cee2082e824005fafa8c23f79e01445cda9"
     }
   ]
 }

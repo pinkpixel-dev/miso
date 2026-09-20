@@ -152,6 +152,17 @@ export function toolsPath(projectId: string, assetId?: string): string {
 }
 
 /**
+ * Sound design: sound effects and transcriptions, at /projects/:id/sound.
+ *
+ * No take in the address, unlike remix and the workbench. The page is a list of
+ * everything a project has transcribed, and the take picker is one control on
+ * it, so a take in the URL would claim the page is about that take.
+ */
+export function soundPath(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}/sound`;
+}
+
+/**
  * The remix route for a take, or for picking one, optionally on a named tool.
  *
  * The tool goes in the address for the same reason the source does: so it can

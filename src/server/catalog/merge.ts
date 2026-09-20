@@ -2,6 +2,7 @@ import type { Catalog, CatalogFamily, CatalogPackage } from '../../shared/types.
 import type { LiveStatus } from '../audiocpp/packageStatus.ts';
 import type { InstallRow } from '../db/installs.ts';
 import type { ModelSpec } from './parse.ts';
+import { isSfxPackage } from './sfx.ts';
 
 /**
  * Vendored specs plus live status plus Miso's own install rows, joined.
@@ -23,7 +24,7 @@ export function buildCatalog(input: {
   const sizes = new Map(live.kind === 'ready' ? live.packages.map((p) => [p.id, p]) : []);
   const byInstall = new Map(installs.map((row) => [row.packageId, row]));
 
-  const families: CatalogFamily[] = specs.map((spec) => {
+  const families: CatalogFamily[] = specs.flatMap((spec) => {
     const packages: CatalogPackage[] = spec.packages.map((pkg) => {
       const size = sizes.get(pkg.id);
       const install = byInstall.get(pkg.id);
@@ -53,7 +54,11 @@ export function buildCatalog(input: {
     // is the order upstream chose to list its precisions in.
     packages.sort((a, b) => Number(b.recommended) - Number(a.recommended));
 
-    return {
+    const sfx = packages.filter((pkg) => isSfxPackage(pkg.id));
+    const rest = packages.filter((pkg) => !isSfxPackage(pkg.id));
+
+    const card = {
+      id: spec.family,
       family: spec.family,
       displayName: spec.displayName,
       summary: spec.summary,
@@ -61,6 +66,25 @@ export function buildCatalog(input: {
       languages: spec.languages,
       packages,
     };
+
+    // A family that ships both kinds becomes two cards. Only Stable Audio 3
+    // does today: its three SFX packages sat behind a disclosure reading "8
+    // other versions", which is a good way to own a sound effect model without
+    // ever knowing it. A family that is all one kind stays one card, so
+    // ControlFoley is not retitled "ControlFoley SFX".
+    if (sfx.length === 0 || rest.length === 0) return [card];
+
+    return [
+      { ...card, tasks: spec.tasks.filter((task) => task !== 'sfx'), packages: rest },
+      {
+        ...card,
+        id: `${spec.family}:sfx`,
+        displayName: `${spec.displayName} SFX`,
+        summary: `The sound effect packages of ${spec.displayName}, listed on their own so they are easy to find.`,
+        tasks: spec.tasks.filter((task) => task === 'sfx'),
+        packages: sfx,
+      },
+    ];
   });
 
   return {

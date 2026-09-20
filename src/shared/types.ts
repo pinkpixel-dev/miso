@@ -150,8 +150,66 @@ export interface CatalogPackage {
   install?: InstallProgress;
 }
 
+/**
+ * One note the transcription found.
+ *
+ * Times are seconds from the start of the source take, with the lead-in silence
+ * Miso added already taken back off. `instrument` is the model's own guess and
+ * is carried rather than used: an isolated drum stem came back labelled
+ * acoustic guitar, so nothing in Miso decides anything from it.
+ */
+export interface MidiNote {
+  pitch: number;
+  start: number;
+  end: number;
+  instrument: string;
+}
+
+/**
+ * A transcription: the MIDI file and the notes that are in it.
+ *
+ * Not an `Asset`, on purpose. A MIDI file cannot be played by the dock, drawn
+ * as a waveform, exported as WAV or MP3, separated or mixed, and
+ * music-metadata cannot read it at all. See the comment on the
+ * `midi_artifacts` table.
+ *
+ * `notes` is what the preview plays. The `.mid` file is what you download, and
+ * it is fetched separately rather than carried in this row.
+ */
+export interface MidiArtifact {
+  id: string;
+  projectId: string;
+  sourceAssetId: string;
+  jobId?: string;
+  label: string;
+  filename: string;
+  bytes: number;
+  noteCount: number;
+  durationSeconds?: number;
+  notes: MidiNote[];
+  createdAt: string;
+}
+
 /** A model family and its precisions, one card on the catalog screen. */
 export interface CatalogFamily {
+  /**
+   * What identifies this card, which is not always the spec family.
+   *
+   * One spec can produce more than one card: Stable Audio 3 ships its sound
+   * effect packages in the same spec as its music ones, and they get a card of
+   * their own so they are not folded away under eight other versions. Both
+   * cards keep `family: 'stable_audio'`, because that is what the packages
+   * actually belong to and what a task matches on. Only this field tells the
+   * two cards apart.
+   */
+  id: string;
+  /**
+   * The spec family these packages belong to.
+   *
+   * Not unique across cards, and not a React key. A task names the families it
+   * runs on and `installedPackages` matches against this, so changing it to
+   * make a card unique would hide those packages from their own task.
+   */
   family: string;
   displayName: string;
   summary: string;
@@ -402,6 +460,25 @@ export interface TaskField {
  */
 export interface StudioTask {
   id: string;
+  /**
+   * Whether the studio offers the guided prompt builder for this task.
+   *
+   * The builder writes songs from a genre, a mood and a voice, so a task that
+   * does not produce a song says no. The family alone cannot answer it: Stable
+   * Audio writes both music and sound effects.
+   */
+  guidedPrompt: boolean;
+  /**
+   * Which page offers this task, when `inputRoles` would put it in the wrong
+   * one.
+   *
+   * Absent for almost everything, and absent means the old rule: no input roles
+   * puts a task on the create form, a source role puts it on the remix picker.
+   * `sound` moves it to the sound page, which is where the two phase 7 tools
+   * live. A task must land on exactly one of the three, and a route test checks
+   * that none of them falls through the gaps.
+   */
+  surface?: 'sound';
   label: string;
   /**
    * The same task named as a thing rather than an action.

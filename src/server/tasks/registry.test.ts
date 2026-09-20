@@ -549,11 +549,32 @@ describe('the routes stage 0 rejected', () => {
     ]);
   });
 
-  it('keeps Stable Audio to text-to-music, which is the part that works', () => {
+  it('keeps Stable Audio to the two things it generates from nothing', () => {
     const stableAudioTasks = listTasks().filter((task) => task.family === 'stable_audio');
 
-    expect(stableAudioTasks.map((task) => task.id)).toEqual(['generate.stableaudio']);
-    expect(stableAudioTasks[0]?.inputRoles).toEqual([]);
+    expect(stableAudioTasks.map((task) => task.id)).toEqual(['generate.stableaudio', 'generate.sfx']);
+
+    // The point of this test, which the SFX task did not change: no entry reads
+    // source audio. Stable Audio's init-audio and inpainting modes were probed
+    // on 2026-09-14 and both are inert, so there is no remix entry to add.
+    for (const task of stableAudioTasks) expect(task.inputRoles).toEqual([]);
+  });
+
+  it('splits the family packages between the music task and the SFX task', () => {
+    const music = taskOf('generate.stableaudio');
+    const sfx = taskOf('generate.sfx');
+
+    expect(packageRunsTask(music, 'stable_audio_3_medium_q8_0')).toBe(true);
+    expect(packageRunsTask(music, 'stable_audio_3_small_sfx_q8_0')).toBe(false);
+    expect(packageRunsTask(sfx, 'stable_audio_3_small_sfx_q8_0')).toBe(true);
+    expect(packageRunsTask(sfx, 'stable_audio_3_medium_q8_0')).toBe(false);
+  });
+
+  it('does not offer the song prompt builder for a sound effect', () => {
+    // The builder asks for a genre, a mood and a voice. The family supports it
+    // for music, so the refusal has to come from the task.
+    expect(taskOf('generate.sfx').guidedPrompt).toBe(false);
+    expect(taskOf('generate.stableaudio').guidedPrompt).toBeUndefined();
   });
 });
 

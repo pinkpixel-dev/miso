@@ -34,6 +34,8 @@ jobRoutes.get('/tasks', (c) =>
   c.json<StudioTask[]>(
     listTasks().map((task) => ({
       id: task.id,
+      guidedPrompt: task.guidedPrompt ?? true,
+      surface: task.surface,
       label: task.label,
       shortLabel: task.shortLabel,
       summary: task.summary,

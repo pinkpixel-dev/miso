@@ -1,4 +1,4 @@
-import { AudioLines, Pencil, Plus, Scissors, SlidersHorizontal } from 'lucide-react';
+import { AudioLines, Pencil, Plus, Scissors, SlidersHorizontal, Waves } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,7 +9,7 @@ import { JobList } from '../components/JobList.tsx';
 import { TakeSections } from '../components/project/TakeSections.tsx';
 import { TakeDetailPanel } from '../components/shell/TakeDetailPanel.tsx';
 import { IconButton, Panel, cx } from '../components/ui.tsx';
-import { SEPARATE_TASK_ID, createPath, remixPath, toolsPath } from '../lib/routes.ts';
+import { SEPARATE_TASK_ID, createPath, remixPath, soundPath, toolsPath } from '../lib/routes.ts';
 import { findProducingJob } from '../lib/takeDetails.ts';
 import { groupTakes } from '../lib/takeGroups.ts';
 import { usePlayer } from '../lib/usePlayer.ts';
@@ -230,6 +230,15 @@ export function ProjectRoute() {
             <Link to={toolsPath(projectId)} className={toolLink}>
               <SlidersHorizontal aria-hidden="true" className="h-4 w-4 shrink-0" />
               Audio tools
+            </Link>
+            {/*
+              Also always offered. Sound effects need nothing to work from, and
+              the transcription half says so itself when the project has no WAV
+              take to read.
+            */}
+            <Link to={soundPath(projectId)} className={toolLink}>
+              <Waves aria-hidden="true" className="h-4 w-4 shrink-0" />
+              Sound design
             </Link>
           </nav>
         </div>

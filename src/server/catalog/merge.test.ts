@@ -30,6 +30,24 @@ const ace: ModelSpec = {
   recommendedPackageId: 'ace_turbo_q8',
 };
 
+/**
+ * One spec carrying both kinds, which is the shape Stable Audio 3 really has.
+ * Package ids follow the real ones closely enough to hit the `_sfx_` rule.
+ */
+const stableAudio: ModelSpec = {
+  family: 'stable_audio',
+  displayName: 'Stable Audio 3',
+  summary: 'Instrumental music and sound effects.',
+  tasks: ['music', 'sfx', 'edit'],
+  languages: ['en'],
+  packages: [
+    { id: 'sa_medium_q8', label: 'Medium Q8', precision: 'q8_0', directory: 'SA-GGUF', files: [] },
+    { id: 'sa_small_music_q8', label: 'Small Music Q8', precision: 'q8_0', directory: 'SA-GGUF', files: [] },
+    { id: 'sa_small_sfx_q8', label: 'Small SFX Q8', precision: 'q8_0', directory: 'SA-GGUF', files: [] },
+  ],
+  recommendedPackageId: 'sa_medium_q8',
+};
+
 const base = { specs: [ace], installs: [] as InstallRow[], specVersion: 'abc', backendUrl: 'http://backend' };
 
 describe('buildCatalog', () => {
@@ -109,6 +127,35 @@ describe('buildCatalog', () => {
     });
     const ids = catalog.families.flatMap((f) => f.packages.map((p) => p.id));
     expect(ids).toEqual(['ace_turbo_q8', 'ace_turbo_bf16']);
+  });
+
+  it('gives a family that ships both kinds a second card for its SFX packages', () => {
+    const catalog = buildCatalog({ ...base, specs: [stableAudio], live: { kind: 'scanning' } });
+
+    expect(catalog.families.map((f) => f.id)).toEqual(['stable_audio', 'stable_audio:sfx']);
+    expect(catalog.families[1]?.displayName).toBe('Stable Audio 3 SFX');
+    expect(catalog.families[0]?.packages.map((p) => p.id)).toEqual(['sa_medium_q8', 'sa_small_music_q8']);
+    expect(catalog.families[1]?.packages.map((p) => p.id)).toEqual(['sa_small_sfx_q8']);
+  });
+
+  it('keeps both cards on the spec family, so a task still finds their packages', () => {
+    // installedPackages matches a task to its packages by this field. Making
+    // the SFX card unique here instead of on id would hide it from its own task.
+    const catalog = buildCatalog({ ...base, specs: [stableAudio], live: { kind: 'scanning' } });
+    expect(catalog.families.map((f) => f.family)).toEqual(['stable_audio', 'stable_audio']);
+  });
+
+  it('splits the tasks line so neither card claims what it cannot do', () => {
+    const catalog = buildCatalog({ ...base, specs: [stableAudio], live: { kind: 'scanning' } });
+    expect(catalog.families[0]?.tasks).toEqual(['music', 'edit']);
+    expect(catalog.families[1]?.tasks).toEqual(['sfx']);
+  });
+
+  it('leaves a family that is all one kind as a single card', () => {
+    const catalog = buildCatalog({ ...base, live: { kind: 'scanning' } });
+    expect(catalog.families).toHaveLength(1);
+    expect(catalog.families[0]?.id).toBe('ace_step');
+    expect(catalog.families[0]?.displayName).toBe('ACE-Step 1.5');
   });
 
   it('echoes the spec version and the backend it describes', () => {

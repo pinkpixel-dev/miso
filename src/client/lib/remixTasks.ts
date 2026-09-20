@@ -27,9 +27,15 @@ export const REGION_FIELDS: ReadonlySet<string> = new Set(['regionStart', 'regio
  * `inputRoles` is the same field that keeps these off the create form, so the
  * two pages split one list between them and a route added to the registry turns
  * up here with no change to this file.
+ *
+ * A task can name another page with `surface`, and transcription does. It reads
+ * a take like everything here, but it turns one into a MIDI file rather than
+ * into another take, which makes it analysis rather than a remix. That
+ * overrides the September 14 decision that one page carries every task working
+ * from a take, and the reversal is in DOCS/MEMORY.md.
  */
 export function remixTasks(tasks: StudioTask[]): StudioTask[] {
-  return tasks.filter((task) => task.inputRoles.includes('source'));
+  return tasks.filter((task) => task.inputRoles.includes('source') && task.surface === undefined);
 }
 
 /**

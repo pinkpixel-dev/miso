@@ -583,3 +583,150 @@ minutes for a two and a half minute song. See `DOCS/plans/2026-09-19-phase-7a-up
   L/R correlation 0.9866, which is nearly centred.
 - `guidance_scale`, `ddim_eta` and the two chunking options were never measured. They are real
   option names, since a wrong name nested is refused, but nothing confirmed what they do.
+
+## The backend's runtime task kinds, in full
+
+Sending `/v1/models/load` a `task` it does not know answers with the whole set:
+
+```
+unsupported task: not_a_real_task (expected vad, asr, diar, sep, gen, tts,
+clon, vc, s2s, align, vdes, spk, svc, or midi)
+```
+
+Fourteen, where Miso's `serverTask` union carries the four it uses. Worth
+knowing because AudioSR was registered as `s2s` all along, and nothing in Miso
+said so.
+
+## MuScriptor, transcription to MIDI
+
+Probed on 2026-09-19 against `muscriptor_small_f32`, loaded from
+`/app/models/MuScriptor-Small-GGUF` with `--task midi`. 412 MB on disk, about
+390 MiB of VRAM, and it loads instantly.
+
+### It answers with artifacts instead of audio
+
+There is no `audio` key at all. The response is:
+
+```
+text       note events as a JSON string
+language   "midi-json"
+artifacts  [{ id, kind, payload, meta }]
+timing     { wall_ms }
+```
+
+The artifact is `{ id: "result", kind: "midi", payload: <base64>, meta: {
+extension: "mid", format: "midi", mime: "audio/midi" } }`, and the payload is a
+standard MIDI file: format 1, 480 PPQ, one track per instrument the model
+thinks it heard.
+
+This is why `readTaskResult` no longer demands audio. It still refuses a
+response carrying neither.
+
+### The events are a flat list, paired by index
+
+```
+{"type":"start","pitch":68,"start_time":0.67,"index":0,"instrument":"acoustic_piano"}
+{"type":"end","end_time":1.36,"start_event_index":0}
+```
+
+Ends do not follow their starts and do not arrive in order. Two overlapping
+notes interleave, so pairing them by walking in step gives the first note the
+second one's end time.
+
+### Pitch is exact, and a note at t=0 is lost
+
+A synthesized C major scale, eight notes of 0.6 s each starting at t=0:
+
+```
+expected  60 62 64 65 67 69 71 72
+returned     62 64 65 67 69 71 72     seven notes, first one missing
+```
+
+The same file with one second of silence in front returned all eight, correct,
+with onsets inside 30 ms. That is why `analyze.midi` declares
+`inputLeadInSeconds: 1`, and it matters most for a clip trimmed in the
+workbench, which lands on an onset by design.
+
+### Speed and coverage
+
+```
+20 s of music   141 notes   1.9 s
+30 s of drums    76 notes   1.2 s
+80 s of music   339 notes   3.4 s
+```
+
+About 24x realtime. There is no length ceiling: the 80 s file transcribed out
+to 74.6 s, and the shorter spans above are simply where the last note fell.
+
+### The instrument labels are not reliable
+
+An isolated drum stem came back as 76 `acoustic_guitar` notes and no drums.
+Pitch measured well and the labels did not, so Miso carries the label and
+decides nothing from it. The preview plays everything as one voice.
+
+## Stable Audio SFX against Stable Audio music
+
+Probed on 2026-09-19. Both loaded with `--task gen --family stable_audio`, the
+SFX packages from `/app/models/Stable-Audio-3-Small-SFX-GGUF`. Same prompts,
+same seed, six seconds. Loudness per half second, in dBFS:
+
+```
+door,  SFX model:  -63 -56 -53 -55 -60 -62 -62 -56 [-28] -46 -60 -90
+door,  music model:-24 -24 -25 -26 -28 -31 -31 -32  -26  -44 -77 -90
+
+glass, SFX model:  -68 -73 [-33] -43 -61 -71 -75 -75 -75 -70 -73 -81
+glass, music model:-16 -17  -28  -44 -63 -69 -65 -60 -41 -60 -72 -90
+```
+
+The SFX packages make an isolated event surrounded by near silence. The music
+packages fill the whole duration. That is the difference between a sound effect
+and a track, and it is why they are two tasks rather than one form with a
+switch.
+
+The output is quiet, peaking about -28 dBFS. Normalize in the workbench is the
+answer when it needs to sit louder.
+
+### Its options are real, and checking them needs two values
+
+`duration_seconds`, `num_inference_steps`, `guidance_scale` and `seed` all
+change the audio, on the SFX packages and the music ones alike.
+
+They nearly got written up as inert. Comparing one value against a request that
+sent nothing produced identical bytes, which looked conclusive and was not: the
+backend's own defaults are 30 steps and guidance 9, so the test had compared
+the default with itself. `steps=1` runs in 0.7 s and `steps=100` in 16.9 s,
+with different audio.
+
+**Two values far apart, never one value against the default.** Everything below
+was measured that way.
+
+## ControlFoley and MiDashengLM-Gen, probed and dropped
+
+Both installed on 2026-09-19, probed, and removed the same day along with their
+specs and their weights. Recorded so nobody pays the download twice.
+
+**ControlFoley** works and loses to Stable Audio SFX on nearly everything.
+12.56 GB on disk against 2.36, mono against stereo, a fixed 8.01 s output, and
+16 to 30 s per effect against 0.7 to 2.1. `duration`, `steps`, `length`,
+`guidance_scale` and `negative_text` are all accepted and all inert:
+`duration=3` and `duration=12` return byte-identical audio, and so do `steps=8`
+and `steps=25`. Only `text` and `seed` do anything. Its one advantage was
+sharper prompt differentiation, a 10x spread in zero-crossing rate against
+4.7x, which is weak evidence next to the rest.
+
+**MiDashengLM-Gen** answers at **16 kHz mono**, which is the material upscaling
+exists to rescue, and upscaling was dropped. Its structured prompt tags, the
+whole point of the `generate.layered` box, do nothing at all:
+
+```
+no tag                 sha 185d7ac57dd58a57
+style=jazz             sha 185d7ac57dd58a57
+style=heavy-metal      sha 185d7ac57dd58a57
+tags=lofi,chill        sha 185d7ac57dd58a57
+instrument=saxophone   sha 185d7ac57dd58a57
+```
+
+Byte-identical. Unlike the other families it validates option names, so these
+are accepted rather than rejected, which makes the inertness harder to spot and
+not less total. `duration` is ignored too: `duration=5` and `duration=15` both
+returned exactly 10.00 s. Only `text` and `seed` change anything.

@@ -35,6 +35,7 @@ function job(id: string, taskId: string, outputAssetIds: string[]): Job {
 
 function task(id: string, label: string, shortLabel: string, inputRoles: string[]): StudioTask {
   return {
+    guidedPrompt: true,
     id,
     label,
     shortLabel,

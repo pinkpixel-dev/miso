@@ -16,7 +16,7 @@ function pkg(id: string, patch: Partial<CatalogPackage> = {}): CatalogPackage {
 function catalogOf(packages: CatalogPackage[], family = 'ace_step'): Catalog {
   return {
     families: [
-      { family, displayName: 'ACE-Step', summary: '', tasks: [], languages: [], packages },
+      { id: family, family, displayName: 'ACE-Step', summary: '', tasks: [], languages: [], packages },
     ],
     live: 'ready',
     specVersion: 'test',
@@ -27,6 +27,7 @@ function catalogOf(packages: CatalogPackage[], family = 'ace_step'): Catalog {
 function taskOf(packageIds: string[], ...families: string[]): StudioTask {
   return {
     id: 'remix.repaint',
+    guidedPrompt: true,
     label: 'Repaint a section',
     shortLabel: 'Repaints',
     summary: '',

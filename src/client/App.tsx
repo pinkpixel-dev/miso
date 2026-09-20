@@ -9,6 +9,7 @@ import { RemixRoute } from './routes/Remix.tsx';
 import { SettingsRoute } from './routes/Settings.tsx';
 import { StartRoute } from './routes/Start.tsx';
 import { StemsRoute } from './routes/Stems.tsx';
+import { SoundRoute } from './routes/Sound.tsx';
 import { ToolsRoute } from './routes/Tools.tsx';
 
 export function App() {
@@ -43,6 +44,12 @@ export function App() {
             job or waits on a model.
           */}
           <Route path="projects/:id/tools" element={<ToolsRoute />} />
+          {/*
+            Sound design. Project scoped for the same reason the workbench is,
+            and separate from both the create form and the remix picker because
+            neither tool on it makes a song.
+          */}
+          <Route path="projects/:id/sound" element={<SoundRoute />} />
           {/*
             App level, like models and settings. The library is every project's
             takes, so it belongs to none of them, and compare holds two takes

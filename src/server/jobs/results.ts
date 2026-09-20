@@ -2,13 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { rename, writeFile } from 'node:fs/promises';
 import type { Database } from 'better-sqlite3';
-import type { Asset } from '../../shared/types.ts';
-import type { TaskResult } from '../audiocpp/client.ts';
+import type { Asset, MidiArtifact } from '../../shared/types.ts';
+import type { TaskArtifact, TaskResult } from '../audiocpp/client.ts';
 import { insertAsset, setAssetPeaks } from '../db/assets.ts';
+import { insertMidiArtifact } from '../db/midi.ts';
 import { readAudioFacts } from '../library/metadata.ts';
 import { convertWavRate } from '../library/resample.ts';
 import { peaksFromWav } from '../library/wavPeaks.ts';
-import { assetPath, ensureProjectDir, removeTemp, tempPath } from '../library/storage.ts';
+import { parseMidiNotes, notesDuration } from '../library/midiNotes.ts';
+import { assetPath, ensureProjectDir, midiPath, removeTemp, tempPath } from '../library/storage.ts';
 
 /**
  * Turns what audio.cpp returned into assets on disk.
@@ -164,4 +166,94 @@ export async function storeResult(
       atRate(Buffer.from(result.audio, 'base64')),
     ),
   ];
+}
+
+/**
+ * Puts a transcription's MIDI file on disk and writes the row that points at it.
+ *
+ * The same order as `storeAudio`, file before row, so a crash between the two
+ * leaves a file nothing points at rather than a row with no file.
+ *
+ * There is no equivalent of `readAudioFacts` here, and nothing is validated
+ * past the file being non-empty. music-metadata does not read MIDI, and
+ * checking the four byte `MThd` header would be a guess at what the backend
+ * meant rather than a fact about it. The `meta` on the artifact is what says
+ * this is MIDI, and it comes from the server.
+ *
+ * `notes` can be empty when the event list could not be read. That is stored
+ * rather than refused: the file is still a transcription, it just has no
+ * preview.
+ */
+export async function storeMidi(
+  handle: Database,
+  options: {
+    projectId: string;
+    jobId: string;
+    sourceAssetId: string;
+    label: string;
+    /** Silence the worker put in front of the source, taken back off the times. */
+    leadInSeconds?: number;
+  },
+  artifact: TaskArtifact,
+  text: string | undefined,
+): Promise<MidiArtifact> {
+  await ensureProjectDir(options.projectId);
+
+  const bytes = Buffer.from(artifact.payload, 'base64');
+  if (bytes.length === 0) throw new Error('The server returned an empty MIDI payload');
+
+  const notes = parseMidiNotes(text, options.leadInSeconds ?? 0);
+  const id = randomUUID();
+
+  const temp = tempPath(options.projectId);
+  await writeFile(temp, bytes);
+  try {
+    await rename(temp, midiPath(options.projectId, id));
+  } catch (error) {
+    await removeTemp(temp);
+    throw error;
+  }
+
+  return insertMidiArtifact(handle, {
+    id,
+    projectId: options.projectId,
+    sourceAssetId: options.sourceAssetId,
+    jobId: options.jobId,
+    label: options.label,
+    filename: `${options.label}.mid`,
+    bytes: bytes.length,
+    checksum: createHash('sha256').update(bytes).digest('hex'),
+    durationSeconds: notesDuration(notes),
+    notes,
+  });
+}
+
+/**
+ * Stores every artifact a job produced.
+ *
+ * Only MIDI exists today, and only one artifact comes back per run, but the
+ * response carries a list and a task that returned two would be stored as two
+ * rather than silently losing one.
+ */
+export async function storeArtifacts(
+  handle: Database,
+  options: {
+    projectId: string;
+    jobId: string;
+    sourceAssetId: string;
+    label: string;
+    leadInSeconds?: number;
+  },
+  result: TaskResult,
+): Promise<MidiArtifact[]> {
+  const midi = result.artifacts.filter((artifact) => artifact.kind === 'midi');
+  if (midi.length === 0) {
+    throw new Error('The server finished the transcription but returned no MIDI file');
+  }
+
+  const stored: MidiArtifact[] = [];
+  for (const artifact of midi) {
+    stored.push(await storeMidi(handle, options, artifact, result.text));
+  }
+  return stored;
 }

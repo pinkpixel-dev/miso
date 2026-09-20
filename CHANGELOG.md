@@ -3,6 +3,52 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.29.0 - September 20, 2026
+
+### 🔊 Sound design
+
+- A new page at `/projects/:id/sound`, reached from the project page. It holds
+  the two tools that are not about writing songs.
+- **Sound effects.** Write a short sound from a description of what happens, on
+  Stable Audio 3 SFX. It moved off the generate form, where nobody found it.
+- **Transcriptions.** Read the notes out of a WAV take and get a standard MIDI
+  file, on MuScriptor. Each one lists the take it came from, its note count and
+  its length, and can be played back as plain tones before you download it.
+
+### 🎛️ Models
+
+- MuScriptor is in the catalog and has a task behind it.
+- ControlFoley and MiDashengLM-Gen are out again. Both were installed and
+  measured first. ControlFoley costs five times the disk of Stable Audio SFX for
+  mono audio at a fixed eight seconds and fifteen times the wait, and
+  MiDashengLM-Gen answers at 16 kHz mono with every one of its prompt tags
+  inert. The measurements are in `src/server/audiocpp/fixtures/README.md`.
+
+### 🧹 Maintenance
+
+- A job result can now be a file that is not audio. MIDI files live in their own
+  table rather than beside takes, because nothing that lists takes could play,
+  draw, export or mix one.
+- Transcription gets a second of silence in front of its source, because the
+  model drops a note starting at zero. The offset comes back off the note times.
+
+## 0.28.0 - September 19, 2026
+
+### 🎛️ Models
+
+- Stable Audio 3 SFX has its own card on the models page. Its three sound effect packages
+  used to sit behind a disclosure reading "8 other versions", where nobody found them.
+- ControlFoley, MiDashengLM-Gen and MuScriptor are back in the catalog, so their weights can
+  be installed and probed. Nothing in Miso runs them yet. They were removed in 0.26.0 for
+  exactly that reason, and they come out again if the probe does not justify building the
+  tasks behind them.
+
+### 🧹 Maintenance
+
+- The rule for which packages are sound effect models lives in one place,
+  `src/server/catalog/sfx.ts`, shared by the catalog split and the Stable Audio task that
+  keeps them off the music form.
+
 ## 0.27.0 - September 19, 2026
 
 ### 🔄 Conversion

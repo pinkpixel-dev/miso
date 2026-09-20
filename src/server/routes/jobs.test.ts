@@ -62,18 +62,24 @@ describe('GET /api/tasks', () => {
   });
 
   /**
-   * Both directions, because the create column and the remix page split this
-   * one list between them. A task landing in neither would simply disappear
-   * from the studio, which no page would report as an error.
+   * Every direction, because three pages split this one list between them. A
+   * task landing on none of them would simply disappear from the studio, which
+   * no page would report as an error.
+   *
+   * `surface` was added on 2026-09-19 and makes that easier to get wrong, since
+   * it overrides the `inputRoles` rule the other two pages read.
    */
-  it('puts every task on exactly one side of that filter', async () => {
+  it('puts every task on exactly one page', async () => {
     const response = await app().request('/api/tasks');
     const tasks = (await response.json()) as StudioTask[];
 
-    const generators = tasks.filter((task) => task.inputRoles.length === 0);
-    const remixes = tasks.filter((task) => task.inputRoles.length > 0);
+    const sound = tasks.filter((task) => task.surface === 'sound');
+    const rest = tasks.filter((task) => task.surface === undefined);
+    const generators = rest.filter((task) => task.inputRoles.length === 0);
+    const remixes = rest.filter((task) => task.inputRoles.length > 0);
 
-    expect(generators.length + remixes.length).toBe(tasks.length);
+    expect(generators.length + remixes.length + sound.length).toBe(tasks.length);
+
     expect(remixes.map((task) => task.id).sort()).toEqual([
       'remix.cover',
       'remix.covernofsq',
@@ -81,6 +87,9 @@ describe('GET /api/tasks', () => {
       'stems.separate',
       'voice.rvc',
     ]);
+
+    // Neither of these makes a song, and one of them does not make audio.
+    expect(sound.map((task) => task.id).sort()).toEqual(['analyze.midi', 'generate.sfx']);
   });
 
   /**
