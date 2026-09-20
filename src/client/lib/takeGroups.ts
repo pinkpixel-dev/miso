@@ -30,24 +30,26 @@ export interface TakeSection {
 /**
  * Where a take came from.
  *
- * `rank` orders the sections against each other: what you made first, then
- * what you made out of something else, then what you brought in, then the
- * pieces a separator produced, and last the takes whose task this build no
- * longer has.
+ * `rank` orders the sections against each other: the songs you wrote first,
+ * then the sound effects, then what you made out of something else, then what
+ * you brought in, then the pieces a separator produced, and last the takes
+ * whose task this build no longer has.
  */
 type Origin =
   | { rank: 0; key: 'generated'; label: string }
-  | { rank: 1; key: string; label: string; taskOrder: number }
-  | { rank: 2; key: 'imported'; label: string }
-  | { rank: 3; key: 'stems'; label: string }
-  | { rank: 4; key: 'mixes'; label: string }
-  | { rank: 5; key: 'unknown'; label: string };
+  | { rank: 1; key: 'sfx'; label: string }
+  | { rank: 2; key: string; label: string; taskOrder: number }
+  | { rank: 3; key: 'imported'; label: string }
+  | { rank: 4; key: 'stems'; label: string }
+  | { rank: 5; key: 'mixes'; label: string }
+  | { rank: 6; key: 'unknown'; label: string };
 
 const GENERATED: Origin = { rank: 0, key: 'generated', label: 'Generated songs' };
-const IMPORTED: Origin = { rank: 2, key: 'imported', label: 'Imported audio' };
-const STEMS: Origin = { rank: 3, key: 'stems', label: 'Stems' };
-const MIXES: Origin = { rank: 4, key: 'mixes', label: 'Mixes' };
-const UNKNOWN: Origin = { rank: 5, key: 'unknown', label: 'Other takes' };
+const SOUND_EFFECTS: Origin = { rank: 1, key: 'sfx', label: 'Sound effects' };
+const IMPORTED: Origin = { rank: 3, key: 'imported', label: 'Imported audio' };
+const STEMS: Origin = { rank: 4, key: 'stems', label: 'Stems' };
+const MIXES: Origin = { rank: 5, key: 'mixes', label: 'Mixes' };
+const UNKNOWN: Origin = { rank: 6, key: 'unknown', label: 'Other takes' };
 
 /** Which job produced which take, built once instead of scanned per take. */
 function producersOf(jobs: Job[]): Map<string, Job> {
@@ -85,12 +87,20 @@ function originOf(
   // nothing, which is what makes it a song rather than something made out of
   // another take. Reading this off inputRoles rather than off the shape of the
   // task id means a route added later lands in the right place on its own.
-  if (found.task.inputRoles.length === 0) return GENERATED;
+  //
+  // Except that a sound effect is written from nothing too, and a door slam
+  // under a heading reading Generated songs is wrong in a way that matters:
+  // that heading is also the rule the create form's column filters on, so an
+  // effect stood in a list of tracks. `surface` is the same field the sound
+  // page uses to claim the task, so the two cannot drift apart.
+  if (found.task.inputRoles.length === 0) {
+    return found.task.surface === 'sound' ? SOUND_EFFECTS : GENERATED;
+  }
 
   // shortLabel rather than label, because this is a heading. `label` is the
   // instruction a tool is offered under, "Repaint a section", which tells the
   // reader to do something when it is only naming the takes underneath it.
-  return { rank: 1, key: found.task.id, label: found.task.shortLabel, taskOrder: found.order };
+  return { rank: 2, key: found.task.id, label: found.task.shortLabel, taskOrder: found.order };
 }
 
 /** Newest first, matching the takes column. Ties keep the order they arrived in. */
@@ -125,8 +135,8 @@ export function groupTakes(assets: Asset[], jobs: Job[], tasks: StudioTask[]): T
       if (left.origin.rank !== right.origin.rank) return left.origin.rank - right.origin.rank;
       // Within the derived sections, follow the order the registry lists its
       // tasks in, so the page matches how tasks are offered everywhere else.
-      const leftOrder = left.origin.rank === 1 ? left.origin.taskOrder : 0;
-      const rightOrder = right.origin.rank === 1 ? right.origin.taskOrder : 0;
+      const leftOrder = left.origin.rank === 2 ? left.origin.taskOrder : 0;
+      const rightOrder = right.origin.rank === 2 ? right.origin.taskOrder : 0;
       return leftOrder - rightOrder;
     })
     .map(({ origin, takes }) => ({ key: origin.key, label: origin.label, takes: newestFirst(takes) }));
@@ -135,13 +145,30 @@ export function groupTakes(assets: Asset[], jobs: Job[], tasks: StudioTask[]): T
 /**
  * The takes the create page's column shows.
  *
- * Generated songs only. Imports and anything made out of another take live on
- * the project page, so the column beside the form holds what the form put
- * there. Both pages read this rule from here rather than each deciding for
- * themselves, which is the disagreement `routes.ts` exists to prevent.
+ * Generated songs only. Sound effects, imports and anything made out of
+ * another take live on the project page, so the column beside the form holds
+ * what the form put there. Both pages read this rule from here rather than
+ * each deciding for themselves, which is the disagreement `routes.ts` exists
+ * to prevent.
  */
 export function generatedTakes(assets: Asset[], jobs: Job[], tasks: StudioTask[]): Asset[] {
+  return takesRanked(assets, jobs, tasks, 0);
+}
+
+/**
+ * The sound effects the sound design page lists.
+ *
+ * Effects are takes like any other: they are audio, they play in the dock and
+ * they export. What they are not is songs, so they have their own section
+ * here, and the sound page lists them under the form that wrote them rather
+ * than leaving them to be found among the tracks.
+ */
+export function soundEffectTakes(assets: Asset[], jobs: Job[], tasks: StudioTask[]): Asset[] {
+  return takesRanked(assets, jobs, tasks, 1);
+}
+
+function takesRanked(assets: Asset[], jobs: Job[], tasks: StudioTask[], rank: number): Asset[] {
   const producers = producersOf(jobs);
   const byId = new Map(tasks.map((task, order) => [task.id, { task, order }]));
-  return assets.filter((asset) => originOf(asset, producers, byId).rank === 0);
+  return assets.filter((asset) => originOf(asset, producers, byId).rank === rank);
 }

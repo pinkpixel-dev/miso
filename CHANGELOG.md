@@ -3,6 +3,45 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.30.0 - September 20, 2026
+
+### 🐛 MIDI preview
+
+- **Fixed a transcription that played silently.** The preview set its level from
+  the most notes ever sounding at once, and MuScriptor can end a long take on a
+  stutter: one 169 second transcription here holds 1725 duplicate drum hits
+  piled on a single instant, against two to six notes through the actual music.
+  Dividing by that peak put the whole piece at about -38 dBFS. It played
+  correctly and could not be heard. The level now comes from how many notes
+  sound at once for most of the time, so a spike a hundredth of a second wide
+  cannot quieten the minutes around it.
+- Added a limiter in front of the output. The level is set from what is
+  sounding 95 percent of the time, and this is what the other 5 percent costs
+  instead of clipping.
+
+### 🎛️ Transport
+
+- The preview pauses and resumes where it stopped, rather than only stopping.
+- Added a scrub bar with a running time and the total, so you can jump to the
+  part of a transcription you want to check. It works with the mouse, a
+  touchscreen, and the keyboard.
+- Seeking now frees the notes it skipped past. They were silent but stayed
+  scheduled, and a few seeks on a six thousand note transcription added up.
+
+### 🔊 Sound design page
+
+- The page lists the sound effects it has written, under the form that wrote
+  them. Each one plays in the dock, exports, and deletes from there.
+- The page takes the full width. The column beside it listed the project's
+  generated songs, which is everything the page is not about, while neither of
+  the things it makes could appear in it.
+
+### 🗂️ Takes
+
+- Sound effects have their own heading on the project page instead of sitting
+  under Generated songs. They are written from nothing, like a song, so the
+  rule that told them apart is the page the task belongs to.
+
 ## 0.29.0 - September 20, 2026
 
 ### 🔊 Sound design

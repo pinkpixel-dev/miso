@@ -30,6 +30,9 @@ export const STEMS_PATH = '/projects/:id/stems/:jobId';
  */
 export const TOOLS_PATH = '/projects/:id/tools';
 
+/** Sound design: sound effects and transcriptions. */
+export const SOUND_PATH = '/projects/:id/sound';
+
 /** The app level screens, which are not scoped to a project. */
 export const LIBRARY_PATH = '/library';
 export const COMPARE_PATH = '/compare';
@@ -58,7 +61,10 @@ export function projectIdFrom(pathname: string): string | undefined {
  * The project page and the remix page carry their own list of takes, so keeping
  * the column would put the same list on screen twice. The workbench is the same
  * case: it picks what to work on itself, and it needs the width for a waveform
- * you are placing a boundary on to the tenth of a second.
+ * you are placing a boundary on to the tenth of a second. The sound page joined
+ * them on 2026-09-20: the column beside it listed generated songs, which is
+ * everything that page is not about, while the two things it does make were
+ * nowhere in it. It lists its own effects and transcriptions instead.
  *
  * The library, Compare, Models and Settings are app level and have nothing to do with
  * whichever project happens to be open, so a project's takes beside them
@@ -79,6 +85,7 @@ export function wantsFullWidth(pathname: string): boolean {
   if (matchPath({ path: REMIX_PATH, end: false }, pathname) !== null) return true;
   if (matchPath({ path: STEMS_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: TOOLS_PATH, end: true }, pathname) !== null) return true;
+  if (matchPath({ path: SOUND_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: LIBRARY_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: COMPARE_PATH, end: true }, pathname) !== null) return true;
   if (matchPath({ path: MODELS_PATH, end: true }, pathname) !== null) return true;

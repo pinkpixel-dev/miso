@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Asset, Job, StudioTask } from '../../shared/types.ts';
-import { generatedTakes, groupTakes } from './takeGroups.ts';
+import { generatedTakes, groupTakes, soundEffectTakes } from './takeGroups.ts';
 
 function asset(id: string, createdAt: string, extra: Partial<Asset> = {}): Asset {
   return {
@@ -33,7 +33,13 @@ function job(id: string, taskId: string, outputAssetIds: string[]): Job {
   };
 }
 
-function task(id: string, label: string, shortLabel: string, inputRoles: string[]): StudioTask {
+function task(
+  id: string,
+  label: string,
+  shortLabel: string,
+  inputRoles: string[],
+  surface?: 'sound',
+): StudioTask {
   return {
     guidedPrompt: true,
     id,
@@ -44,6 +50,7 @@ function task(id: string, label: string, shortLabel: string, inputRoles: string[
     vocals: 'both',
     packageIds: [],
     inputRoles,
+    surface,
     fields: [],
   };
 }
@@ -51,6 +58,7 @@ function task(id: string, label: string, shortLabel: string, inputRoles: string[
 const TASKS: StudioTask[] = [
   task('generate.text2music', 'ACE-Step 1.5', 'ACE-Step', []),
   task('generate.stableaudio', 'Stable Audio 3', 'Stable Audio', []),
+  task('generate.sfx', 'Make a sound effect', 'Sound effects', [], 'sound'),
   task('remix.repaint', 'Repaint a section', 'Repaints', ['source']),
 ];
 
@@ -151,6 +159,7 @@ describe('groupTakes', () => {
       asset('orphan', '2026-09-14T10:00:00Z'),
       asset('import', '2026-09-14T10:00:00Z', { kind: 'source' }),
       asset('repaint', '2026-09-14T10:00:00Z'),
+      asset('effect', '2026-09-14T10:00:00Z'),
       asset('song', '2026-09-14T10:00:00Z'),
     ];
     const jobs = [
@@ -159,10 +168,12 @@ describe('groupTakes', () => {
       job('j3', 'remix.retired', ['orphan']),
       job('j4', 'stems.separate', ['stem']),
       job('j5', 'stems.mix', ['mix']),
+      job('j6', 'generate.sfx', ['effect']),
     ];
 
     expect(groupTakes(takes, jobs, TASKS).map((section) => section.key)).toEqual([
       'generated',
+      'sfx',
       'remix.repaint',
       'imported',
       'stems',
@@ -205,6 +216,22 @@ describe('generatedTakes', () => {
     expect(generatedTakes([song, repaint, imported], jobs, TASKS)).toEqual([song]);
   });
 
+  /**
+   * A sound effect is written from nothing, exactly like a song, so the
+   * inputRoles rule alone put it in this list and under the Generated songs
+   * heading. What tells them apart is the page the task belongs to.
+   */
+  it('leaves sound effects out, which is what surface is for', () => {
+    const song = asset('song', '2026-09-14T10:00:00Z');
+    const effect = asset('effect', '2026-09-14T11:00:00Z');
+    const jobs = [
+      job('j1', 'generate.text2music', ['song']),
+      job('j2', 'generate.sfx', ['effect']),
+    ];
+
+    expect(generatedTakes([song, effect], jobs, TASKS)).toEqual([song]);
+  });
+
   it('keeps the order it was given, since the caller already sorted', () => {
     const first = asset('a1', '2026-09-14T12:00:00Z');
     const second = asset('a2', '2026-09-14T10:00:00Z');
@@ -216,5 +243,33 @@ describe('generatedTakes', () => {
   it('is empty for a project of nothing but imports', () => {
     const imported = asset('a1', '2026-09-14T10:00:00Z', { kind: 'source' });
     expect(generatedTakes([imported], [], TASKS)).toEqual([]);
+  });
+});
+
+describe('soundEffectTakes', () => {
+  it('keeps what the sound page wrote and nothing else', () => {
+    const effect = asset('effect', '2026-09-14T11:00:00Z');
+    const song = asset('song', '2026-09-14T10:00:00Z');
+    const imported = asset('import', '2026-09-14T12:00:00Z', { kind: 'source' });
+    const jobs = [
+      job('j1', 'generate.sfx', ['effect']),
+      job('j2', 'generate.text2music', ['song']),
+    ];
+
+    expect(soundEffectTakes([effect, song, imported], jobs, TASKS)).toEqual([effect]);
+  });
+
+  it('holds its own section on the project page too', () => {
+    const effect = asset('effect', '2026-09-14T11:00:00Z');
+    const jobs = [job('j1', 'generate.sfx', ['effect'])];
+
+    expect(groupTakes([effect], jobs, TASKS)).toEqual([
+      { key: 'sfx', label: 'Sound effects', takes: [effect] },
+    ]);
+  });
+
+  it('is empty for a project that has never made one', () => {
+    const song = asset('song', '2026-09-14T10:00:00Z');
+    expect(soundEffectTakes([song], [job('j1', 'generate.text2music', ['song'])], TASKS)).toEqual([]);
   });
 });

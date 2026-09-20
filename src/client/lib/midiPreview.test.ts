@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MidiNote } from '../../shared/types.ts';
-import { maxPolyphony, noteFrequency, notesFrom, previewDuration, voiceGain } from './midiPreview.ts';
+import { noteFrequency, notesFrom, previewDuration, typicalPolyphony, voiceGain } from './midiPreview.ts';
 
 function note(pitch: number, start: number, end: number): MidiNote {
   return { pitch, start, end, instrument: 'piano' };
@@ -18,18 +18,47 @@ describe('noteFrequency', () => {
   });
 });
 
-describe('maxPolyphony', () => {
+describe('typicalPolyphony', () => {
   it('counts notes that overlap, not notes in a row', () => {
-    expect(maxPolyphony([note(60, 0, 1), note(62, 1, 2), note(64, 2, 3)])).toBe(1);
-    expect(maxPolyphony([note(60, 0, 3), note(64, 1, 3), note(67, 2, 3)])).toBe(3);
+    expect(typicalPolyphony([note(60, 0, 1), note(62, 1, 2), note(64, 2, 3)])).toBe(1);
+    expect(typicalPolyphony([note(60, 0, 3), note(64, 0, 3), note(67, 0, 3)])).toBe(3);
   });
 
   it('counts a note starting exactly as another ends, which is the quiet way round', () => {
-    expect(maxPolyphony([note(60, 0, 1), note(62, 1, 2)])).toBe(1);
+    expect(typicalPolyphony([note(60, 0, 1), note(62, 1, 2)])).toBe(1);
+  });
+
+  it('ignores a spike too short to hear, which is the bug it exists for', () => {
+    // A minute of a plain two note texture, then the stutter MuScriptor can
+    // end a long take on: hundreds of duplicate hits on one instant. The old
+    // maximum answered 502 here and put the whole minute at -38 dBFS.
+    const music = [note(60, 0, 60), note(64, 0, 60)];
+    const stutter = Array.from({ length: 500 }, () => note(35, 59.9, 59.91));
+
+    expect(typicalPolyphony([...music, ...stutter])).toBe(2);
+  });
+
+  it('still hears a passage that is genuinely dense for long enough', () => {
+    const sparse = [note(60, 0, 10)];
+    const dense = Array.from({ length: 8 }, (_, step) => note(60 + step, 2, 9));
+
+    expect(typicalPolyphony([...sparse, ...dense])).toBe(9);
+  });
+
+  it('weighs a count by how long it lasts, not by how many notes carry it', () => {
+    // Two voices for nine seconds, six for one. The quantile follows the time.
+    const held = [note(60, 0, 10), note(64, 0, 10)];
+    const brief = Array.from({ length: 4 }, (_, step) => note(70 + step, 9, 10));
+
+    expect(typicalPolyphony([...held, ...brief], 0.5)).toBe(2);
+  });
+
+  it('answers one when every note is instantaneous, rather than nothing', () => {
+    expect(typicalPolyphony([note(60, 1, 1), note(64, 2, 2)])).toBe(1);
   });
 
   it('is zero for nothing', () => {
-    expect(maxPolyphony([])).toBe(0);
+    expect(typicalPolyphony([])).toBe(0);
   });
 });
 

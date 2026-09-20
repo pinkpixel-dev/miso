@@ -1,11 +1,13 @@
 import { ArrowLeft } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { JobList } from '../components/JobList.tsx';
 import { SoundEffects } from '../components/sound/SoundEffects.tsx';
 import { Transcriptions } from '../components/sound/Transcriptions.tsx';
 import { projectPath } from '../lib/routes.ts';
+import { soundEffectTakes } from '../lib/takeGroups.ts';
 import { useMidiArtifacts } from '../lib/useMidiArtifacts.ts';
+import { usePlayer } from '../lib/usePlayer.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
 /**
@@ -24,14 +26,34 @@ import { useStudio } from '../lib/useStudio.ts';
  *
  * Project scoped, because a sound effect is saved into a project and a
  * transcription hangs off one of its takes.
+ *
+ * Full width from 2026-09-20. The takes column that stood here listed the
+ * project's generated songs, which is everything this page is not about, while
+ * neither of the things it makes could appear in it: an effect was filed under
+ * the songs and a transcription is not a take at all. Both now sit under the
+ * form that made them.
  */
 export function SoundRoute() {
-  const { project, projectId, assets, tasks, catalog, jobs, submit, cancelJob, dismissJobs, dismissedCount } =
-    useStudio();
+  const {
+    project,
+    projectId,
+    assets,
+    allJobs,
+    tasks,
+    catalog,
+    jobs,
+    submit,
+    removeAsset,
+    cancelJob,
+    dismissJobs,
+    dismissedCount,
+  } = useStudio();
+  const { clear } = usePlayer();
 
   const [busy, setBusy] = useState<'sfx' | 'midi' | undefined>();
 
   const midi = useMidiArtifacts(projectId, jobs);
+  const effects = useMemo(() => soundEffectTakes(assets, allJobs, tasks), [assets, allJobs, tasks]);
 
   const sfxTask = tasks.find((task) => task.id === 'generate.sfx');
   const midiTask = tasks.find((task) => task.id === 'analyze.midi');
@@ -67,8 +89,16 @@ export function SoundRoute() {
       <SoundEffects
         task={sfxTask}
         catalog={catalog}
+        effects={effects}
         busy={busy === 'sfx'}
         onSubmit={(modelId, params) => void run('sfx', { taskId: 'generate.sfx', modelId, params })}
+        onRemove={(asset) => {
+          // The dock holds an asset rather than an id, so a deleted effect
+          // would otherwise sit in the transport pointing at a file that is
+          // gone. Same reason as the takes column.
+          clear(asset.id);
+          removeAsset(asset.id);
+        }}
       />
 
       <Transcriptions

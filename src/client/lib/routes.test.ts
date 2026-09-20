@@ -68,6 +68,15 @@ describe('wantsFullWidth', () => {
     expect(wantsFullWidth('/projects/abc/tools')).toBe(true);
   });
 
+  /**
+   * The column beside the sound page listed generated songs, which is what
+   * that page is not about, and neither of the things it makes could appear
+   * in it. Both are now listed on the page itself.
+   */
+  it('is true on the sound page, which lists its own effects and transcriptions', () => {
+    expect(wantsFullWidth('/projects/abc/sound')).toBe(true);
+  });
+
   it('is true on the project page, which carries its own list of takes', () => {
     expect(wantsFullWidth('/projects/abc')).toBe(true);
   });
