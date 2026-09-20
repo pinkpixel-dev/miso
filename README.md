@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="Miso logo" width="300">
+</p>
+
 # Miso
 
 A local music generation and remix studio. You bring a prompt or a song, and Miso gives you
@@ -10,17 +14,15 @@ and a record of exactly how each clip was made so you can change one thing and t
 
 <!-- TODO: screenshot of a project open, with a waveform loaded and the queue visible. -->
 
-> **Where this is at.** This is the first public release. Miso installs models, keeps your
-> projects and audio, generates with ACE-Step from a guided prompt builder with lyrics
-> written for you if you want them, repaints a section of a track, covers a take, holds any
-> two takes against each other, splits a song into stems you can mix and export, sings a
-> vocal stem again in another voice, transcribes a take to MIDI, makes sound effects, and
-> converts, trims, fades and levels audio in the browser without touching a model.
->
-> I have run it on one machine, a laptop with a 16 GB RTX 4090. Other cards and other
-> drivers are untested, so if something breaks on yours I would like to hear about it.
+<p align="center">
+  <img src="screenshots/screenshot1.png" alt="Miso Project page" width="85%">
+</p>
 
-## Why it exists
+This is the first public release. Miso installs models, keeps your projects and audio, generates with ACE-Step from a guided prompt builder with lyrics written for you if you want them, repaints a section of a track, covers a take, holds any two takes against each other, splits a song into stems you can mix and export, sings a vocal stem again in another voice, transcribes a take to MIDI, makes sound effects, and converts, trims, fades and levels audio in the browser without touching a model.
+
+I have run this on one machine, a laptop with a 16 GB RTX 4090. Other cards and other drivers are untested, so if something breaks on yours I would like to hear about it.
+
+## Why I made this
 
 There are other interfaces for audio.cpp, including one built into the server itself. They
 are all one-shot: fill in a form, get a file, lose it when you close the tab. None of them
@@ -218,8 +220,9 @@ user audio.cpp runs as. If Docker created it for you as root, installs fail with
 
 ### 5. Write a song
 
-<!-- TODO: screenshot of the Generate panel in guided mode, with chips picked, the built
-     prompt visible underneath, and lyrics in the editor. -->
+<p align="center">
+  <img src="screenshots/screenshot2.png" alt="Miso Generate panel" width="85%">
+</p>
 
 Open a project and use the Generate panel.
 
@@ -307,7 +310,9 @@ without leaving the prompt box, and F flips between takes on the Compare screen.
 
 Nothing fires while you are typing, apart from generate, which is meant to.
 
-<!-- TODO: screenshot of the Stems screen with a separated take and the stem faders. -->
+<p align="center">
+  <img src="screenshots/screenshot3.png" alt="Miso Stems screen" width="85%">
+</p>
 
 ## Where the disk goes
 
