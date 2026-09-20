@@ -126,3 +126,55 @@ describe('generate.yue2', () => {
     expect(names).toContain('maxTokens');
   });
 });
+
+describe('generate.yue2 with a score to follow', () => {
+  const MELODY = 'X:1\nM:4/4  L:1/16\nV: Vocal clef=treble\nK:C\nc4c4g4g4|a4a4g8|\n';
+
+  it('sends a supplied score nested under options, like every other knob', () => {
+    // Probed on 2026-09-20 before this was built, because two entries in
+    // DOCS/ERRORS.md are this backend accepting a field and ignoring it. Two
+    // runs at seed 4242 differing only in this came back as different songs.
+    const request = yue.buildRequest(paramsFor({ ...SONG, cot: 'melody', abc: MELODY }), {});
+
+    expect(request.abc).toBeUndefined();
+    expect(request.options).toMatchObject({ abc: MELODY.trim(), cot: 'melody' });
+  });
+
+  it('leaves the score out when there is not one, rather than sending an empty plan', () => {
+    // An empty box is the ordinary case of letting YuE2 plan for itself, not a
+    // score with no notes in it. Sending it would point the melody route at
+    // nothing.
+    for (const abc of ['', '   \n  ']) {
+      const options = yue.buildRequest(paramsFor({ ...SONG, cot: 'melody', abc }), {})
+        .options as Record<string, unknown>;
+      expect(options.abc).toBeUndefined();
+    }
+  });
+
+  it('trims the score, so a trailing newline is not what decides it', () => {
+    const options = yue.buildRequest(paramsFor({ ...SONG, cot: 'melody', abc: `\n${MELODY}\n` }), {})
+      .options as Record<string, unknown>;
+    expect(options.abc).toBe(MELODY.trim());
+  });
+
+  it('refuses a score with the planning turned off', () => {
+    // `cot=off` never looks at a score. Caught here rather than after four
+    // gigabytes have loaded and a song has come back ignoring the tune.
+    const result = validateParams(yue, { ...SONG, cot: 'off', abc: MELODY });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('planning left on');
+  });
+
+  it('allows the planning routes, and an empty score with planning off', () => {
+    for (const cot of ['melody', 'full']) {
+      expect(validateParams(yue, { ...SONG, cot, abc: MELODY }).ok).toBe(true);
+    }
+    expect(validateParams(yue, { ...SONG, cot: 'off' }).ok).toBe(true);
+  });
+
+  it('offers the score as its own kind of field, and never demands one', () => {
+    const field = yue.fields.find((entry) => entry.name === 'abc');
+    expect(field?.kind).toBe('score');
+    expect(field?.required).toBe(false);
+  });
+});

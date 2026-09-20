@@ -482,7 +482,7 @@ export interface Job {
 export interface TaskField {
   name: string;
   label: string;
-  kind: 'text' | 'lyrics' | 'number' | 'choice';
+  kind: 'text' | 'lyrics' | 'number' | 'choice' | 'score';
   required: boolean;
   min?: number;
   max?: number;

@@ -11,6 +11,7 @@ import { jobRoutes } from './jobs.ts';
 import { lyricsRoutes } from './lyrics.ts';
 import { projectRoutes } from './projects.ts';
 import { savedRoutes } from './saved.ts';
+import { scoreRoutes } from './scores.ts';
 import { storageRoutes } from './storage.ts';
 
 export const api = new Hono();
@@ -109,5 +110,6 @@ api.route('/', assetRoutes);
 api.route('/', storageRoutes);
 api.route('/', jobRoutes);
 api.route('/', midiRoutes);
+api.route('/', scoreRoutes);
 api.route('/', lyricsRoutes);
 api.route('/', savedRoutes);

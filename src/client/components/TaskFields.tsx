@@ -1,5 +1,6 @@
-import type { TaskField } from '../../shared/types.ts';
+import type { ScoreArtifact, TaskField } from '../../shared/types.ts';
 import { LyricsEditor } from './LyricsEditor.tsx';
+import { ScoreField } from './ScoreField.tsx';
 import { Field, SegmentedControl, TextArea } from './ui.tsx';
 
 /**
@@ -15,12 +16,22 @@ export function PlainField({
   value,
   onChange,
   placeholder = 'cinematic synth pop with clear vocals',
+  scores = [],
 }: {
   field: TaskField;
   value: string;
   onChange: (value: string) => void;
   /** The example shown in an empty text box, which differs by what is being written. */
   placeholder?: string;
+  /**
+   * Scores already in this project, for a `score` field's picker.
+   *
+   * Empty everywhere but the create column, which is the only page that offers
+   * a task taking one. An empty list is not an error: it draws the box and the
+   * file button without the picker, which is what a project that has not
+   * planned anything yet should see.
+   */
+  scores?: ScoreArtifact[];
 }) {
   if (field.kind === 'number') {
     return (
@@ -52,6 +63,10 @@ export function PlainField({
         hint={field.help}
       />
     );
+  }
+
+  if (field.kind === 'score') {
+    return <ScoreField field={field} value={value} onChange={onChange} scores={scores} />;
   }
 
   if (field.kind === 'lyrics') {

@@ -13,6 +13,7 @@ import type {
   PromptSuggestion,
   SavedPrompt,
   SavedPromptKind,
+  ScoreArtifact,
   Settings,
   SettingsPatch,
   StorageUsage,
@@ -187,6 +188,16 @@ export const api = {
   /** Every transcription in a project, newest first, with its notes. */
   getMidi: (projectId: string) =>
     request<MidiArtifact[]>(`/projects/${encodeURIComponent(projectId)}/midi`),
+
+  /**
+   * Every score in the project, for the picker on the create form.
+   *
+   * A score's own download hangs off its take, which is the question a take
+   * answers. This is the other question: which scores exist at all, so one can
+   * be handed to YuE2 as the plan for a new song.
+   */
+  getScores: (projectId: string) =>
+    request<ScoreArtifact[]>(`/projects/${encodeURIComponent(projectId)}/scores`),
 
   /** Answers with what is left, the same way deleting a saved prompt does. */
   deleteMidi: (projectId: string, midiId: string) =>

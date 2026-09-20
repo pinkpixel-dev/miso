@@ -7,6 +7,7 @@ import type {
   CatalogPackage,
   Job,
   PromptSuggestion,
+  ScoreArtifact,
   StudioState,
   StudioTask,
 } from '../../shared/types.ts';
@@ -103,6 +104,7 @@ export function GeneratePanel({
   tasks,
   jobs,
   assets,
+  scores,
   catalog,
   catalogLoading,
   prefill,
@@ -113,6 +115,8 @@ export function GeneratePanel({
   jobs: Job[];
   /** The project's own tracks, for a task that sings in a voice from one. */
   assets: Asset[];
+  /** The project's own scores, for a task that can be given a plan to follow. */
+  scores: ScoreArtifact[];
   catalog: Catalog | undefined;
   catalogLoading: boolean;
   /** What a past job says this form should start from, when one was named. */
@@ -550,6 +554,7 @@ export function GeneratePanel({
                 field={field}
                 value={fieldValues[field.name] ?? ''}
                 onChange={(value) => setValue(field.name, value)}
+                scores={scores}
               />
             ))}
           </div>
@@ -645,6 +650,7 @@ export function GeneratePanel({
                 field={field}
                 value={fieldValues[field.name] ?? ''}
                 onChange={(value) => setValue(field.name, value)}
+                scores={scores}
               />
             ))}
           </div>

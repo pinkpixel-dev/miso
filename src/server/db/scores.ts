@@ -104,3 +104,22 @@ export function assetsWithScores(handle: Database, assetIds: string[]): Set<stri
 
   return new Set(rows.map((row) => row.asset_id));
 }
+
+/**
+ * Every score in one project, newest first.
+ *
+ * The ABC comes with each row rather than behind a second request. The picker
+ * on the create form loads a score into the box the moment it is chosen, and a
+ * score is about a kilobyte, so a list of them is smaller than the list of
+ * transcriptions next door that carries every note event.
+ *
+ * `score_artifacts_project` in 010 is the index this reads, which was added
+ * against this query before there was one.
+ */
+export function listScoreArtifacts(handle: Database, projectId: string): ScoreArtifact[] {
+  const rows = handle
+    .prepare('SELECT * FROM score_artifacts WHERE project_id = ? ORDER BY created_at DESC, rowid DESC')
+    .all(projectId) as Record_[];
+
+  return rows.map(toArtifact);
+}

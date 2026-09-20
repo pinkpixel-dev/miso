@@ -30,7 +30,14 @@ export interface TaskParams {
 export interface ParamField {
   name: string;
   label: string;
-  kind: 'text' | 'lyrics' | 'number' | 'choice';
+  /**
+   * How the field is drawn, and nothing about what it means.
+   *
+   * `score` is an ABC document: many lines, monospaced, and long enough that a
+   * three-row box would hide all of it. It is otherwise an ordinary string
+   * field and travels as one.
+   */
+  kind: 'text' | 'lyrics' | 'number' | 'choice' | 'score';
   required: boolean;
   /** Numbers only. Both ends are inclusive and enforced on the server. */
   min?: number;

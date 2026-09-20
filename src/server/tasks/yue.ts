@@ -131,6 +131,32 @@ export const yue2: TaskDefinition = {
       ],
       help: 'Whether it writes a score before the music. Planning gives you the score to download and costs about half again in time.',
     },
+    /**
+     * An ABC score to sing instead of one the model plans for itself.
+     *
+     * Probed on 2026-09-20 against `yue2_main_q8_0`, because a request option
+     * accepted and ignored is a trap this backend has sprung twice before. See
+     * DOCS/ERRORS.md. Two runs at seed 4242 differing only in this field came
+     * back as different songs, and two different scores at that same seed came
+     * back different again, so the score is read rather than merely counted.
+     *
+     * Three things follow from that probe and are worth knowing here:
+     *
+     *   - Supplying one skips the planning stage, so no score artifact comes
+     *     back. `storeScores` filters rather than requires, so a take planned
+     *     from an external score simply has none of its own to download.
+     *   - It is faster for the same reason: 22 s against 36 s.
+     *   - The song runs as long as the score does. A four bar melody gave a
+     *     15.8 s song where a longer one gave 39.7 s, which is why the help
+     *     says to bring the whole tune.
+     */
+    {
+      name: 'abc',
+      label: 'Score',
+      kind: 'score',
+      required: false,
+      help: 'An ABC score for it to follow, instead of planning its own. The song lasts as long as the score, so bring the whole tune. Leave it empty to let YuE2 write the melody.',
+    },
     {
       name: 'maxTokens',
       label: 'Length limit',
@@ -183,6 +209,23 @@ export const yue2: TaskDefinition = {
     },
   ],
   /**
+   * A score with the planning turned off.
+   *
+   * `cot=off` is the route that writes music straight from the lyrics and
+   * never looks at a score, so the two together are a contradiction rather
+   * than a preference. Caught here because the alternative is a job that
+   * queues, loads four gigabytes, runs for half a minute and hands back a song
+   * that ignored the tune it was given, which reads as the feature being
+   * broken.
+   */
+  validate(params) {
+    const abc = typeof params.abc === 'string' ? params.abc.trim() : '';
+    if (abc !== '' && params.cot === 'off') {
+      return 'A score needs the planning left on. Choose Melody only, or clear the score.';
+    }
+    return undefined;
+  },
+  /**
    * Nested, apart from the two flags.
    *
    * `lyrics` and `seed` are `--lyrics` and `--seed` on the CLI, so they sit at
@@ -194,6 +237,11 @@ export const yue2: TaskDefinition = {
     const options: Record<string, unknown> = { style: params.prompt };
 
     if (typeof params.cot === 'string') options.cot = params.cot;
+    // Only when there is one. An empty string here is not an empty score, it
+    // is the ordinary case of letting the model plan, and sending it would ask
+    // the melody route to follow nothing.
+    const abc = typeof params.abc === 'string' ? params.abc.trim() : '';
+    if (abc !== '') options.abc = abc;
     if (typeof params.maxTokens === 'number') options.semantic_max_tokens = params.maxTokens;
     if (typeof params.guidanceScale === 'number') options.guidance_scale = params.guidanceScale;
     if (typeof params.steps === 'number') options.num_inference_steps = params.steps;

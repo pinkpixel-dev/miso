@@ -6,6 +6,7 @@ import { Panel } from '../components/ui.tsx';
 import { installedPackages } from '../lib/models.ts';
 import { prefillFromJob } from '../lib/reusePrompt.ts';
 import { projectPath } from '../lib/routes.ts';
+import { useScoreArtifacts } from '../lib/useScoreArtifacts.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
 /**
@@ -23,6 +24,15 @@ import { useStudio } from '../lib/useStudio.ts';
 export function CreateRoute() {
   const { project, loading, error, tasks, jobs, allJobs, assets, catalog, catalogLoading, submit } =
     useStudio();
+
+  /*
+    Scores this project already has, for YuE2's score field.
+
+    Read from `allJobs` rather than the queue for the same reason the seed job
+    is: the queue hides finished jobs once somebody clears it, and a score
+    outlives that. Clearing the queue should not empty the picker.
+  */
+  const scores = useScoreArtifacts(project?.id, allJobs);
 
   /*
     The form can be seeded from a take that already exists, which the address
@@ -114,6 +124,7 @@ export function CreateRoute() {
         tasks={tasks}
         jobs={jobs}
         assets={assets}
+        scores={scores}
         catalog={catalog}
         catalogLoading={catalogLoading}
         prefill={prefill}

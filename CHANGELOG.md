@@ -38,6 +38,24 @@ the music.
   through the arrangement.
 - The weights are CC-BY-NC-4.0, which is non-commercial.
 
+### 🎵 Bring your own score
+
+- **Hand YuE2 a tune instead of letting it invent one.** The create form has a
+  Score box. Paste an ABC score, load an `.abc` file, or pick a score this
+  project already made. Anything you load can be edited before you send it.
+- **Rearrange a song you already wrote.** Generate a song with planning on,
+  pick its score in the box, change the style, and hear the same melody played
+  another way. This is the quickest way in, and it needs nothing from outside
+  Miso.
+- **The song lasts as long as the score.** Bring the whole tune. Four bars of
+  melody give you about sixteen seconds of song.
+- **A score needs the planning left on.** Choosing a score with planning set to
+  None is refused before the job queues, instead of running for a minute and
+  handing back a song that ignored the tune.
+- **A take built from a score has no score to save.** YuE2 skipped the planning
+  because you did it, so there is nothing for it to hand back. The Save ABC
+  option is simply absent on those takes.
+
 ### 🐛 Fixes
 
 - **Takes are named after what you actually wrote.** A YuE2 take was named after
@@ -57,6 +75,11 @@ the music.
   own table and hang off the take they were planned for, so deleting the take
   takes its score with it.
 - A task can name a second package its family cannot run without.
+- Task fields have a `score` kind, drawn as a monospaced box with a picker and
+  a file button. A task can also refuse a combination of fields before the job
+  queues, which is what catches a score with the planning off.
+- `GET /api/projects/:id/scores` lists a project's scores. Downloading one
+  still hangs off the take it planned.
 
 ## 1.2.0 - September 20, 2026
 

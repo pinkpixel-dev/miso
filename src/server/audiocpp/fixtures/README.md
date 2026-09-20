@@ -805,6 +805,42 @@ almost continuously, so the two numbers were never measuring the same thing.
 `yue2_main_bf16` was never installed and is no longer suspected. If vocal quality is questioned
 again, compare passages that both contain singing, or listen.
 
+### A supplied score is read, not just counted
+
+Probed on 2026-09-20, before any of the cover work was built. Two entries in DOCS/ERRORS.md are
+this backend taking a request option and ignoring it, so this one was measured rather than
+trusted to the spec.
+
+Three runs at seed 4242 with the same lyrics and the same style, `cot=melody` throughout:
+
+```
+no abc supplied        23.6 s of audio   35.7 s wall   score artifact returned
+melody A supplied      39.7 s of audio   21.5 s wall   no artifact
+melody B supplied      15.8 s of audio   10.4 s wall   no artifact
+```
+
+Melody A was eight bars of 4/4, melody B four bars of 3/4. Same seed for all three. The two
+supplied scores gave different songs of different lengths, so the score is read rather than
+counted, and the run with no score gave a third song again.
+
+Four things follow from that:
+
+- **The planning stage is skipped.** A run given a score returns no score artifact, because it
+  wrote none. `storeScores` filters the artifact list rather than requiring an entry, so a take
+  planned from an external score simply has none to download. That is an ordinary outcome and
+  not a failure.
+- **It is faster.** 21.5 s against 35.7 s for a longer piece of audio, which is the ABC stage
+  not running.
+- **The song runs as long as the score does.** Four bars gave a 15.8 s song. This is the fact
+  most worth telling somebody in the UI, because a short melody looks like a truncated song.
+- **`cot=melody` works.** It was unrun before this. Its output carries a Vocal voice and an Ins
+  voice with no chord symbols, which is the shape the YuE2 model card asks for in a cover.
+
+Verified end to end through Miso's own worker afterwards, not only against the raw API. The
+same seed and the same melody A through a queued `generate.yue2` job produced a 48 kHz stereo
+take of 39.718 s, matching the direct run to the millisecond, which is what says the score
+reached the model unchanged.
+
 ### Two packages into one folder, and they cannot race
 
 A working YuE2 needs a model package and a decoder package. All five write the same four
@@ -832,9 +868,11 @@ reads the first `.gguf` instead, which still gives ACE-Step `ACE-Step1.5-GGUF/tu
 
 ### Still unknown
 
-- `cot=melody` was never run. `off` and `full` were.
-- Whether a supplied `abc` or `abc_file` is honoured over HTTP. That is the cover path and it
-  is unbuilt, see DOCS/ROADMAP.md.
+- `abc_file`, the path form of a supplied score. Only `abc`, the text form, was measured, and
+  Miso has no way to put a file on the backend anyway.
+- Whether a score longer than the lyrics changes where the singing stops.
+- The six ABC sampling options, `abc_temperature` and its five neighbours. They only affect a
+  score the model writes itself, which is why nothing has needed them yet.
 - The bf16 and q4_0 model packages, and the f32 decoder. Only q8_0 with the f16 decoder was
   installed.
 - The AR and NAR LoRA session options. Both want a safetensors path on the backend, and Miso
