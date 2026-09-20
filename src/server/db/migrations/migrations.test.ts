@@ -266,3 +266,61 @@ describe('008_mix.sql', () => {
     expect(names).toContain('assets_by_project');
   });
 });
+
+describe('010_scores.sql', () => {
+  function withTake(handle: Database.Database) {
+    handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Demo')").run();
+    handle
+      .prepare(
+        `INSERT INTO assets (id, project_id, kind, label, filename, format, bytes, checksum)
+         VALUES ('a1', 'p1', 'generated', 'Night Drive', 'night.wav', 'wav', 100, 'abc')`,
+      )
+      .run();
+    handle
+      .prepare(
+        `INSERT INTO score_artifacts (id, project_id, asset_id, label, filename, bytes, checksum, abc)
+         VALUES ('s1', 'p1', 'a1', 'Night Drive', 'Night Drive.abc', 12, 'def', 'X:1')`,
+      )
+      .run();
+  }
+
+  it('creates the table', () => {
+    expect(tableNames(fresh())).toContain('score_artifacts');
+  });
+
+  it('deletes a score with the take it was planned for', () => {
+    // A plan for a song that no longer exists means nothing.
+    const handle = fresh();
+    withTake(handle);
+
+    handle.prepare("DELETE FROM assets WHERE id = 'a1'").run();
+
+    const left = handle.prepare('SELECT COUNT(*) AS n FROM score_artifacts').get() as { n: number };
+    expect(left.n).toBe(0);
+  });
+
+  it('deletes a score with its project', () => {
+    const handle = fresh();
+    withTake(handle);
+
+    handle.prepare("DELETE FROM projects WHERE id = 'p1'").run();
+
+    const left = handle.prepare('SELECT COUNT(*) AS n FROM score_artifacts').get() as { n: number };
+    expect(left.n).toBe(0);
+  });
+
+  it('refuses a score for a take that does not exist', () => {
+    const handle = fresh();
+    handle.prepare("INSERT INTO projects (id, name) VALUES ('p1', 'Demo')").run();
+
+    expect(() =>
+      handle
+        .prepare(
+          `INSERT INTO score_artifacts (id, project_id, asset_id, label, filename, bytes, checksum, abc)
+           VALUES ('s1', 'p1', 'nope', 'x', 'x.abc', 1, 'd', 'X:1')`,
+        )
+        .run(),
+    ).toThrow();
+  });
+});
+

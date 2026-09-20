@@ -131,6 +131,7 @@ export function LibraryRow({
         assetId={take.assetId}
         label={take.label}
         format={take.format}
+        hasScore={take.hasScore}
       />
 
       <DropdownMenu.Root>

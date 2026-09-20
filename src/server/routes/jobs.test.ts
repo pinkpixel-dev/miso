@@ -100,6 +100,7 @@ describe('GET /api/tasks', () => {
       'generate.sing',
       'generate.stableaudio',
       'generate.text2music',
+      'generate.yue2',
     ]);
 
     // Neither of these makes a song, and one of them does not make audio.

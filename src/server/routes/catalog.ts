@@ -5,7 +5,7 @@ import { clearLiveStatusCache, getLiveStatus } from '../audiocpp/packageStatus.t
 import { buildCatalog } from '../catalog/merge.ts';
 import { findPackage, loadSpecs, specVersion } from '../catalog/registry.ts';
 import { db } from '../db/index.ts';
-import { listInstalls, recordInstallStarted, updateInstall } from '../db/installs.ts';
+import { activeInstalls, listInstalls, recordInstallStarted, updateInstall } from '../db/installs.ts';
 import { ensurePollerRunning } from '../installs/poller.ts';
 import { readSettings } from '../db/settings.ts';
 
@@ -38,9 +38,46 @@ function knownPackage(id: string): boolean {
   return findPackage(id) !== undefined;
 }
 
+/**
+ * An install already running into the folder this one wants.
+ *
+ * Two packages of one family usually land in their own folders, and two
+ * installs at once are fine. YuE2 is the exception: its five packages all write
+ * the same four sidecar files into `Yue2-3B-GGUF/`, and two installs racing
+ * each other there fail with `package file already exists`, measured on
+ * 2026-09-20. One at a time works every time.
+ *
+ * Checked by folder rather than by family, because the folder is what the
+ * conflict is actually about. A family that someday splits across two folders
+ * can still install both at once.
+ */
+function installBlockedBy(id: string): string | undefined {
+  const wanted = findPackage(id)?.pkg.directory;
+  if (wanted === undefined) return undefined;
+
+  for (const row of activeInstalls(db())) {
+    if (row.packageId === id) continue;
+    const found = findPackage(row.packageId);
+    if (found?.pkg.directory === wanted) return found.pkg.label;
+  }
+
+  return undefined;
+}
+
 catalogRoutes.post('/catalog/packages/:id/install', async (c) => {
   const id = c.req.param('id');
   if (!knownPackage(id)) return c.json<ApiError>({ error: `Miso has no spec for the package ${id}` }, 404);
+
+  const blocking = installBlockedBy(id);
+  if (blocking !== undefined) {
+    return c.json<ApiError>(
+      {
+        error: `${blocking} is installing into the same folder`,
+        detail: 'These two share files, so they have to install one at a time. Try again when it finishes.',
+      },
+      409,
+    );
+  }
 
   const backendUrl = readSettings().backendUrl;
   const result = await startInstall(backendUrl, id);

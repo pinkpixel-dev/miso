@@ -2,10 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { rename, writeFile } from 'node:fs/promises';
 import type { Database } from 'better-sqlite3';
-import type { Asset, MidiArtifact } from '../../shared/types.ts';
+import type { Asset, MidiArtifact, ScoreArtifact } from '../../shared/types.ts';
 import type { TaskArtifact, TaskResult } from '../audiocpp/client.ts';
 import { insertAsset, setAssetPeaks } from '../db/assets.ts';
 import { insertMidiArtifact } from '../db/midi.ts';
+import { insertScoreArtifact } from '../db/scores.ts';
 import { readAudioFacts } from '../library/metadata.ts';
 import { convertWavRate } from '../library/resample.ts';
 import { peaksFromWav } from '../library/wavPeaks.ts';
@@ -257,3 +258,51 @@ export async function storeArtifacts(
   }
   return stored;
 }
+
+/**
+ * Stores the score a generation left beside its take, when it left one.
+ *
+ * Unlike `storeArtifacts`, an empty result is not an error. YuE2 returns a
+ * score when its planning is on and nothing when it is off, and both are
+ * ordinary outcomes of a run somebody asked for. Every other family returns no
+ * artifacts at all and passes straight through.
+ *
+ * The score hangs off the take it was planned for rather than off a source.
+ * There is no source: the song was written from words.
+ */
+export async function storeScores(
+  handle: Database,
+  options: { projectId: string; jobId: string; assetId: string; label: string },
+  result: TaskResult,
+): Promise<ScoreArtifact[]> {
+  // By extension rather than by kind. The kind on this artifact is `custom`,
+  // which says nothing, while the meta carries `extension: abc` and
+  // `mime: text/vnd.abc`. Both come from the server.
+  const scores = result.artifacts.filter((artifact) => artifact.extension === 'abc');
+
+  const stored: ScoreArtifact[] = [];
+  for (const artifact of scores) {
+    const abc = Buffer.from(artifact.payload, 'base64').toString('utf8');
+    // A score with no text in it is not stored. The take is still a take, and
+    // a row pointing at an empty document would draw a download that hands
+    // somebody an empty file.
+    if (abc.trim() === '') continue;
+
+    stored.push(
+      insertScoreArtifact(handle, {
+        id: randomUUID(),
+        projectId: options.projectId,
+        assetId: options.assetId,
+        jobId: options.jobId,
+        label: options.label,
+        filename: `${options.label}.abc`,
+        bytes: Buffer.byteLength(abc, 'utf8'),
+        checksum: createHash('sha256').update(abc).digest('hex'),
+        abc,
+      }),
+    );
+  }
+
+  return stored;
+}
+

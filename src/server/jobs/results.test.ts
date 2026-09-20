@@ -9,7 +9,8 @@ import { createJob } from '../db/jobs.ts';
 import { createProject } from '../db/projects.ts';
 import { validatePeaks } from '../library/peaks.ts';
 import { assetPath, midiPath, projectDir } from '../library/storage.ts';
-import { storeArtifacts, storeResult } from './results.ts';
+import { storeArtifacts, storeResult, storeScores } from './results.ts';
+import { findScoreForAsset } from '../db/scores.ts';
 import type { TaskResult } from '../audiocpp/client.ts';
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), '../library/fixtures');
@@ -315,3 +316,100 @@ describe('storeArtifacts', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('storeScores', () => {
+  const ABC = 'X:1\nM:2/4\nK:D\nV: Vocal\n"D"d8d2e4f2|\n';
+
+  function score(abc: string) {
+    return {
+      id: 'score',
+      // `custom` says nothing, which is why the extension is what this reads.
+      kind: 'custom',
+      payload: Buffer.from(abc, 'utf8').toString('base64'),
+      extension: 'abc',
+      mime: 'text/vnd.abc',
+    };
+  }
+
+  async function takeFor(): Promise<string> {
+    const [asset] = await storeResult(
+      handle,
+      { projectId, jobId, label: 'Night Drive' },
+      result({ audio: tone }),
+    );
+    return asset!.id;
+  }
+
+  it('keeps the score against the take it was planned for', async () => {
+    const assetId = await takeFor();
+
+    const stored = await storeScores(
+      handle,
+      { projectId, jobId, assetId, label: 'Night Drive' },
+      result({ audio: tone, artifacts: [score(ABC)] }),
+    );
+
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.assetId).toBe(assetId);
+    expect(stored[0]?.filename).toBe('Night Drive.abc');
+    expect(stored[0]?.abc).toBe(ABC);
+    expect(findScoreForAsset(handle, assetId)?.abc).toBe(ABC);
+  });
+
+  it('is fine with a run that returned no score at all', async () => {
+    // Planning off is an ordinary thing to ask for, unlike transcription
+    // finishing with no MIDI, which is a failure.
+    const assetId = await takeFor();
+
+    const stored = await storeScores(
+      handle,
+      { projectId, jobId, assetId, label: 'Night Drive' },
+      result({ audio: tone }),
+    );
+
+    expect(stored).toEqual([]);
+    expect(findScoreForAsset(handle, assetId)).toBeUndefined();
+  });
+
+  it('ignores an artifact that is not a score', async () => {
+    const assetId = await takeFor();
+    const midi = { id: 'midi', kind: 'midi', payload: 'TVRoZA==', extension: 'mid', mime: 'audio/midi' };
+
+    const stored = await storeScores(
+      handle,
+      { projectId, jobId, assetId, label: 'Night Drive' },
+      result({ audio: tone, artifacts: [midi] }),
+    );
+
+    expect(stored).toEqual([]);
+  });
+
+  it('does not store an empty score', async () => {
+    // A row pointing at nothing would draw a download that hands somebody an
+    // empty file.
+    const assetId = await takeFor();
+
+    const stored = await storeScores(
+      handle,
+      { projectId, jobId, assetId, label: 'Night Drive' },
+      result({ audio: tone, artifacts: [score('   \n')] }),
+    );
+
+    expect(stored).toEqual([]);
+  });
+
+  it('goes when the take goes', async () => {
+    // A plan for a song that no longer exists means nothing, which the foreign
+    // key in 010 enforces.
+    const assetId = await takeFor();
+    await storeScores(
+      handle,
+      { projectId, jobId, assetId, label: 'Night Drive' },
+      result({ audio: tone, artifacts: [score(ABC)] }),
+    );
+
+    handle.prepare('DELETE FROM assets WHERE id = ?').run(assetId);
+    expect(findScoreForAsset(handle, assetId)).toBeUndefined();
+  });
+});
+

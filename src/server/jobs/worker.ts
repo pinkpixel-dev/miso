@@ -26,7 +26,7 @@ import {
   type TaskDefinition,
 } from '../tasks/registry.ts';
 import { ensureLoaded } from './residency.ts';
-import { storeArtifacts, storeResult } from './results.ts';
+import { storeArtifacts, storeResult, storeScores } from './results.ts';
 import type { Asset, Job } from '../../shared/types.ts';
 
 /**
@@ -112,19 +112,44 @@ function backoffFor(attempts: number): number {
  * is called in the library, and the rest of this file cannot be reached without
  * a backend to run against.
  */
+/**
+ * The first line of a written field that is worth putting on a take.
+ *
+ * Section tags are skipped. YuE2 and MiniMax both want lyrics that open with
+ * `[Verse]`, and taking the first line literally named every YuE2 take
+ * "[Verse]". A lyric that is nothing but tags returns undefined and the caller
+ * moves on to whatever is next.
+ */
+function firstWrittenLine(written: string): string | undefined {
+  for (const raw of written.split('\n')) {
+    const line = raw.trim();
+    if (line === '') continue;
+    // A whole line inside brackets is a marker, not words. A line that merely
+    // contains brackets is kept, because that is a lyric with an aside in it.
+    if (/^\[[^\]]*\]$/.test(line)) continue;
+    return line;
+  }
+
+  return undefined;
+}
+
 export function labelFor(job: Job, task: TaskDefinition, sourceLabel?: string): string {
   if (job.title !== undefined && job.title.trim() !== '') return job.title.trim();
 
-  // The prompt first, then the lyrics. Almost every generator has a prompt and
-  // it wins, so this changed nothing for any of them. `generate.sing` has no
-  // prompt at all: it is given words and a voice, and the words are what the
-  // take is. Without this every sung take in a project is called "Sing lyrics
-  // in a voice", which is the same problem the source rule below solves for
-  // separation.
-  for (const key of ['prompt', 'lyrics']) {
+  // Whatever the person actually wrote, in the order a family calls it. Almost
+  // every generator has a prompt and it wins, so adding the other two changed
+  // nothing for any of them. `generate.yue2` calls its prompt a style, and
+  // `generate.sing` has neither: it is given words and a voice, and the words
+  // are what the take is. Without this a project fills with takes all called
+  // "Sing lyrics in a voice", which is the problem the source rule below
+  // solves for separation.
+  for (const key of ['prompt', 'style', 'lyrics']) {
     const written = job.params[key];
     if (typeof written !== 'string' || written.trim() === '') continue;
-    const line = written.trim().split('\n')[0] ?? '';
+
+    const line = firstWrittenLine(written);
+    if (line === undefined) continue;
+
     return line.length > 60 ? `${line.slice(0, 57)}...` : line;
   }
 
@@ -467,17 +492,32 @@ async function runOne(job: Job): Promise<number> {
         result.value,
       );
     } else {
-      await storeResult(
+      const label = labelFor(job, task, staged.sourceLabel);
+      const stored = await storeResult(
         db(),
         {
           projectId: job.projectId,
           jobId: job.id,
-          label: labelFor(job, task, staged.sourceLabel),
+          label,
           singleKind: task.resultKind,
           sampleRate: task.matchesSourceSampleRate ? staged.sourceSampleRate : undefined,
         },
         result.value,
       );
+
+      // A take can come back with a score beside it. YuE2 writes one when its
+      // planning is on, and this is where it is kept: hung off the take it was
+      // planned for, because there is no source to hang it off. Every other
+      // family returns no artifacts and this does nothing. A run whose planning
+      // was off is the same, which is why it is not an error to find none.
+      const take = stored[0];
+      if (take !== undefined) {
+        await storeScores(
+          db(),
+          { projectId: job.projectId, jobId: job.id, assetId: take.id, label },
+          result.value,
+        );
+      }
     }
     setJobState(db(), job.id, 'complete');
   } catch (error) {

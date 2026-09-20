@@ -211,6 +211,11 @@ export function downloadUrl(projectId: string, assetId: string): string {
   return `/api/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/download`;
 }
 
+/** The ABC score a take was planned from, for a download link. */
+export function scoreUrl(projectId: string, assetId: string): string {
+  return `/api/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/score`;
+}
+
 /** A transcription's MIDI file, for a download link. */
 export function midiDownloadUrl(projectId: string, midiId: string): string {
   return `/api/projects/${encodeURIComponent(projectId)}/midi/${encodeURIComponent(midiId)}/download`;

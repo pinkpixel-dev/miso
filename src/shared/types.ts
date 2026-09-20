@@ -190,6 +190,28 @@ export interface MidiArtifact {
   createdAt: string;
 }
 
+/**
+ * The ABC score a planning generator wrote before it wrote the music.
+ *
+ * Only YuE2 produces one, and only when its planning is left on. A take
+ * generated without planning simply has no score, which is not an error.
+ *
+ * `abc` is the document itself rather than a path, because it is about a
+ * kilobyte. The download route serves it as `text/vnd.abc`.
+ */
+export interface ScoreArtifact {
+  id: string;
+  projectId: string;
+  /** The take this was planned for. Deleting the take deletes the score. */
+  assetId: string;
+  jobId?: string;
+  label: string;
+  filename: string;
+  bytes: number;
+  abc: string;
+  createdAt: string;
+}
+
 /** A model family and its precisions, one card on the catalog screen. */
 export interface CatalogFamily {
   /**
@@ -284,6 +306,11 @@ export interface Asset {
   channels?: number;
   peaks?: number[][];
   createdAt: string;
+  /**
+   * Whether a score was planned for this take, so the export menu knows to
+   * offer it. Only YuE2 writes one, and only with its planning left on.
+   */
+  hasScore?: boolean;
 }
 
 /**
@@ -318,6 +345,8 @@ export interface LibraryTake {
   title?: string;
   prompt?: string;
   lyrics?: string;
+  /** Whether a score was planned for this take. See `Asset.hasScore`. */
+  hasScore?: boolean;
 }
 
 /** A project together with its assets, newest first. */

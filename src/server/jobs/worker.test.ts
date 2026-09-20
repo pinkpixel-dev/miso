@@ -177,8 +177,34 @@ describe('whether a failed job is worth staging again', () => {
   });
 });
 
-describe('labelFor and the lyrics fallback', () => {
+describe('labelFor and the written-field fallback', () => {
   const sing = findTask('generate.sing');
+  const yue = findTask('generate.yue2');
+
+  it('names a YuE2 take after its style, not its section tag', () => {
+    // YuE2 calls its prompt a style and wants lyrics that open with [Verse].
+    // Reading the lyrics first named every take in a project "[Verse]".
+    const named = job({
+      taskId: yue!.id,
+      params: { style: 'English, indie pop, warm lead vocal', lyrics: '[Verse]\nSoft morning light' },
+    });
+    expect(labelFor(named, yue!)).toBe('English, indie pop, warm lead vocal');
+  });
+
+  it('skips section tags when the words are all it has', () => {
+    const named = job({ taskId: sing!.id, params: { lyrics: '[Chorus]\nStay with the rhythm' } });
+    expect(labelFor(named, sing!)).toBe('Stay with the rhythm');
+  });
+
+  it('keeps a lyric that merely contains brackets', () => {
+    const named = job({ taskId: sing!.id, params: { lyrics: 'we go [together] now' } });
+    expect(labelFor(named, sing!)).toBe('we go [together] now');
+  });
+
+  it('falls through to the task label when the lyrics are only tags', () => {
+    const named = job({ taskId: sing!.id, params: { lyrics: '[Verse]\n[Chorus]' } });
+    expect(labelFor(named, sing!)).toBe(sing!.label);
+  });
 
   it('names a sung take after its first line', () => {
     // It has no prompt and no source, so without this every sung take in a

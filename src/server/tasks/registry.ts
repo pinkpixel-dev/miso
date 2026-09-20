@@ -6,6 +6,7 @@ import { transcribe } from './muscriptor.ts';
 import { separate } from './separate.ts';
 import { stableAudio, stableAudioSfx } from './stableaudio.ts';
 import { vevoSing, vevoSvc } from './vevo.ts';
+import { yue2 } from './yue.ts';
 import { rvc } from './voice.ts';
 import type { ServerTaskKind, TaskDefinition, TaskParams } from './types.ts';
 
@@ -30,7 +31,7 @@ export type { ParamField, ParamValue, ServerTaskKind, TaskDefinition, TaskParams
  * order, so this is also the order the tools appear in beside a take.
  */
 const tasks = new Map<string, TaskDefinition>(
-  [text2music, minimax, heartmula, stableAudio, stableAudioSfx, repaint, cover, coverNoFsq, separate, rvc, vevoSvc, vevoSing, transcribe].map(
+  [text2music, minimax, heartmula, yue2, stableAudio, stableAudioSfx, repaint, cover, coverNoFsq, separate, rvc, vevoSvc, vevoSing, transcribe].map(
     (task) => [
       task.id,
       task,

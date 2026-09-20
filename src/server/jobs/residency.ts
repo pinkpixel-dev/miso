@@ -109,6 +109,23 @@ export async function ensureLoaded(
     };
   }
 
+  // A second package the family cannot run without. Only YuE2 has one: its
+  // model and its decoder install separately into the same folder, and without
+  // the decoder the load fails with a message about a missing component file
+  // rather than about the thing to go and install. Asked here because the
+  // package list is already in hand.
+  const needed = task.requiresPackage;
+  if (needed !== undefined && !sizes.value.scanning) {
+    if (!sizes.value.packages.find((p) => p.id === needed)?.installed) {
+      const label = findPackage(needed)?.pkg.label ?? needed;
+      return {
+        ok: false,
+        reason: 'not_installed',
+        message: `${found.pkg.label} also needs ${label}, which is not installed yet.`,
+      };
+    }
+  }
+
   const root = await fetchModelsRoot(baseUrl);
   if (!root.ok) return failed(root);
 

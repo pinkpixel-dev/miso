@@ -79,8 +79,15 @@ function asStringArray(value: unknown): string[] {
  * that repeats the target directory, so their file paths are already rooted
  * there and the part that matters is what follows. MiniMax Music 3 has no
  * strip_prefix and lists bare filenames, which land directly in the target
- * directory. Both end up as target_directory plus whatever directory the first
- * file sits in.
+ * directory. Both end up as target_directory plus whatever directory the
+ * weights sit in.
+ *
+ * The weights, not the first file. Those were the same thing until YuE2, whose
+ * file list opens with four sidecar configs under `sidecars/` and ends with the
+ * GGUF at the package root. Reading the first entry pointed the loader at
+ * `Yue2-3B-GGUF/sidecars`, which is not where the model is. ACE-Step still gets
+ * its variant subdirectory, because there the GGUF itself is the thing inside
+ * `turbo/`.
  */
 function packageFiles(pkg: Record<string, unknown>): string[] {
   return Array.isArray(pkg.files) ? pkg.files.filter((f): f is string => typeof f === 'string') : [];
@@ -89,11 +96,17 @@ function packageFiles(pkg: Record<string, unknown>): string[] {
 function packageDirectory(pkg: Record<string, unknown>, filename: string, index: number): string {
   const target = asString(pkg.target_directory, filename, `packages[${index}].target_directory`);
   const files = packageFiles(pkg);
-  const first = files[0];
-  if (first === undefined) fail(filename, `packages[${index}].files must list at least one file`);
+  if (files.length === 0) fail(filename, `packages[${index}].files must list at least one file`);
+
+  // The weights decide. A package with no GGUF at all falls back to its first
+  // file, which is how a safetensors package would still resolve rather than
+  // failing to parse over a format nothing has vendored yet.
+  const weights = files.find((file) => file.endsWith('.gguf')) ?? files[0];
+  if (weights === undefined) fail(filename, `packages[${index}].files must list at least one file`);
 
   const prefix = typeof pkg.strip_prefix === 'string' ? pkg.strip_prefix : undefined;
-  const relative = prefix && first.startsWith(`${prefix}/`) ? first.slice(prefix.length + 1) : first;
+  const relative =
+    prefix && weights.startsWith(`${prefix}/`) ? weights.slice(prefix.length + 1) : weights;
 
   const slash = relative.lastIndexOf('/');
   return slash === -1 ? target : `${target}/${relative.slice(0, slash)}`;

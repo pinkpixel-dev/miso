@@ -1,0 +1,98 @@
+import { describe, expect, it } from 'vitest';
+import { findTask, taskPackageIds, validateParams } from './registry.ts';
+
+const yue = findTask('generate.yue2');
+if (!yue) throw new Error('generate.yue2 is missing from the registry');
+
+function paramsFor(raw: Record<string, unknown>) {
+  const result = validateParams(yue!, raw);
+  if (!result.ok) throw new Error(`validateParams refused this: ${result.error}`);
+  return result.value;
+}
+
+const SONG = { style: 'English, indie pop, warm lead vocal', lyrics: '[Verse]\nSoft morning light' };
+
+describe('generate.yue2', () => {
+  it('generates from nothing, like the other song writers', () => {
+    expect(yue.family).toBe('yue2');
+    expect(yue.serverTask).toBe('gen');
+    expect(yue.inputRoles).toEqual([]);
+  });
+
+  it('sends the style nested and the lyrics flat', () => {
+    // The trap. `style` beside `lyrics` is refused outright with `Yue2 requires
+    // non-empty style`, measured on 2026-09-20. `--lyrics` and `--seed` are CLI
+    // flags so they are top level; everything else is a --request-option.
+    const request = yue.buildRequest(paramsFor(SONG), {});
+
+    expect(request.lyrics).toBe(SONG.lyrics);
+    expect(request.style).toBeUndefined();
+    expect(request.options).toMatchObject({ style: SONG.style });
+  });
+
+  it('keeps every knob inside options', () => {
+    const request = yue.buildRequest(
+      paramsFor({ ...SONG, cot: 'melody', maxTokens: 2000, steps: 12, guidanceScale: 1.5 }),
+      {},
+    );
+
+    expect(request.options).toEqual({
+      style: SONG.style,
+      cot: 'melody',
+      semantic_max_tokens: 2000,
+      guidance_scale: 1.5,
+      num_inference_steps: 12,
+    });
+  });
+
+  it('keeps the seed at the top level, where the flag is', () => {
+    const request = yue.buildRequest(paramsFor({ ...SONG, seed: 99 }), {});
+    expect(request.seed).toBe(99);
+    expect((request.options as Record<string, unknown>).seed).toBeUndefined();
+  });
+
+  it('plans by default, because the score is the point of it', () => {
+    const request = yue.buildRequest(paramsFor(SONG), {});
+    expect((request.options as Record<string, unknown>).cot).toBe('full');
+  });
+
+  it('refuses a song with no style and no words', () => {
+    expect(validateParams(yue, { lyrics: 'words' }).ok).toBe(false);
+    expect(validateParams(yue, { style: 'pop' }).ok).toBe(false);
+  });
+
+  it('offers only the model packages, never the decoder', () => {
+    // Five packages ship: three models and two decoders. Without this the
+    // studio would offer "Yue2 VAE F16" as a thing to write a song with.
+    const offered = taskPackageIds(yue);
+
+    expect(offered).toContain('yue2_main_q8_0');
+    expect(offered).toContain('yue2_main_bf16');
+    expect(offered.some((id) => id.startsWith('yue2_vae_'))).toBe(false);
+  });
+
+  it('names the decoder it cannot run without', () => {
+    expect(yue.requiresPackage).toBe('yue2_vae_f16');
+  });
+
+  it('names the component files of whichever package was chosen', () => {
+    // The backend's own defaults name one fixed set, and which precision is on
+    // disk depends on the package installed. Same reasoning as MiniMax.
+    const q8 = { id: 'yue2_main_q8_0', label: '', precision: 'q8_0', directory: 'Yue2-3B-GGUF', files: ['sidecars/yue2-model-config.json', 'yue2-3b-q8_0.gguf'] };
+    const bf16 = { ...q8, id: 'yue2_main_bf16', files: ['sidecars/yue2-model-config.json', 'yue2-3b-bf16.gguf'] };
+
+    expect(yue.sessionOptions?.(q8)).toEqual({
+      'yue2.model_gguf': 'yue2-3b-q8_0.gguf',
+      'yue2.vae_gguf': 'yue2-vae-f16.gguf',
+    });
+    expect(yue.sessionOptions?.(bf16)['yue2.model_gguf']).toBe('yue2-3b-bf16.gguf');
+  });
+
+  it('has no length in seconds, because the model decides that', () => {
+    // Every other generator takes a duration. YuE2 works its length out from
+    // the lyrics, and the only control is where to stop.
+    const names = yue.fields.map((field) => field.name);
+    expect(names).not.toContain('durationSeconds');
+    expect(names).toContain('maxTokens');
+  });
+});

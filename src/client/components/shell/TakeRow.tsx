@@ -115,6 +115,7 @@ export function TakeRow({
         filename={asset.filename}
         label={asset.label}
         format={asset.format}
+        hasScore={asset.hasScore}
       />
 
       <DropdownMenu.Root>

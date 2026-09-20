@@ -1,5 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import type { Asset, AssetFormat, AssetKind, LibraryTake } from '../../shared/types.ts';
+import { assetsWithScores } from './scores.ts';
 
 /**
  * Asset rows.
@@ -82,7 +83,16 @@ export function listAssets(handle: Database, projectId: string): Asset[] {
   const records = handle
     .prepare('SELECT * FROM assets WHERE project_id = ? ORDER BY created_at DESC, rowid DESC')
     .all(projectId) as Record_[];
-  return records.map(toAsset);
+
+  // Which of these were planned before they were played. Asked once for the
+  // whole page rather than once per row, and the score itself is not read: the
+  // list only needs to know whether to offer the download.
+  const scored = assetsWithScores(
+    handle,
+    records.map((record) => record.id),
+  );
+
+  return records.map((record) => ({ ...toAsset(record), hasScore: scored.has(record.id) }));
 }
 
 /** The row shape behind a library take. Peaks are never selected. */
@@ -97,6 +107,7 @@ interface LibraryRecord {
   duration_seconds: number | null;
   created_at: string;
   has_peaks: number;
+  has_score: number;
   task_id: string | null;
   title: string | null;
   params: string | null;
@@ -137,6 +148,7 @@ export function listLibraryTakes(handle: Database): LibraryTake[] {
       `SELECT a.id, a.project_id, a.kind, a.label, a.format, a.bytes,
               a.duration_seconds, a.created_at,
               a.peaks IS NOT NULL AS has_peaks,
+              EXISTS (SELECT 1 FROM score_artifacts s WHERE s.asset_id = a.id) AS has_score,
               p.name AS project_name,
               j.task_id, j.title, j.params
        FROM assets a
@@ -157,6 +169,7 @@ export function listLibraryTakes(handle: Database): LibraryTake[] {
     durationSeconds: record.duration_seconds ?? undefined,
     createdAt: record.created_at,
     hasPeaks: record.has_peaks === 1,
+    hasScore: record.has_score === 1,
     taskId: record.task_id ?? undefined,
     title: record.title ?? undefined,
     prompt: jobText(record.params, 'prompt'),
@@ -166,7 +179,8 @@ export function listLibraryTakes(handle: Database): LibraryTake[] {
 
 export function readAsset(handle: Database, id: string): Asset | undefined {
   const record = handle.prepare('SELECT * FROM assets WHERE id = ?').get(id) as Record_ | undefined;
-  return record ? toAsset(record) : undefined;
+  if (!record) return undefined;
+  return { ...toAsset(record), hasScore: assetsWithScores(handle, [record.id]).has(record.id) };
 }
 
 export function insertAsset(handle: Database, input: NewAsset): Asset {

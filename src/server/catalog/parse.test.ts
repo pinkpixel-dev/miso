@@ -69,3 +69,54 @@ describe('parseSpec', () => {
     }
   });
 });
+
+describe('the directory a package installs into', () => {
+  /**
+   * The loader is handed this path, so getting it wrong is a failed load with a
+   * message about safetensors sources rather than about the path. See
+   * DOCS/ERRORS.md.
+   */
+  it('keeps the variant subdirectory when the weights live in one', () => {
+    // ACE-Step installs into ACE-Step1.5-GGUF/turbo, and pointing at the parent
+    // falls back to a safetensors source and fails on a missing file.
+    const spec = parseSpec(loadSpec('ace_step.json'), 'ace_step.json');
+    const turbo = spec.packages.find((pkg) => pkg.id === 'ace_step_turbo_bf16');
+    expect(turbo?.directory).toBe('ACE-Step1.5-GGUF/turbo');
+  });
+
+  it('ignores sidecars that sort before the weights', () => {
+    // YuE2 lists four configs under sidecars/ before its GGUF at the package
+    // root. Reading the first entry pointed the loader at Yue2-3B-GGUF/sidecars.
+    const spec = parseSpec(loadSpec('yue2.json'), 'yue2.json');
+    for (const pkg of spec.packages) {
+      expect(pkg.directory).toBe('Yue2-3B-GGUF');
+    }
+  });
+
+  it('uses the target directory when the weights sit at the package root', () => {
+    const spec = parseSpec(loadSpec('minimax_music3.json'), 'minimax_music3.json');
+    expect(spec.packages[0]?.directory).toBe('MiniMax-Music3-GGUF');
+  });
+
+  it('falls back to the first file when a package ships no gguf', () => {
+    // Nothing vendored is like this today. A safetensors package should still
+    // resolve to something rather than failing to parse.
+    const spec = parseSpec(
+      {
+        family: 'made_up',
+        display_name: 'Made Up',
+        packages: [
+          {
+            id: 'made_up_st',
+            precision: 'f32',
+            target_directory: 'Made-Up',
+            files: ['weights/model.safetensors'],
+          },
+        ],
+      },
+      'made_up.json',
+    );
+    expect(spec.packages[0]?.directory).toBe('Made-Up/weights');
+  });
+});
+

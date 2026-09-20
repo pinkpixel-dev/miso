@@ -3,6 +3,50 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 1.3.0 - September 20, 2026
+
+YuE2 joins the song writers. It is the first model here that answers at 48 kHz
+stereo, and the first that will hand you the score it planned before it wrote
+the music.
+
+### 🎼 YuE2
+
+- **Full songs at 48 kHz stereo.** Write a style and some lyrics with [Verse]
+  and [Chorus] tags, and it writes the song around that structure. About 44
+  seconds of music in under a minute on a 16 GB card.
+- **It plans before it plays.** Leave planning on and the ABC score it wrote
+  comes back with the take. Save the score from the same menu you export audio
+  from. Turn planning off for a faster run and no score.
+- **No length in seconds.** YuE2 works the length out from your lyrics, so the
+  form has a length limit instead: raise it for a long lyric, lower it to stop
+  early.
+- **Two packages.** YuE2 needs a model and a decoder, and they install into the
+  same folder. Install them one at a time: the second one is refused while the
+  first is still running, and the message says which to wait for. Miso also
+  refuses to start a song when the decoder is missing rather than failing
+  halfway through loading.
+- The weights are CC-BY-NC-4.0, which is non-commercial.
+
+### 🐛 Fixes
+
+- **Takes are named after what you actually wrote.** A YuE2 take was named after
+  the first line of its lyrics, which is a section tag, so every song in a
+  project came out called "[Verse]". Section tags are skipped now, and a model
+  that calls its prompt a style is named from that.
+- **The model folder is worked out from the weights.** YuE2 ships config files
+  in a subfolder and its model at the top, and Miso pointed the loader at the
+  subfolder. Nothing else was affected, and ACE-Step still loads from its own
+  variant folder.
+
+### 🧱 Internals
+
+- Vendored model specs now include `yue2`, from the same audio.cpp commit as
+  Vevo2.
+- A task can return a take and an artifact together. Scores are kept in their
+  own table and hang off the take they were planned for, so deleting the take
+  takes its score with it.
+- A task can name a second package its family cannot run without.
+
 ## 1.2.0 - September 20, 2026
 
 Vevo2 can now write the vocal instead of only converting one. Give it lyrics

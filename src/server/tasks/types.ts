@@ -222,6 +222,17 @@ export interface TaskDefinition {
    */
   acceptsPackage?(packageId: string): boolean;
   /**
+   * A second package this task's family cannot run without.
+   *
+   * Only YuE2 has one. Its five packages are three models and two decoders,
+   * and a working install needs one of each in the same directory. Without
+   * this the Models screen would offer a model package that installs, sits on
+   * disk at 4 GB, and fails at load with a message about a missing component.
+   *
+   * Left out by every family whose packages are precisions of one thing.
+   */
+  requiresPackage?: string;
+  /**
    * Whether the guided prompt builder is offered for this task.
    *
    * The builder writes songs. It asks for a genre, a mood and a voice, and

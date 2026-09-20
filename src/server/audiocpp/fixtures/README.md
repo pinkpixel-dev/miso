@@ -691,6 +691,105 @@ minutes for a two and a half minute song. See `DOCS/plans/2026-09-19-phase-7a-up
 - `guidance_scale`, `ddim_eta` and the two chunking options were never measured. They are real
   option names, since a wrong name nested is refused, but nothing confirmed what they do.
 
+## YuE2, probed and kept
+
+Measured on 2026-09-20 against `ghcr.io/0xshug0/audio.cpp:full-cuda13` at audio.cpp 9ba8841,
+packages `yue2_main_q8_0` and `yue2_vae_f16`. This is the image the container was moved to that
+day; everything above it was measured on older builds.
+
+### It is the only generator here that answers at 48 kHz stereo
+
+| CoT | Audio out | Wall | RTF |
+|---|---:|---:|---:|
+| `off` | 43.0 s | 37.5 s | 0.87 |
+| `full` | 44.0 s | 56.1 s | 1.28 |
+
+48 kHz stereo either way. Peak VRAM was 9189 MiB of a 16 GB card, measured with `nvidia-smi`
+sampling through a `cot=full` run, so none of the arena session options needed turning down.
+Upstream quotes 11.18 GiB unquantized on a 24 GB card, which is the same shape.
+
+There is no duration. YuE2 works its length out from the lyrics, and `semantic_max_tokens` is
+the stop rather than the target. Every other generator in the registry takes a length in
+seconds, and `generate.yue2` is the only one whose form does not offer one.
+
+### The style is a request option, and it says so
+
+Sending `style` flat beside `lyrics`:
+
+```
+Yue2 requires non-empty style
+```
+
+Third family to follow the rule in DOCS/ERRORS.md, and the first one to refuse rather than
+accept the field and ignore it. `--lyrics` and `--seed` are CLI flags and stay at the top
+level. `style`, `cot`, `semantic_max_tokens`, `guidance_scale` and `num_inference_steps` are
+all `--request-option` and belong under `options`.
+
+### The score comes back as an artifact beside the audio
+
+With `cot=full` or `cot=melody` the response carries both:
+
+```
+artifacts: [{ id: "score", kind: "custom", payload: <base64>,
+              meta: { format: "abc", extension: "abc", mime: "text/vnd.abc",
+                      source: "generated", truncated: "false" } }]
+```
+
+`kind` is `custom`, which says nothing, so `storeScores` matches on the extension instead. The
+payload decodes to a real ABC document with separate Vocal and Ins voices, chord symbols, a key
+and tempo, and section comments:
+
+```abc
+X:1
+M:4/4  L:1/16  Q:1/4=100
+V: Vocal clef=treble name="Vocal Melody" snm="Vocal"
+V: Ins clef=treble name="Ins Melody" snm="Inst."
+K:C
+% intro
+V: Vocal
+z8a2g2e2d2|"Fmaj7"e2d2"G"c4z8|"Am7"z8a2g2e2d2|
+```
+
+This is a task returning a take **and** an artifact, which nothing did before. `produces:
+'artifact'` was an either/or, and transcription's `storeArtifacts` also requires a source asset
+to hang the file off. A generated song has no source, so the score hangs off the take instead.
+With `cot=off` no artifact comes back at all, which is an ordinary outcome and not a failure.
+
+### Two packages into one folder, and they cannot race
+
+A working YuE2 needs a model package and a decoder package. All five write the same four
+sidecar files into `Yue2-3B-GGUF/`, and starting both installs at once fails:
+
+```
+package file already exists: /app/models/Yue2-3B-GGUF/sidecars/yue2-generation-config.json
+```
+
+Installed one at a time it works every time, with or without `overwrite`. This was checked
+rather than assumed: after the first failure the conflict was recreated by removing only the
+decoder's gguf and its `.audiocpp-package-*.json` manifest, leaving the shared sidecars in
+place, and the install then succeeded. So the sidecars existing is not the problem. Two jobs
+writing them at the same time is.
+
+`/catalog/packages/:id/install` refuses a second install into a folder that already has one
+running, and the refusal names the package holding it.
+
+### The install directory is not the first file in the list
+
+`packageDirectory` in the catalog parser read `files[0]` to find the variant subdirectory that
+ACE-Step needs. YuE2's file list opens with four sidecars under `sidecars/` and ends with the
+GGUF at the package root, so that rule pointed the loader at `Yue2-3B-GGUF/sidecars`. It now
+reads the first `.gguf` instead, which still gives ACE-Step `ACE-Step1.5-GGUF/turbo`.
+
+### Still unknown
+
+- `cot=melody` was never run. `off` and `full` were.
+- Whether a supplied `abc` or `abc_file` is honoured over HTTP. That is the cover path and it
+  is unbuilt, see DOCS/ROADMAP.md.
+- The bf16 and q4_0 model packages, and the f32 decoder. Only q8_0 with the f16 decoder was
+  installed.
+- The AR and NAR LoRA session options. Both want a safetensors path on the backend, and Miso
+  has no way to put a non-audio file there.
+
 ## The backend's runtime task kinds, in full
 
 Sending `/v1/models/load` a `task` it does not know answers with the whole set:

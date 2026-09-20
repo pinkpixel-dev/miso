@@ -16,6 +16,7 @@ import {
 } from '../db/assets.ts';
 import { db } from '../db/index.ts';
 import { createJob, listJobInputs, listJobs, readJob } from '../db/jobs.ts';
+import { findScoreForAsset } from '../db/scores.ts';
 import { readProject } from '../db/projects.ts';
 import { storeAudio } from '../jobs/results.ts';
 import { readAudioFacts } from '../library/metadata.ts';
@@ -646,3 +647,36 @@ assetRoutes.get('/projects/:id/assets/:assetId/download', async (c) => {
     },
   });
 });
+
+/**
+ * The ABC score a take was planned from, as a download.
+ *
+ * Served from the database rather than from disk, which 010 explains: the
+ * document is about a kilobyte and lives in a column.
+ *
+ * A take with no score is a 404 and not an error worth dressing up. Only YuE2
+ * writes one, and only with its planning left on, so most takes in a project
+ * will never have one.
+ */
+assetRoutes.get('/projects/:id/assets/:assetId/score', (c) => {
+  const projectId = c.req.param('id');
+  const assetId = c.req.param('assetId');
+
+  const asset = assetIn(projectId, assetId);
+  if (!asset) return c.json<ApiError>({ error: `No asset with the id ${assetId}` }, 404);
+
+  const score = findScoreForAsset(db(), assetId);
+  if (!score) {
+    return c.json<ApiError>({ error: `${asset.label} was generated without a score` }, 404);
+  }
+
+  return new Response(score.abc, {
+    status: 200,
+    headers: {
+      'content-type': 'text/vnd.abc; charset=utf-8',
+      'content-length': String(Buffer.byteLength(score.abc, 'utf8')),
+      'content-disposition': disposition(score.filename),
+    },
+  });
+});
+

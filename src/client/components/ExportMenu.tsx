@@ -2,6 +2,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Download, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import type { AssetFormat } from '../../shared/types.ts';
+import { scoreUrl } from '../lib/api.ts';
 import {
   EXPORT_FORMATS,
   exportAsset,
@@ -37,6 +38,7 @@ export function ExportMenu({
   filename,
   label,
   format,
+  hasScore,
 }: {
   projectId: string;
   assetId: string;
@@ -46,6 +48,14 @@ export function ExportMenu({
   label: string;
   /** The format it is stored in, which decides which choice is instant. */
   format: AssetFormat;
+  /**
+   * Whether this take has a score to save beside the audio.
+   *
+   * Only YuE2 writes one, and only with its planning left on, so most takes
+   * never show this. Drawn from what the row says rather than by trying the
+   * address, because a download that 404s is worse than one that is not there.
+   */
+  hasScore?: boolean;
 }) {
   const [progress, setProgress] = useState<ExportProgress | undefined>();
   const [error, setError] = useState<string | undefined>();
@@ -127,6 +137,27 @@ export function ExportMenu({
                 </span>
               </DropdownMenu.Item>
             ))}
+
+            {/*
+              The plan the song was written from, which is a text document
+              rather than audio. A plain link: there is nothing to convert and
+              nothing to wait for.
+            */}
+            {hasScore ? (
+              <>
+                <DropdownMenu.Separator className="my-1 h-px bg-line" />
+                <DropdownMenu.Item asChild>
+                  <a
+                    href={scoreUrl(projectId, assetId)}
+                    download
+                    className="flex cursor-pointer items-center justify-between gap-3 rounded-sm px-2 py-1.5 text-sm text-ink-muted outline-none data-[highlighted]:bg-raised data-[highlighted]:text-ink"
+                  >
+                    <span>Save the score</span>
+                    <span className="text-xs text-ink-faint">ABC</span>
+                  </a>
+                </DropdownMenu.Item>
+              </>
+            ) : null}
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>

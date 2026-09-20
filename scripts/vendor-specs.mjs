@@ -43,6 +43,11 @@ const COMMIT = process.env.AUDIOCPP_COMMIT ?? '9ba884179826c3b33dd305185b5f94c79
 // Vevo2 joined on 2026-09-20, with `voice.vevo2` behind it the same day. The
 // pin moved from 05f9c5d to 9ba8841 to reach it, and every spec already here
 // was byte for byte identical at both commits, so nothing else moved with it.
+//
+// YuE2 joined the same day, from the same commit, with `generate.yue2` behind
+// it. It is the first family whose packages are not all the same thing: three
+// are the model and two are the decoder, and a working install needs one of
+// each. `generate.yue2` takes only the model packages.
 const FAMILIES = [
   'ace_step',
   'minimax_music3',
@@ -53,6 +58,7 @@ const FAMILIES = [
   'mel_band_roformer',
   'rvc',
   'vevo2',
+  'yue2',
   'muscriptor',
 ];
 
