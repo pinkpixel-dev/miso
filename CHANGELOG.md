@@ -25,6 +25,13 @@ the music.
   first is still running, and the message says which to wait for. Miso also
   refuses to start a song when the decoder is missing rather than failing
   halfway through loading.
+- **The same form as the other song writers.** Lyrics on top with the "Write
+  lyrics for me" assistant, then the style, then the options, and the guided
+  builder writes a YuE2 style prompt for you if you would rather describe the
+  song than write the prompt.
+- **No Instrumental for this one.** YuE2 refuses an empty lyric, so the vocal
+  control does not offer it rather than letting you pick something that cannot
+  run.
 - The weights are CC-BY-NC-4.0, which is non-commercial.
 
 ### 🐛 Fixes

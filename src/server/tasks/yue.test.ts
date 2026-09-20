@@ -10,7 +10,7 @@ function paramsFor(raw: Record<string, unknown>) {
   return result.value;
 }
 
-const SONG = { style: 'English, indie pop, warm lead vocal', lyrics: '[Verse]\nSoft morning light' };
+const SONG = { prompt: 'English, indie pop, warm lead vocal', lyrics: '[Verse]\nSoft morning light' };
 
 describe('generate.yue2', () => {
   it('generates from nothing, like the other song writers', () => {
@@ -19,7 +19,18 @@ describe('generate.yue2', () => {
     expect(yue.inputRoles).toEqual([]);
   });
 
-  it('sends the style nested and the lyrics flat', () => {
+  it('calls its style field prompt, which is what the create form lays out on', () => {
+    // Named `style` at first, which gave YuE2 a form unlike the other four:
+    // lyrics below the style box and no assistant on either, because the panel
+    // keys the guided builder, the lyrics card and the richer-prompt button on
+    // a field called `prompt`.
+    const names = yue.fields.map((field) => field.name);
+    expect(names).toContain('prompt');
+    expect(names).not.toContain('style');
+    expect(yue.fields.find((field) => field.name === 'prompt')?.label).toBe('Style');
+  });
+
+  it('sends the prompt nested as style, and the lyrics flat', () => {
     // The trap. `style` beside `lyrics` is refused outright with `Yue2 requires
     // non-empty style`, measured on 2026-09-20. `--lyrics` and `--seed` are CLI
     // flags so they are top level; everything else is a --request-option.
@@ -27,7 +38,8 @@ describe('generate.yue2', () => {
 
     expect(request.lyrics).toBe(SONG.lyrics);
     expect(request.style).toBeUndefined();
-    expect(request.options).toMatchObject({ style: SONG.style });
+    expect(request.prompt).toBeUndefined();
+    expect(request.options).toMatchObject({ style: SONG.prompt });
   });
 
   it('keeps every knob inside options', () => {
@@ -37,7 +49,7 @@ describe('generate.yue2', () => {
     );
 
     expect(request.options).toEqual({
-      style: SONG.style,
+      style: SONG.prompt,
       cot: 'melody',
       semantic_max_tokens: 2000,
       guidance_scale: 1.5,
@@ -58,7 +70,7 @@ describe('generate.yue2', () => {
 
   it('refuses a song with no style and no words', () => {
     expect(validateParams(yue, { lyrics: 'words' }).ok).toBe(false);
-    expect(validateParams(yue, { style: 'pop' }).ok).toBe(false);
+    expect(validateParams(yue, { prompt: 'pop' }).ok).toBe(false);
   });
 
   it('offers only the model packages, never the decoder', () => {
@@ -86,6 +98,15 @@ describe('generate.yue2', () => {
       'yue2.vae_gguf': 'yue2-vae-f16.gguf',
     });
     expect(yue.sessionOptions?.(bf16)['yue2.model_gguf']).toBe('yue2-3b-bf16.gguf');
+  });
+
+  it('cannot do an instrumental, so the studio locks the vocal control', () => {
+    // Settled by the backend, not the spec: an empty lyric answers `Yue2
+    // requires non-empty lyrics`. With `both` the guided builder would offer
+    // Instrumental, skip the lyrics for it, and leave the button locked with
+    // no visible field to unlock it.
+    expect(yue.vocals).toBe('required');
+    expect(yue.fields.find((field) => field.name === 'lyrics')?.required).toBe(true);
   });
 
   it('has no length in seconds, because the model decides that', () => {

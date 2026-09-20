@@ -81,7 +81,7 @@ export const EMPTY_STUDIO: StudioState = {
 };
 
 /** The families the builder knows how to write a prompt for. */
-const GUIDED_FAMILIES = new Set(['ace_step', 'minimax_music3', 'heartmula', 'stable_audio']);
+const GUIDED_FAMILIES = new Set(['ace_step', 'minimax_music3', 'heartmula', 'stable_audio', 'yue2']);
 
 /** Whether this model family has compilation rules, and so a guided mode. */
 export function supportsGuided(family: string): boolean {
@@ -148,6 +148,8 @@ export function compile(
       };
     case 'stable_audio':
       return { prompt: stableAudioSentence(style, mood), params: {} };
+    case 'yue2':
+      return { prompt: yue2Style(style, mood, voice, mode), params: {} };
     default:
       return { prompt: aceStepDescriptors(style, mood, voice, mode), params: {} };
   }
@@ -191,6 +193,26 @@ function voicePhrase(voice: string, mode: VocalMode): string {
  * parts are joined with commas in the order a person would say them: what kind
  * of music, how it feels, what it sounds like, and who is singing.
  */
+/**
+ * YuE2 wants a comma-separated style prompt that opens with the language.
+ *
+ * Close to ACE-Step's shape and not the same: every example upstream begins
+ * with the language of the lyrics, and leaving it off is how you get a song
+ * sung in the wrong one. English is assumed because the model ships English and
+ * Chinese and the builder has no language control, so somebody wanting Mandarin
+ * types it into the style box in custom mode.
+ *
+ * The production phrase is on the end for the same reason MiniMax has one: a
+ * bare list of descriptors with no recording quality in it tends to come back
+ * sounding like a demo.
+ */
+function yue2Style(style: string, mood: string, voice: string, mode: VocalMode): string {
+  const described = ['English', style, mood].filter((part) => part !== '');
+  described.push(mode === 'instrumental' ? VOCAL_PHRASES[mode] : voicePhrase(voice, mode));
+  described.push('polished studio production');
+  return described.join(', ');
+}
+
 function aceStepDescriptors(style: string, mood: string, voice: string, mode: VocalMode): string {
   const described = [style, mood].filter((part) => part !== '');
   described.push(mode === 'instrumental' ? VOCAL_PHRASES[mode] : voicePhrase(voice, mode));

@@ -136,14 +136,12 @@ function firstWrittenLine(written: string): string | undefined {
 export function labelFor(job: Job, task: TaskDefinition, sourceLabel?: string): string {
   if (job.title !== undefined && job.title.trim() !== '') return job.title.trim();
 
-  // Whatever the person actually wrote, in the order a family calls it. Almost
-  // every generator has a prompt and it wins, so adding the other two changed
-  // nothing for any of them. `generate.yue2` calls its prompt a style, and
-  // `generate.sing` has neither: it is given words and a voice, and the words
-  // are what the take is. Without this a project fills with takes all called
-  // "Sing lyrics in a voice", which is the problem the source rule below
-  // solves for separation.
-  for (const key of ['prompt', 'style', 'lyrics']) {
+  // The prompt, then the words. Every generator but one has a prompt and it
+  // wins, so this changed nothing for any of them. `generate.sing` has none: it
+  // is given words and a voice, and the words are what the take is. Without
+  // this a project fills with takes all called "Sing lyrics in a voice", which
+  // is the problem the source rule below solves for separation.
+  for (const key of ['prompt', 'lyrics']) {
     const written = job.params[key];
     if (typeof written !== 'string' || written.trim() === '') continue;
 

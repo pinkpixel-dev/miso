@@ -725,6 +725,17 @@ accept the field and ignore it. `--lyrics` and `--seed` are CLI flags and stay a
 level. `style`, `cot`, `semantic_max_tokens`, `guidance_scale` and `num_inference_steps` are
 all `--request-option` and belong under `options`.
 
+### It cannot do an instrumental
+
+```
+lyrics: ""  ->  Yue2 requires non-empty lyrics
+```
+
+Same shape as the style refusal, and the reason `generate.yue2` declares
+`vocals: 'required'` rather than `both`. MiniMax Music 3 is declared the same way for the same
+reason. The spec says lyrics are required and is right about it, which only a refused request
+settles.
+
 ### The score comes back as an artifact beside the audio
 
 With `cot=full` or `cot=melody` the response carries both:

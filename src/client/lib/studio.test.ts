@@ -79,6 +79,7 @@ describe('supportsGuided', () => {
     expect(supportsGuided('minimax_music3')).toBe(true);
     expect(supportsGuided('heartmula')).toBe(true);
     expect(supportsGuided('stable_audio')).toBe(true);
+    expect(supportsGuided('yue2')).toBe(true);
     expect(supportsGuided('htdemucs')).toBe(false);
   });
 });
@@ -117,6 +118,21 @@ describe('compile, per family', () => {
 
     expect(compiled.prompt).toBe('a dreamy synthwave song');
     expect(compiled.params.tags).toBe('synthwave, dreamy, airy female vocals');
+  });
+
+  it('opens a YuE2 style with the language', () => {
+    // Every upstream example begins with the language of the lyrics, and
+    // leaving it off is how a song comes back sung in the wrong one.
+    expect(compile(song, 'yue2').prompt).toBe(
+      'English, synthwave, dreamy, airy female vocals, polished studio production',
+    );
+  });
+
+  it('writes a YuE2 instrumental without a voice', () => {
+    const quiet = state({ style: 'synthwave', mood: 'dreamy', vocalMode: 'instrumental' });
+    expect(compile(quiet, 'yue2').prompt).toBe(
+      'English, synthwave, dreamy, instrumental, no vocals, polished studio production',
+    );
   });
 
   it('never writes a voice into a Stable Audio prompt', () => {

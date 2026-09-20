@@ -181,12 +181,13 @@ describe('labelFor and the written-field fallback', () => {
   const sing = findTask('generate.sing');
   const yue = findTask('generate.yue2');
 
-  it('names a YuE2 take after its style, not its section tag', () => {
-    // YuE2 calls its prompt a style and wants lyrics that open with [Verse].
-    // Reading the lyrics first named every take in a project "[Verse]".
+  it('names a YuE2 take after its prompt, not its section tag', () => {
+    // YuE2 wants lyrics that open with [Verse], so reading the lyrics first
+    // named every take in a project "[Verse]". Its style field is called
+    // `prompt`, which is what the create form keys its layout on.
     const named = job({
       taskId: yue!.id,
-      params: { style: 'English, indie pop, warm lead vocal', lyrics: '[Verse]\nSoft morning light' },
+      params: { prompt: 'English, indie pop, warm lead vocal', lyrics: '[Verse]\nSoft morning light' },
     });
     expect(labelFor(named, yue!)).toBe('English, indie pop, warm lead vocal');
   });

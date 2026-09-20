@@ -48,7 +48,19 @@ export const yue2: TaskDefinition = {
   summary: 'Writes a full song from lyrics and a style, and can hand back the score it planned. 48 kHz stereo.',
   family: 'yue2',
   serverTask: 'gen',
-  vocals: 'both',
+  /**
+   * It cannot do an instrumental, which the backend settled rather than the
+   * spec. An empty lyric answers `Yue2 requires non-empty lyrics`, measured on
+   * 2026-09-20. MiniMax Music 3 is declared for the same reason.
+   *
+   * This matters on the form rather than only in the request. The guided
+   * builder offers Instrumental, and with `both` it would skip the lyrics for
+   * an instrumental run while the field stayed required: the button locks and
+   * the box that would unlock it is not on screen. `required` locks the vocal
+   * control off Instrumental instead, which is the honest version of the same
+   * fact.
+   */
+  vocals: 'required',
   inputRoles: [],
   /**
    * The decoder is not something to generate with.
@@ -81,8 +93,19 @@ export const yue2: TaskDefinition = {
     };
   },
   fields: [
+    /**
+     * Named `prompt` although YuE2 calls it a style.
+     *
+     * The create form keys its whole layout on a field called `prompt`: the
+     * guided builder compiles into it, the lyrics card sits above it, "Make the
+     * prompt richer" reads it, and saved prompts load into it. Calling this
+     * `style` gave YuE2 a form that looked nothing like the other four, with
+     * the lyrics box below the style box and no assistant on either. The label
+     * still says Style, because that is what the model calls it and what the
+     * help describes. `buildRequest` sends it as `style`.
+     */
     {
-      name: 'style',
+      name: 'prompt',
       label: 'Style',
       kind: 'text',
       required: true,
@@ -163,7 +186,8 @@ export const yue2: TaskDefinition = {
    * `options`, where a wrong name is refused instead of swallowed.
    */
   buildRequest(params) {
-    const options: Record<string, unknown> = { style: params.style };
+    // `prompt` on the form, `style` on the wire. See the field above.
+    const options: Record<string, unknown> = { style: params.prompt };
 
     if (typeof params.cot === 'string') options.cot = params.cot;
     if (typeof params.maxTokens === 'number') options.semantic_max_tokens = params.maxTokens;
