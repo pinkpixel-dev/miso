@@ -93,6 +93,35 @@ export function trim(
   return channels.map((channel) => channel.slice(from, to));
 }
 
+/**
+ * Cuts the audio in two at a point, keeping both sides.
+ *
+ * Not an `Edit`, because everything on the chain takes audio and gives back
+ * audio, and this gives back two. It is what the split action runs, after the
+ * chain and after the rate change, so each half is a clean cut through audio
+ * that has already been through the filter once.
+ *
+ * A cut at either end throws rather than quietly producing an empty half. A
+ * take with no samples in it is not a useful thing to write into a project.
+ */
+export function cutAt(
+  channels: Float32Array[],
+  sampleRate: number,
+  seconds: number,
+): [Float32Array[], Float32Array[]] {
+  const frames = channels[0]?.length ?? 0;
+  const at = frameAt(seconds, sampleRate, frames);
+
+  if (at === 0 || at === frames) {
+    throw new Error('The cut is at one end, so a split would leave nothing on one side.');
+  }
+
+  return [
+    channels.map((channel) => channel.slice(0, at)),
+    channels.map((channel) => channel.slice(at)),
+  ];
+}
+
 /** The gain a fade is at, a fraction of the way through it. */
 function fadeGain(progress: number, curve: FadeCurve): number {
   const t = Math.max(0, Math.min(1, progress));

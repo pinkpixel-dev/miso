@@ -6,7 +6,7 @@ import { wavByteLength } from '../../shared/wav.ts';
 import { audioUrl } from './api.ts';
 import { decodeFile, savedFilename } from './decodeFile.ts';
 import { fetchInRanges } from './fetchRanged.ts';
-import { applyEdits, durationOf, peakOf, type Edit } from './edits.ts';
+import { applyEdits, cutAt, durationOf, peakOf, type Edit } from './edits.ts';
 import { saveToProject, type SaveProgress } from './saveAudio.ts';
 
 /**
@@ -86,6 +86,14 @@ export interface WorkbenchState {
   saving: SaveProgress | undefined;
   /** Saves the rendered audio as a take. Returns the asset, or undefined on failure. */
   save: (suffix: string) => Promise<Asset | undefined>;
+  /**
+   * Cuts at a point and saves both halves as takes.
+   *
+   * The one operation that produces two results, so it is not an entry on the
+   * edit chain. Everything on the chain takes audio and gives back audio, and
+   * this gives back two.
+   */
+  splitAt: (seconds: number) => Promise<boolean>;
 }
 
 function messageFrom(cause: unknown): string {
@@ -183,6 +191,21 @@ export function useWorkbench(
     : 0;
   const outputBytes = wavByteLength(outputFrames, rendered.length);
 
+  /**
+   * The audio as it will be written: every edit applied, at the output rate.
+   *
+   * Resampling happens here rather than on the chain, and after the edits
+   * rather than before them, so the sinc filter runs once over the finished
+   * result instead of once per undo.
+   */
+  const renderForOutput = useCallback(
+    (from: WorkbenchSource): Float32Array[] => {
+      const edited = applyEdits(from.channels, from.sampleRate, edits);
+      return resampleChannels(edited, from.sampleRate, outputRate);
+    },
+    [edits, outputRate],
+  );
+
   const save = useCallback(
     async (suffix: string): Promise<Asset | undefined> => {
       if (!projectId || !source) return undefined;
@@ -190,12 +213,9 @@ export function useWorkbench(
       setSaving({ fraction: 0, stage: 'encoding' });
       setError(undefined);
       try {
-        const channels = applyEdits(source.channels, source.sampleRate, edits);
-        const atRate = resampleChannels(channels, source.sampleRate, outputRate);
-
         const asset = await saveToProject({
           projectId,
-          channels: atRate,
+          channels: renderForOutput(source),
           sampleRate: outputRate,
           filename: savedFilename(source.name, suffix),
           onProgress: setSaving,
@@ -210,7 +230,46 @@ export function useWorkbench(
         setSaving(undefined);
       }
     },
-    [projectId, source, edits, outputRate, onSaved],
+    [projectId, source, outputRate, onSaved, renderForOutput],
+  );
+
+  const splitAt = useCallback(
+    async (seconds: number): Promise<boolean> => {
+      if (!projectId || !source) return false;
+
+      setSaving({ fraction: 0, stage: 'encoding' });
+      setError(undefined);
+      try {
+        // Resample once over the whole thing and cut afterwards. Cutting first
+        // would put each half through its own filter, and a filter has edges,
+        // so the two pieces would not join back together cleanly.
+        const [before, after] = cutAt(renderForOutput(source), outputRate, seconds);
+
+        const halves = [
+          { channels: before, suffix: 'part 1' },
+          { channels: after, suffix: 'part 2' },
+        ];
+
+        for (const half of halves) {
+          await saveToProject({
+            projectId,
+            channels: half.channels,
+            sampleRate: outputRate,
+            filename: savedFilename(source.name, half.suffix),
+            onProgress: setSaving,
+          });
+        }
+
+        onSaved();
+        return true;
+      } catch (cause) {
+        setError(messageFrom(cause));
+        return false;
+      } finally {
+        setSaving(undefined);
+      }
+    },
+    [projectId, source, outputRate, onSaved, renderForOutput],
   );
 
   return {
@@ -234,5 +293,6 @@ export function useWorkbench(
     overLimit: outputBytes > MAX_ASSET_BYTES,
     saving,
     save,
+    splitAt,
   };
 }

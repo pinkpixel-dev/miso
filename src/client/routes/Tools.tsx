@@ -1,11 +1,16 @@
 import { ArrowLeft, RotateCcw } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { CutControls } from '../components/workbench/CutControls.tsx';
+import { EditChain } from '../components/workbench/EditChain.tsx';
 import { SaveControls } from '../components/workbench/SaveControls.tsx';
 import { SourceFacts } from '../components/workbench/SourceFacts.tsx';
 import { SourcePanel } from '../components/workbench/SourcePanel.tsx';
+import { WaveformEditor } from '../components/workbench/WaveformEditor.tsx';
 import { Button, Panel } from '../components/ui.tsx';
+import { type Region } from '../lib/region.ts';
 import { projectPath } from '../lib/routes.ts';
+import { usePlayer } from '../lib/usePlayer.ts';
 import { useStudio } from '../lib/useStudio.ts';
 import { useWorkbench } from '../lib/useWorkbench.ts';
 
@@ -31,8 +36,27 @@ export function ToolsRoute() {
   const { project, projectId, assets, loading, reload } = useStudio();
   const [searchParams] = useSearchParams();
 
+  const { nowPlaying, playing, toggle } = usePlayer();
+
   const workbench = useWorkbench(routeProjectId ?? projectId, reload);
-  const { source, loadTake } = workbench;
+  const { source, loadTake, renderedDuration } = workbench;
+
+  // The span to keep, and where a split would cut. Both are about the rendered
+  // audio rather than the source, so both start again when the chain changes
+  // the length underneath them.
+  //
+  // The whole track, deliberately, rather than the middle third `defaultRegion`
+  // gives the remix page. There the region marks a section to work on, and a
+  // sensible guess helps. Here it marks what to keep, so anything less than all
+  // of it is the page proposing to throw two thirds of the track away before
+  // anybody has asked for anything.
+  const [region, setRegion] = useState<Region>({ start: 0, end: 0 });
+  const [playhead, setPlayhead] = useState(0);
+
+  useEffect(() => {
+    setRegion({ start: 0, end: renderedDuration });
+    setPlayhead(0);
+  }, [renderedDuration]);
 
   // Arriving here follows a link, and a client side route change leaves focus
   // on whatever was clicked, which is a panel that has since closed. Moving it
@@ -120,7 +144,55 @@ export function ToolsRoute() {
             <SourceFacts source={source} />
 
             <div className="border-t border-line pt-5">
-              <SaveControls workbench={workbench} suffix="converted" label="Save into the project" />
+              <WaveformEditor
+                channels={workbench.rendered}
+                sampleRate={source.sampleRate}
+                duration={renderedDuration}
+                region={region}
+                onRegion={setRegion}
+                onPlayhead={setPlayhead}
+                onBeforePlay={() => {
+                  // The dock and this editor are two players on one page.
+                  // Only one of them should be making noise.
+                  if (playing && nowPlaying !== undefined) toggle();
+                }}
+              />
+            </div>
+
+            <div className="border-t border-line pt-5">
+              <CutControls
+                region={region}
+                duration={renderedDuration}
+                playhead={playhead}
+                busy={workbench.saving !== undefined}
+                onRegion={setRegion}
+                onTrim={() =>
+                  workbench.pushEdit({ kind: 'trim', start: region.start, end: region.end })
+                }
+                onSplit={() => void workbench.splitAt(playhead)}
+              />
+            </div>
+
+            <div className="border-t border-line pt-5">
+              <EditChain
+                edits={workbench.edits}
+                onUndo={workbench.undo}
+                onClear={workbench.clearEdits}
+              />
+            </div>
+
+            <div className="border-t border-line pt-5">
+              {/*
+                What the saved file is called depends on what happened to it.
+                Converting and editing are different enough that a project full
+                of files called "(edited)" that were only converted would be
+                misleading.
+              */}
+              <SaveControls
+                workbench={workbench}
+                suffix={workbench.edits.length === 0 ? 'converted' : 'edited'}
+                label="Save into the project"
+              />
             </div>
 
             <div className="border-t border-line pt-4">

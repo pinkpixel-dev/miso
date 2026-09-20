@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ImportDropZone } from '../components/ImportDropZone.tsx';
 import { JobList } from '../components/JobList.tsx';
-import { RegionControls } from '../components/remix/RegionControls.tsx';
+import { RegionControls } from '../components/RegionControls.tsx';
 import { RegionEditor } from '../components/remix/RegionEditor.tsx';
 import { RemixForm } from '../components/remix/RemixForm.tsx';
 import { SourcePicker } from '../components/remix/SourcePicker.tsx';

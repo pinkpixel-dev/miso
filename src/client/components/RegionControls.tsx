@@ -6,7 +6,7 @@ import {
   clampRegion,
   moveBoundary,
   type Region,
-} from '../../lib/region.ts';
+} from '../lib/region.ts';
 
 /**
  * The region as two numbers you can type and step.
@@ -20,6 +20,11 @@ import {
  * held. The browser's own arrow handling on a number input would step by the
  * `step` attribute and would not clamp against the other boundary, so the keys
  * are handled here instead.
+ *
+ * It sits here rather than under `remix/` because two pages place a region now.
+ * The remix page marks the span a model should work on, and the workbench marks
+ * the span to keep. The control is the same either way, and only one of those
+ * pages is on screen at a time, so the fixed element ids cannot collide.
  */
 
 /** A boundary being typed, kept as text so a half-typed number is not fought. */

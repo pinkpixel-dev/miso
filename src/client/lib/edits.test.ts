@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { peak, sine } from '../../shared/testSignals.ts';
 import {
   applyEdits,
+  cutAt,
   decibelsToGain,
   describeEdit,
   durationOf,
@@ -285,5 +286,41 @@ describe('describeEdit', () => {
       'Exponential fade in over 2.00s',
     );
     expect(describeEdit({ kind: 'normalize', ceilingDecibels: -1 })).toBe('Normalized to -1.0 dB');
+  });
+});
+
+describe('cutAt', () => {
+  it('splits into two halves that add back up', () => {
+    const [before, after] = cutAt(flat(1000), RATE, 0.4);
+    expect(before[0]!.length).toBe(400);
+    expect(after[0]!.length).toBe(600);
+  });
+
+  it('keeps every channel on both sides', () => {
+    const [before, after] = cutAt([new Float32Array(100), new Float32Array(100)], RATE, 0.05);
+    expect(before).toHaveLength(2);
+    expect(after).toHaveLength(2);
+  });
+
+  it('loses no samples and reorders none', () => {
+    const source = [sine(100, RATE, 1)];
+    const [before, after] = cutAt(source, RATE, 0.3);
+    expect([...Array.from(before[0]!), ...Array.from(after[0]!)]).toEqual(
+      Array.from(source[0]!),
+    );
+  });
+
+  it('refuses a cut at either end rather than writing an empty take', () => {
+    expect(() => cutAt(flat(1000), RATE, 0)).toThrow('nothing on one side');
+    expect(() => cutAt(flat(1000), RATE, 1)).toThrow('nothing on one side');
+    expect(() => cutAt(flat(1000), RATE, -5)).toThrow('nothing on one side');
+    expect(() => cutAt(flat(1000), RATE, 99)).toThrow('nothing on one side');
+  });
+
+  it('does not touch the source', () => {
+    const source = [sine(100, RATE, 1)];
+    const before = Float32Array.from(source[0]!);
+    cutAt(source, RATE, 0.5);
+    expect(Array.from(source[0]!)).toEqual(Array.from(before));
   });
 });
