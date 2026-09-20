@@ -110,7 +110,7 @@ export function ToolsRoute() {
         <SourcePanel
           assets={assets}
           loading={loading}
-          busy={workbench.loading}
+          busy={workbench.loading !== undefined}
           onFile={(file) => void workbench.loadFile(file)}
           onTake={(asset) => void workbench.loadTake(asset)}
         />
@@ -141,7 +141,11 @@ export function ToolsRoute() {
       )}
 
       {workbench.loading ? (
-        <p className="text-sm text-ink-muted">Decoding. This happens in the browser.</p>
+        <p className="text-sm text-ink-muted" role="status">
+          {workbench.loading.stage === 'reading'
+            ? `Reading the file, ${Math.round(workbench.loading.fraction * 100)}% of the way through.`
+            : 'Decoding. This happens in the browser.'}
+        </p>
       ) : null}
     </div>
   );

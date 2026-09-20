@@ -5,6 +5,7 @@ import type { Asset } from '../../shared/types.ts';
 import { wavByteLength } from '../../shared/wav.ts';
 import { audioUrl } from './api.ts';
 import { decodeFile, savedFilename } from './decodeFile.ts';
+import { fetchInRanges } from './fetchRanged.ts';
 import { applyEdits, durationOf, peakOf, type Edit } from './edits.ts';
 import { saveToProject, type SaveProgress } from './saveAudio.ts';
 
@@ -48,9 +49,16 @@ export type OutputRate = (typeof OUTPUT_RATES)[number]['rate'];
 
 export const DEFAULT_OUTPUT_RATE: OutputRate = 44_100;
 
+/** What the page is doing while a source is on its way in. */
+export interface LoadProgress {
+  stage: 'reading' | 'decoding';
+  /** How much of the file has arrived. Always 1 while decoding. */
+  fraction: number;
+}
+
 export interface WorkbenchState {
   source: WorkbenchSource | undefined;
-  loading: boolean;
+  loading: LoadProgress | undefined;
   error: string | undefined;
   clearError: () => void;
 
@@ -91,7 +99,7 @@ export function useWorkbench(
   const [source, setSource] = useState<WorkbenchSource | undefined>();
   const [edits, setEdits] = useState<Edit[]>([]);
   const [outputRate, setOutputRate] = useState<OutputRate>(DEFAULT_OUTPUT_RATE);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<LoadProgress | undefined>();
   const [saving, setSaving] = useState<SaveProgress | undefined>();
   const [error, setError] = useState<string | undefined>();
 
@@ -104,7 +112,8 @@ export function useWorkbench(
 
   const loadFile = useCallback(
     async (file: File) => {
-      setLoading(true);
+      // A file from disk is already here. Nothing is read over the network.
+      setLoading({ stage: 'decoding', fraction: 1 });
       setError(undefined);
       try {
         const decoded = await decodeFile(file);
@@ -112,7 +121,7 @@ export function useWorkbench(
       } catch (cause) {
         setError(`${file.name} could not be decoded: ${messageFrom(cause)}`);
       } finally {
-        setLoading(false);
+        setLoading(undefined);
       }
     },
     [take],
@@ -120,19 +129,23 @@ export function useWorkbench(
 
   const loadTake = useCallback(
     async (asset: Asset) => {
-      setLoading(true);
+      setLoading({ stage: 'reading', fraction: 0 });
       setError(undefined);
       try {
-        const response = await fetch(audioUrl(asset.projectId, asset.id));
-        if (!response.ok) throw new Error(`The service answered HTTP ${response.status}`);
+        // Read in ranged pieces, never as one request. A whole file fetch is
+        // refused outright in a browser profile with extensions in it, which
+        // DOCS/ERRORS.md records happening twice.
+        const bytes = await fetchInRanges(audioUrl(asset.projectId, asset.id), (progress) =>
+          setLoading({ stage: 'reading', fraction: progress.fraction }),
+        );
 
-        const blob = await response.blob();
-        const decoded = await decodeFile(new File([blob], asset.filename));
+        setLoading({ stage: 'decoding', fraction: 1 });
+        const decoded = await decodeFile(new File([bytes], asset.filename));
         take({ name: asset.filename, ...decoded, fromAssetId: asset.id });
       } catch (cause) {
         setError(`${asset.label} could not be loaded: ${messageFrom(cause)}`);
       } finally {
-        setLoading(false);
+        setLoading(undefined);
       }
     },
     [take],
