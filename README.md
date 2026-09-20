@@ -105,6 +105,12 @@ Choose an audio file. Miso accepts wav, flac, mp3, and m4a up to 200 MB. The upl
 progress bar, then your browser works out the waveform and sends it up. The waveform appears
 a moment after the upload finishes.
 
+If what you dropped is not already a WAV, Miso asks whether to convert it first. It is worth
+saying yes in most cases. Miso reads WAV on its own, and everything that works on a whole song,
+splitting into stems, converting a voice, and mixing stems back together, needs one. Converting
+only changes the container, so the file gets bigger and does not sound any different. You can
+always import the file untouched instead and convert it later in Audio tools.
+
 Songs and queue jobs have separate scroll areas on desktop, so one long list does not bury
 the other. Queue jobs stay in one list instead of folding older entries behind an expander.
 
@@ -113,8 +119,11 @@ and playback continues from there. Click the track name to open its details over
 list. A generated take shows the exact prompt and lyrics that made it. Imported audio says
 plainly that it has no generation history.
 
-Each track can be renamed, exported, or deleted. Export gives you back exactly the bytes you
-imported under the name you imported them with.
+Each track can be renamed, exported, or deleted. Export offers WAV or MP3. Asking for the
+format a track is already stored in is instant and gives you back exactly the bytes you
+imported, under the name you imported them with. Asking for the other one converts in your
+browser and takes a few seconds on a long track, and MP3 is lossy, so it is for getting a file
+out of Miso rather than for keeping.
 
 A few things worth knowing:
 
@@ -147,7 +156,8 @@ it away without leaving anything behind.
 What you can do to it:
 
 - **Convert** to 16-bit WAV at 44.1 kHz or 48 kHz. 44.1 is what separation and voice
-  conversion need, 48 is what generation writes.
+  conversion need, 48 is what generation writes. Saving always writes WAV, because that is the
+  format the rest of Miso can work with. MP3 is offered on export instead.
 - **Trim** to a region. Drag on the waveform, or type the start and end in seconds.
 - **Split** at a point, which saves both halves as two takes.
 - **Fade in and out**, either a straight line or a curve.
@@ -346,6 +356,12 @@ cannot show it back to you.
 ## License
 
 Apache 2.0. See [LICENSE](LICENSE).
+
+One dependency carries a different licence and is worth naming. MP3 export uses
+[@breezystack/lamejs](https://www.npmjs.com/package/@breezystack/lamejs), which is LGPL-3.0,
+because every JavaScript MP3 encoder is a LAME derivative. It is a separate, unmodified package
+pulled in through npm and loaded only when you actually export an MP3. Since you run Miso from
+source, you can replace or remove it yourself.
 
 ---
 

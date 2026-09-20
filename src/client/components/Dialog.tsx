@@ -14,6 +14,7 @@ export function ConfirmDialog({
   title,
   body,
   confirmLabel,
+  secondary,
   destructive = false,
   busy = false,
   onConfirm,
@@ -23,6 +24,15 @@ export function ConfirmDialog({
   title: string;
   body: ReactNode;
   confirmLabel: string;
+  /**
+   * A third answer, beside the confirm and the cancel.
+   *
+   * For a question where declining is not the same as doing nothing. Importing
+   * an mp3 is the case it was added for: convert it, import it untouched, or
+   * cancel are three different outcomes, and cancel is the only one that leaves
+   * nothing behind.
+   */
+  secondary?: { label: string; onSelect: () => void };
   destructive?: boolean;
   busy?: boolean;
   onConfirm: () => void;
@@ -53,6 +63,11 @@ export function ConfirmDialog({
             <Button variant="ghost" onClick={onCancel} disabled={busy}>
               Cancel
             </Button>
+            {secondary ? (
+              <Button variant="secondary" onClick={secondary.onSelect} disabled={busy}>
+                {secondary.label}
+              </Button>
+            ) : null}
             <Button
               variant="primary"
               busy={busy}

@@ -1,11 +1,11 @@
-import { Download, Mic, Pause, Play } from 'lucide-react';
+import { Mic, Pause, Play } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Asset } from '../../../shared/types.ts';
-import { downloadUrl } from '../../lib/api.ts';
 import { remixPath } from '../../lib/routes.ts';
 import { createTakeSurfer } from '../player/createTakeSurfer.ts';
 import type { StemDeck } from '../player/useStemDeck.ts';
+import { ExportMenu } from '../ExportMenu.tsx';
 import { Tooltip, cx } from '../ui.tsx';
 
 /**
@@ -249,23 +249,16 @@ export function StemTrack({
         </Tooltip>
 
         {/*
-          The same plain download link every take gets, pointed at one stem.
-          Exporting a stem is most of the reason to separate a take at all.
+          Exporting a stem is most of the reason to separate a take at all, so
+          it gets the same format choice a take gets.
         */}
-        <Tooltip label={`Export ${stem.label}`}>
-          <a
-            href={downloadUrl(stem.projectId, stem.id)}
-            download={stem.filename}
-            aria-label={`Export ${stem.label}`}
-            className={cx(
-              'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
-              'text-ink-muted transition-colors duration-150 hover:bg-raised hover:text-ink',
-              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-            )}
-          >
-            <Download aria-hidden="true" className="h-4 w-4" />
-          </a>
-        </Tooltip>
+        <ExportMenu
+          projectId={stem.projectId}
+          assetId={stem.id}
+          filename={stem.filename}
+          label={stem.label}
+          format={stem.format}
+        />
       </div>
 
       {state.loading ? (

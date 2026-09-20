@@ -1,13 +1,13 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Download, MoreHorizontal, Pause, Pencil, Play, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pause, Pencil, Play, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { LibraryTake } from '../../../shared/types.ts';
-import { downloadUrl } from '../../lib/api.ts';
 import { projectPath } from '../../lib/routes.ts';
 import { usePlayer } from '../../lib/usePlayer.ts';
-import { IconButton, Tooltip, cx } from '../ui.tsx';
+import { ExportMenu } from '../ExportMenu.tsx';
+import { IconButton, cx } from '../ui.tsx';
 
 /**
  * One take in the library.
@@ -126,20 +126,12 @@ export function LibraryRow({
         {take.projectName}
       </Link>
 
-      <Tooltip label={`Export ${take.label}`}>
-        <a
-          href={downloadUrl(take.projectId, take.assetId)}
-          download
-          aria-label={`Export ${take.label}`}
-          className={cx(
-            'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
-            'text-ink-muted transition-colors duration-150 hover:bg-raised hover:text-ink',
-            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-          )}
-        >
-          <Download aria-hidden="true" className="h-4 w-4" />
-        </a>
-      </Tooltip>
+      <ExportMenu
+        projectId={take.projectId}
+        assetId={take.assetId}
+        label={take.label}
+        format={take.format}
+      />
 
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>

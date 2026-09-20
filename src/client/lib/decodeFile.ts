@@ -1,4 +1,5 @@
 import type { AssetFormat } from '../../shared/types.ts';
+import { writeWav } from '../../shared/wav.ts';
 
 /**
  * Turns a file into samples, at the rate the file is actually in.
@@ -153,4 +154,33 @@ export const SAVED_FORMAT: AssetFormat = 'wav';
 export function savedFilename(sourceName: string, suffix: string): string {
   const stem = sourceName.replace(/\.[^.]+$/, '') || 'audio';
   return `${stem} (${suffix}).${SAVED_FORMAT}`;
+}
+
+/**
+ * The same audio, in a WAV container.
+ *
+ * Offered when a non-WAV file is imported, because WAV is what the rest of Miso
+ * can work with: the service has no decoder, so separation, voice conversion
+ * and the mix route all refuse anything else. Converting on the way in is what
+ * stops somebody finding that out later, from a job that will not start.
+ *
+ * The sample rate is left exactly as it was, deliberately. Any WAV works for
+ * separation at any rate, because the job worker converts to 44.1 kHz itself
+ * before staging. What it cannot do is read the container. So this changes the
+ * container and nothing else, and no question about rates has to be asked.
+ *
+ * Nothing is recovered by doing this. An mp3 is lossy and a WAV of it holds
+ * exactly what the mp3 held. It is about what Miso can open, not about quality.
+ */
+export async function convertToWav(file: File): Promise<File> {
+  const decoded = await decodeFile(file);
+  const bytes = writeWav(decoded.channels, decoded.sampleRate);
+
+  return new File([bytes], withWavExtension(file.name), { type: 'audio/wav' });
+}
+
+/** The same name, carrying the extension the upload route checks for. */
+export function withWavExtension(filename: string): string {
+  const stem = filename.replace(/\.[^.]+$/, '') || 'audio';
+  return `${stem}.${SAVED_FORMAT}`;
 }

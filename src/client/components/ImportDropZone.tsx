@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ACCEPTED_FORMATS, MAX_ASSET_BYTES } from '../../shared/limits.ts';
+import { convertToWav } from '../lib/decodeFile.ts';
 import type { ImportProgress } from '../lib/useProject.ts';
+import { ConfirmDialog } from './Dialog.tsx';
 
 /**
  * Two doors into the same import.
@@ -10,6 +12,15 @@ import type { ImportProgress } from '../lib/useProject.ts';
  * a file input, because dragging cannot be done on a phone and Miso is used on
  * phones heavily. The button is what carries focus and the accessible name, so
  * keyboard and touch reach this the same way a mouse does.
+ *
+ * A file that is not already a WAV is asked about before it goes anywhere. The
+ * service has no decoder, so an imported mp3 cannot be separated, voice
+ * converted or mixed, and the only way anybody finds that out today is from a
+ * job that will not start. Asking here is the last moment it is cheap to fix.
+ *
+ * Importing it untouched stays available, because the original bytes are
+ * sometimes the point and Export has always promised to give back exactly what
+ * came in.
  */
 export function ImportDropZone({
   onFile,
@@ -29,6 +40,9 @@ export function ImportDropZone({
   workbenchTo?: string;
 }) {
   const [over, setOver] = useState(false);
+  const [asked, setAsked] = useState<File | undefined>();
+  const [converting, setConverting] = useState(false);
+  const [error, setError] = useState<string | undefined>();
   const input = useRef<HTMLInputElement>(null);
 
   const accept = ACCEPTED_FORMATS.map((f) => `.${f}`).join(',');
@@ -36,7 +50,51 @@ export function ImportDropZone({
   const formats = ACCEPTED_FORMATS.join(', ');
 
   function take(file: File | undefined) {
-    if (file) onFile(file);
+    if (!file) return;
+    setError(undefined);
+
+    // A WAV is already what everything here wants, so it is never asked about.
+    if (file.name.toLowerCase().endsWith('.wav')) {
+      onFile(file);
+      return;
+    }
+
+    setAsked(file);
+  }
+
+  async function convertAndImport(file: File) {
+    setConverting(true);
+    try {
+      const wav = await convertToWav(file);
+      setAsked(undefined);
+      onFile(wav);
+    } catch (cause) {
+      setAsked(undefined);
+      setError(
+        `${file.name} could not be converted: ${cause instanceof Error ? cause.message : String(cause)}. Importing it as it is will still work.`,
+      );
+    } finally {
+      setConverting(false);
+    }
+  }
+
+  if (converting) {
+    return (
+      <div className="rounded-md border border-line bg-surface p-4">
+        <p className="text-sm text-ink" role="status">
+          Converting {asked?.name} to WAV. This happens in this browser.
+        </p>
+        <div
+          role="progressbar"
+          aria-label="Converting"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          className="mt-2 h-1 w-full overflow-hidden rounded-full bg-raised"
+        >
+          <div className="h-full w-full bg-accent" />
+        </div>
+      </div>
+    );
   }
 
   if (importing) {
@@ -69,7 +127,10 @@ export function ImportDropZone({
     );
   }
 
+  const extension = asked?.name.split('.').pop()?.toUpperCase() ?? 'This file';
+
   return (
+    <>
     <div
       onDragOver={(event) => {
         event.preventDefault();
@@ -118,5 +179,54 @@ export function ImportDropZone({
         }}
       />
     </div>
+
+      {error ? (
+        <p
+          role="alert"
+          className="mt-2 rounded-md border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-ink"
+        >
+          {error}
+        </p>
+      ) : null}
+
+      {/*
+        Three outcomes, not two. Converting and importing untouched are both
+        real answers, and cancelling is the only one that leaves nothing behind.
+      */}
+      <ConfirmDialog
+        open={asked !== undefined}
+        title={`Convert this ${extension} to WAV?`}
+        confirmLabel="Convert to WAV"
+        secondary={{
+          label: 'Import as it is',
+          onSelect: () => {
+            const file = asked;
+            setAsked(undefined);
+            if (file) onFile(file);
+          },
+        }}
+        onConfirm={() => {
+          if (asked) void convertAndImport(asked);
+        }}
+        onCancel={() => setAsked(undefined)}
+        body={
+          <div className="flex flex-col gap-2">
+            <p>
+              Miso reads WAV on its own. Everything that works on a whole song, splitting into
+              stems, converting a voice, and mixing stems back together, needs one.
+            </p>
+            <p>
+              Converting now keeps the audio exactly as it is and only changes the container, so
+              the file gets larger and does not sound different. An {extension} is already lossy
+              and this does not undo that.
+            </p>
+            <p className="text-ink-faint">
+              Importing it as it is works too. It will play and export normally, and you can
+              convert it later in Audio tools.
+            </p>
+          </div>
+        }
+      />
+    </>
   );
 }

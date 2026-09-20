@@ -3,6 +3,31 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 0.27.0 - September 19, 2026
+
+### 🔄 Conversion
+
+- Importing a file that is not a WAV now asks whether to convert it first. Miso reads WAV on
+  its own, and separation, voice conversion and mixing all need one, so an imported mp3 could
+  not be used for any of them. Converting only changes the container and leaves the sample rate
+  alone, because any WAV separates at any rate.
+- Importing untouched is still offered, and still gives back exactly the bytes you imported
+  when you export it.
+
+### 📤 Export
+
+- Takes, library rows and stems now export as either WAV or MP3.
+- Asking for the format a file is already in stays instant and hands back the stored bytes.
+  Only a format change does any work, and it says what it is doing while it does it.
+- MP3 is an export format only. Nothing writes an MP3 into a project, because separation and
+  voice conversion would then refuse to run on it.
+
+### 📦 Dependencies
+
+- Added `@breezystack/lamejs` for MP3 encoding. It is LGPL-3.0 in an Apache 2.0 project, which
+  was a deliberate choice: every JavaScript MP3 encoder is a LAME derivative. It is unmodified,
+  loaded dynamically into its own 163 KB chunk, and named in the README.
+
 ## 0.26.0 - September 19, 2026
 
 ### 🎛️ Audio workbench
