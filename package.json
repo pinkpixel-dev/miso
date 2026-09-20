@@ -6,6 +6,9 @@
   "description": "A local music generation and remix studio built on audio.cpp",
   "author": "Pink Pixel <admin@pinkpixel.dev>",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.12"
+  },
   "homepage": "https://pinkpixel.dev",
   "scripts": {
     "dev": "concurrently -n client,server -c cyan,magenta \"npm:dev:client\" \"npm:dev:server\"",
@@ -34,6 +37,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.0.0",
+    "tsx": "^4.23.13",
     "undici": "^8.10.2",
     "wavesurfer.js": "^7.12.12",
     "yazl": "^3.3.1"
@@ -48,7 +52,6 @@
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^9.1.0",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
     "vitest": "^5.0.0"

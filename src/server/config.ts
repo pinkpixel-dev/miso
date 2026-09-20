@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -5,6 +6,18 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 /** Repository root, resolved from this file rather than the current directory. */
 export const projectRoot = resolve(here, '../..');
+
+/**
+ * The running version, read from `package.json` so there is one source of it.
+ *
+ * `createRequire` rather than a JSON import because this file is loaded by tsx
+ * in production and by vitest in tests, and a require needs nothing from either
+ * of them. The health route reports it, which is how someone tells which image
+ * a container is actually running.
+ */
+export const version: string = (
+  createRequire(import.meta.url)('../../package.json') as { version: string }
+).version;
 
 /**
  * Where Miso keeps everything it owns: the database and, from phase 3, audio

@@ -1,0 +1,32 @@
+# Everything the image builds from is listed explicitly in the Dockerfile, so
+# this is a backstop rather than the mechanism. It matters most for the two
+# directories that are measured in gigabytes.
+.git
+.gitignore
+node_modules
+dist
+
+# Runtime and local data. models/ is 39 GB on a working machine.
+data
+models
+probe-out
+samples
+*.sqlite
+*.sqlite-journal
+
+# Development material that never ships.
+DOCS
+AGENTS.md
+CLAUDE.md
+reference.png
+scripts
+
+# Tests do not run in the image.
+vitest.config.ts
+vitest.setup.ts
+**/*.test.ts
+**/*.test.tsx
+
+.env
+.env.local
+.DS_Store

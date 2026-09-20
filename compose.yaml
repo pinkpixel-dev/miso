@@ -1,0 +1,90 @@
+# Miso and audio.cpp, on one NVIDIA GPU machine.
+#
+#   docker compose up -d
+#
+# Then open http://127.0.0.1:5171 and download a model from the Models screen.
+# Nothing is bundled: the first run downloads several gigabytes of weights.
+#
+# Read the GPU note on the audiocpp service before changing how it gets the
+# card. It is not the usual incantation, and the usual incantation fails in a
+# way that looks like success.
+
+name: miso
+
+services:
+  audiocpp:
+    # CUDA 12 by default because it runs on older drivers. If your driver is
+    # new enough, full-cuda13 works too and is the same server:
+    #
+    #   AUDIOCPP_TAG=full-cuda13 docker compose up -d
+    #
+    # There are also full-vulkan and full-cpu tags. The CPU one runs Miso
+    # end to end and takes minutes per take instead of seconds.
+    image: ghcr.io/0xshug0/audio.cpp:${AUDIOCPP_TAG:-full-cuda12}
+    command:
+      - server
+      - --ui
+      - --ui-management
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --backend
+      - cuda
+    # The GPU, and why it is written this way.
+    #
+    # `--gpus all`, and its compose equivalent under deploy.resources, starts
+    # the container and gives you a working `nvidia-smi` and no CUDA. The UVM
+    # device nodes get the wrong major number inside the container, nvidia-smi
+    # does not use UVM so it cannot see the problem, and ggml quietly falls back
+    # to the CPU. The named runtime creates the nodes correctly.
+    #
+    # Symptom if this regresses: generation works but takes minutes, and the log
+    # below says CPU where it should name the card.
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    volumes:
+      # audio.cpp owns the weights. Miso downloads them through this server's
+      # management API and never touches this directory itself.
+      #
+      # Defaults to a named volume, so a fresh install needs no decision. If you
+      # already have models on disk from running audio.cpp outside Docker, point
+      # at them instead and skip the download:
+      #
+      #   MISO_MODELS_DIR=/path/to/models docker compose up -d
+      - ${MISO_MODELS_DIR:-models}:/app/models
+    # No ports. Nothing outside the compose network reaches this server, which
+    # matters because its management UI asks nobody for a password.
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  miso:
+    image: ghcr.io/pinkpixel-dev/miso:1.0.0
+    # Building from a checkout instead of pulling:
+    # build: .
+    environment:
+      # Seeds the backend address into settings the first time Miso starts with
+      # an empty database. After that the value in the settings table wins, so
+      # changing this on an existing volume does nothing. Change it in Settings.
+      MISO_BACKEND_URL: http://audiocpp:8080
+    volumes:
+      - miso-data:/data
+    ports:
+      - "127.0.0.1:5171:5171"
+    depends_on:
+      - audiocpp
+    # tsx runs the server in a child process, so pid 1 needs to reap it.
+    init: true
+    restart: unless-stopped
+
+volumes:
+  models:
+  miso-data:
+
+# There is no `internal: true` network here on purpose. audio.cpp downloads
+# model weights from the internet, and an internal network has no route out, so
+# it would break the first thing a new user does. "Only Miso is exposed" is
+# achieved by publishing only Miso's port, which this file does.
