@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { StorageUsage as Usage } from '../../shared/types.ts';
+import type { ModelStorage, StorageUsage as Usage } from '../../shared/types.ts';
 import { api } from '../lib/api.ts';
 import { Panel } from './ui.tsx';
 
@@ -55,6 +55,38 @@ export function StorageUsage() {
           </ul>
         </>
       )}
+
+      {usage ? <Models models={usage.models} /> : null}
     </Panel>
+  );
+}
+
+/**
+ * What the weights take up, which is usually most of the answer.
+ *
+ * Separate from the project list because it is not Miso's disk. The weights
+ * live on the backend, they are deleted from the Models screen, and a person
+ * looking for space needs to be told they exist before anything else here is
+ * worth reading.
+ */
+function Models({ models }: { models: ModelStorage }) {
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      {models.kind === 'ready' ? (
+        <p className="text-sm text-ink">
+          {formatBytes(models.bytes)} of model weights,{' '}
+          {models.count === 1 ? 'one package' : `${models.count} packages`} on the backend.{' '}
+          <Link to="/models" className="text-ink-muted underline underline-offset-4 hover:text-ink">
+            Manage models
+          </Link>
+        </p>
+      ) : models.kind === 'scanning' ? (
+        <p className="text-sm text-ink-muted">Still measuring the model weights.</p>
+      ) : (
+        <p className="text-sm text-ink-muted">
+          Miso could not reach the backend, so the model weights are not counted here.
+        </p>
+      )}
+    </div>
   );
 }

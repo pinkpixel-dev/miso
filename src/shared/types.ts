@@ -331,9 +331,24 @@ export interface ProjectDetail {
  * measured by walking the directory: the count was taken during the upload
  * stream, so it is the same number, and a sum is cheap where a walk is not.
  */
+/**
+ * What the installed model weights take up, which is usually most of the disk.
+ *
+ * Its own shape rather than a number because the answer is often not a number
+ * yet. audio.cpp scans its model directory in the background and the first call
+ * only starts it, and the backend may be unreachable or have management turned
+ * off, in which case Miso does not know and should not imply zero.
+ */
+export type ModelStorage =
+  | { kind: 'ready'; bytes: number; count: number }
+  | { kind: 'scanning' }
+  | { kind: 'unavailable' };
+
 export interface StorageUsage {
   totalBytes: number;
   projects: Project[];
+  /** Weights live on the backend, not in Miso's data directory. */
+  models: ModelStorage;
 }
 
 /**

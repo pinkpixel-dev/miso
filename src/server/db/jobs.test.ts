@@ -9,6 +9,7 @@ import {
   listJobs,
   nextQueuedJob,
   readJob,
+  forgetStagedPath,
   readStagedPath,
   recordStagedPath,
   requeueJob,
@@ -290,6 +291,29 @@ describe('staged uploads', () => {
 
   it('has nothing for an asset that was never staged', () => {
     expect(readStagedPath(handle, 'asset-1', 'http://one')).toBeUndefined();
+  });
+
+  it('forgets one path so the next job uploads again', () => {
+    recordStagedPath(handle, 'asset-1', 'http://one', '/tmp/a.wav');
+    forgetStagedPath(handle, 'asset-1', 'http://one');
+
+    expect(readStagedPath(handle, 'asset-1', 'http://one')).toBeUndefined();
+  });
+
+  it('forgets a path on one backend without touching the other', () => {
+    // A restart strands the paths on one server. The same asset staged to a
+    // different address is still where it was said to be.
+    recordStagedPath(handle, 'asset-1', 'http://one', '/tmp/a.wav');
+    recordStagedPath(handle, 'asset-1', 'http://two', '/tmp/b.wav');
+
+    forgetStagedPath(handle, 'asset-1', 'http://one');
+
+    expect(readStagedPath(handle, 'asset-1', 'http://one')).toBeUndefined();
+    expect(readStagedPath(handle, 'asset-1', 'http://two')).toBe('/tmp/b.wav');
+  });
+
+  it('forgetting something that was never staged is not an error', () => {
+    expect(() => forgetStagedPath(handle, 'asset-1', 'http://one')).not.toThrow();
   });
 
   it('replaces a path when the same asset is staged again', () => {

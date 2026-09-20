@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Asset, Job } from '../../shared/types.ts';
 import { findTask } from '../tasks/registry.ts';
-import { conversionRate, labelFor } from './worker.ts';
+import { conversionRate, labelFor, staleStagedPaths } from './worker.ts';
 
 const task = findTask('generate.text2music');
 if (!task) throw new Error('generate.text2music is missing from the registry');
@@ -137,5 +137,42 @@ describe('whether a source is converted before it is staged', () => {
 
   it('converts when the rate was never recorded rather than trusting it', () => {
     expect(conversionRate(separate!, asset({ sampleRate: undefined }))).toBe(44_100);
+  });
+});
+
+describe('whether a failed job is worth staging again', () => {
+  const REUSED = [
+    { assetId: 'a1', path: '/tmp/audiocpp-ui-1789890382480054/2-clang.wav' },
+    { assetId: 'a2', path: '/tmp/audiocpp-ui-1789890382480054/3-hum.wav' },
+  ];
+
+  /** The real message, from a backend restarted between two separations. */
+  const MISSING =
+    'could not open WAV input: /tmp/audiocpp-ui-1789890382480054/2-clang.wav';
+
+  it('finds the reused path the backend could not open', () => {
+    expect(staleStagedPaths(REUSED, MISSING)).toEqual([REUSED[0]]);
+  });
+
+  it('leaves the other inputs of the same job alone', () => {
+    // Only one path is named, so only one upload is worth doing again.
+    expect(staleStagedPaths(REUSED, MISSING).map((e) => e.assetId)).not.toContain('a2');
+  });
+
+  it('finds nothing when the job failed for some other reason', () => {
+    expect(staleStagedPaths(REUSED, 'CUDA out of memory')).toEqual([]);
+  });
+
+  it('finds nothing when this job uploaded everything itself', () => {
+    // A path that was not reused from the cache is never passed in, so a
+    // failure naming it must not be read as a stale cache entry.
+    expect(staleStagedPaths([], MISSING)).toEqual([]);
+  });
+
+  it('matches a path that appears after a different run directory', () => {
+    // The directory changes on every backend restart, so a stale path and a
+    // live one differ only in that segment. Matching must not be fooled by it.
+    const live = '/tmp/audiocpp-ui-1789890540454921/2-clang.wav';
+    expect(staleStagedPaths(REUSED, `could not open WAV input: ${live}`)).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@ import { readAsset } from '../db/assets.ts';
 import { db } from '../db/index.ts';
 import {
   failInterruptedJobs,
+  forgetStagedPath,
   listJobInputs,
   nextQueuedJob,
   readStagedPath,
@@ -36,6 +37,18 @@ import type { Asset, Job } from '../../shared/types.ts';
 
 /** A busy backend is a state to wait out, but not forever. */
 const MAX_BUSY_ATTEMPTS = 10;
+
+/**
+ * How many times a job may re-upload its source and try again.
+ *
+ * One. A stale cached path is fixed by uploading the file again, and if that
+ * still fails the problem was never the cache. This shares the `attempts`
+ * column with the busy retries above, so a job that has already been requeued
+ * many times for a busy backend will not also get this. That conflation is
+ * deliberate: both counters exist to stop a job looping forever, which is the
+ * only thing either of them is for.
+ */
+const MAX_RESTAGE_ATTEMPTS = 1;
 const FIRST_BACKOFF_MS = 5_000;
 const MAX_BACKOFF_MS = 2 * 60 * 1000;
 
@@ -51,6 +64,29 @@ let lastModelId: string | undefined;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Which reused paths the backend just told us it could not open.
+ *
+ * Matching is on the path itself, which Miso handed over and therefore knows
+ * exactly, rather than on the wording around it. The message reads
+ * `could not open WAV input: /tmp/audiocpp-ui-<run>/<name>.wav`, and that
+ * wording is audio.cpp's to change while the path is ours.
+ *
+ * Only paths that came from the cache are ever passed in. A path this job
+ * uploaded itself is not a stale cache entry, and re-uploading it would change
+ * nothing.
+ *
+ * Exported for its own test: it is the rule that decides whether a failed job
+ * gets a second chance, and the rest of this file cannot be reached without a
+ * backend.
+ */
+export function staleStagedPaths(
+  reused: { assetId: string; path: string }[],
+  message: string,
+): { assetId: string; path: string }[] {
+  return reused.filter((entry) => message.includes(entry.path));
 }
 
 /** Doubles from five seconds and stops at two minutes. */
@@ -186,17 +222,32 @@ async function stageInputs(
   | {
       ok: true;
       staged: Record<string, string>;
+      /**
+       * Paths handed to the backend that came from the cache rather than from
+       * an upload this job made. If the backend cannot open one of these, the
+       * cache is stale and the job is worth trying again. A path this job
+       * uploaded itself is not on this list, because re-uploading it would
+       * change nothing.
+       */
+      reused: { assetId: string; path: string }[];
       sourceLabel: string | undefined;
       sourceSampleRate: number | undefined;
     }
   | { ok: false; message: string }
 > {
   if (task.inputRoles.length === 0) {
-    return { ok: true, staged: {}, sourceLabel: undefined, sourceSampleRate: undefined };
+    return {
+      ok: true,
+      staged: {},
+      reused: [],
+      sourceLabel: undefined,
+      sourceSampleRate: undefined,
+    };
   }
 
   const inputs = listJobInputs(db(), job.id);
   const staged: Record<string, string> = {};
+  const reused: { assetId: string; path: string }[] = [];
   let sourceLabel: string | undefined;
   let sourceSampleRate: number | undefined;
 
@@ -234,6 +285,7 @@ async function stageInputs(
       const cached = readStagedPath(db(), input.assetId, baseUrl);
       if (cached) {
         staged[role] = cached;
+        reused.push({ assetId: input.assetId, path: cached });
         continue;
       }
     }
@@ -259,7 +311,7 @@ async function stageInputs(
     staged[role] = uploaded.value;
   }
 
-  return { ok: true, staged, sourceLabel, sourceSampleRate };
+  return { ok: true, staged, reused, sourceLabel, sourceSampleRate };
 }
 
 /**
@@ -352,6 +404,22 @@ async function runOne(job: Job): Promise<number> {
       }
       requeueJob(db(), job.id);
       return backoffFor(job.attempts);
+    }
+
+    // A path Miso reused from the cache that the backend cannot open means the
+    // file behind it is gone. audio.cpp stages uploads into a directory it
+    // makes per server start and has no delete route, so every restart strands
+    // every path Miso remembers while the address they are keyed by stays the
+    // same. Under compose, where the backend restarts on its own, this is
+    // ordinary rather than rare.
+    //
+    const stale = staleStagedPaths(staged.reused, result.message);
+    if (stale.length > 0 && job.attempts + 1 <= MAX_RESTAGE_ATTEMPTS) {
+      for (const entry of stale) forgetStagedPath(db(), entry.assetId, baseUrl);
+      requeueJob(db(), job.id);
+      // No backoff. Nothing is busy and nothing is going to settle: the next
+      // run uploads the file again, which is the whole fix.
+      return 0;
     }
 
     setJobState(db(), job.id, 'failed', describeRunFailure(result.message, task));

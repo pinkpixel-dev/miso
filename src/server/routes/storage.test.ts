@@ -4,7 +4,7 @@ import type { StorageUsage } from '../../shared/types.ts';
 import { insertAsset } from '../db/assets.ts';
 import { db } from '../db/index.ts';
 import { createProject } from '../db/projects.ts';
-import { storageRoutes } from './storage.ts';
+import { storageRoutes, summarizeModels } from './storage.ts';
 
 function app(): Hono {
   const instance = new Hono();
@@ -56,5 +56,44 @@ describe('GET /api/storage', () => {
     const body = (await (await app().request('/api/storage')).json()) as StorageUsage;
     expect(body.projects).toHaveLength(1);
     expect(body.totalBytes).toBe(0);
+  });
+
+  it('always answers about models, whatever the backend is doing', async () => {
+    // Deliberately not asserting which one. This route asks a real backend, and
+    // whether one is listening on the configured address depends on what the
+    // person running the tests happens to have started. What must hold either
+    // way is that the field is there and says one of the three things it can
+    // say, so the panel never has to guess.
+    const body = (await (await app().request('/api/storage')).json()) as StorageUsage;
+    expect(['ready', 'scanning', 'unavailable']).toContain(body.models.kind);
+  });
+});
+
+describe('what the installed weights add up to', () => {
+  it('counts only what is installed', () => {
+    const summary = summarizeModels([
+      { bytes: 1000, installed: true },
+      { bytes: 9999, installed: false },
+    ]);
+
+    expect(summary).toEqual({ kind: 'ready', bytes: 1000, count: 1 });
+  });
+
+  it('still counts a package the backend could not size', () => {
+    // Dropping it would under-report the number of things taking up space.
+    const summary = summarizeModels([
+      { bytes: 1000, installed: true },
+      { bytes: undefined, installed: true },
+    ]);
+
+    expect(summary).toEqual({ kind: 'ready', bytes: 1000, count: 2 });
+  });
+
+  it('is zero when nothing is installed', () => {
+    expect(summarizeModels([{ bytes: 500, installed: false }])).toEqual({
+      kind: 'ready',
+      bytes: 0,
+      count: 0,
+    });
   });
 });

@@ -280,6 +280,24 @@ export function recordStagedPath(
 }
 
 /**
+ * Forgets one staged upload, so the next job that needs it uploads again.
+ *
+ * There is exactly one reason to call this: the backend was handed this path
+ * and could not open it. audio.cpp stages uploads into a directory it makes per
+ * server start, and `server_identity` is the address, which does not change
+ * when it restarts, so a cached path outlives the file it points at.
+ */
+export function forgetStagedPath(
+  handle: Database,
+  assetId: string,
+  serverIdentity: string,
+): void {
+  handle
+    .prepare('DELETE FROM staged_uploads WHERE asset_id = ? AND server_identity = ?')
+    .run(assetId, serverIdentity);
+}
+
+/**
  * The next job to run, preferring one that needs the model already in memory.
  *
  * This is the whole of the reordering: a queue of six jobs across two models
