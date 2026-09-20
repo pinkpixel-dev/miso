@@ -6,6 +6,7 @@ import type {
   Catalog,
   CatalogPackage,
   Job,
+  MidiArtifact,
   PromptSuggestion,
   ScoreArtifact,
   StudioState,
@@ -105,6 +106,7 @@ export function GeneratePanel({
   jobs,
   assets,
   scores,
+  transcriptions,
   catalog,
   catalogLoading,
   prefill,
@@ -117,6 +119,8 @@ export function GeneratePanel({
   assets: Asset[];
   /** The project's own scores, for a task that can be given a plan to follow. */
   scores: ScoreArtifact[];
+  /** The project's own transcriptions, which convert into a plan to follow. */
+  transcriptions: MidiArtifact[];
   catalog: Catalog | undefined;
   catalogLoading: boolean;
   /** What a past job says this form should start from, when one was named. */
@@ -555,6 +559,7 @@ export function GeneratePanel({
                 value={fieldValues[field.name] ?? ''}
                 onChange={(value) => setValue(field.name, value)}
                 scores={scores}
+                transcriptions={transcriptions}
               />
             ))}
           </div>
@@ -651,6 +656,7 @@ export function GeneratePanel({
                 value={fieldValues[field.name] ?? ''}
                 onChange={(value) => setValue(field.name, value)}
                 scores={scores}
+                transcriptions={transcriptions}
               />
             ))}
           </div>

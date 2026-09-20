@@ -1,6 +1,6 @@
 {
   "name": "miso",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "description": "A local music generation and remix studio built on audio.cpp",

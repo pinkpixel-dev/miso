@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from 'react';
-import type { ScoreArtifact, TaskField } from '../../shared/types.ts';
+import type { MidiArtifact, ScoreArtifact, TaskField } from '../../shared/types.ts';
+import { TranscriptionScoreDialog } from './TranscriptionScoreDialog.tsx';
 import { Button, TextArea } from './ui.tsx';
 
 /** How many lines of a score are worth seeing before it scrolls. */
@@ -9,12 +10,14 @@ const ROWS = 8;
  * An ABC score, pasted, loaded from a file, or taken from a take in this
  * project.
  *
- * Three ways in because a score arrives three ways. YuE2 writes one every time
- * it plans a song, and those are already stored, so the commonest case is
- * reusing one this project made: generate a song, then hand its score back with
- * a different style and hear the same tune arranged another way. The file
- * button is for a score written somewhere else, and the box itself is for
- * editing either of them, which is the whole point of handing a plan back.
+ * Four ways in because a score arrives four ways. YuE2 writes one every time it
+ * plans a song, and those are already stored, so the commonest case is reusing
+ * one this project made: generate a song, then hand its score back with a
+ * different style and hear the same tune arranged another way. A transcription
+ * is the other way, and the one a cover needs: separate a song, transcribe the
+ * vocals stem, and convert the notes to a melody. The file button is for a
+ * score written somewhere else, and the box itself is for editing any of them,
+ * which is the whole point of handing a plan back.
  *
  * It is one text field underneath all of that. The picker and the file button
  * write into the same box, so what gets sent is always what is on screen.
@@ -24,15 +27,19 @@ export function ScoreField({
   value,
   onChange,
   scores,
+  transcriptions,
 }: {
   field: TaskField;
   value: string;
   onChange: (value: string) => void;
   /** Scores already in this project, offered in the picker. */
   scores: ScoreArtifact[];
+  /** Transcriptions in this project, which convert to a melody on the way in. */
+  transcriptions: MidiArtifact[];
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | undefined>();
+  const [converting, setConverting] = useState<MidiArtifact | undefined>();
   const pickerId = useId();
 
   async function load(file: File | undefined): Promise<void> {
@@ -67,7 +74,7 @@ export function ScoreField({
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        {scores.length > 0 ? (
+        {scores.length > 0 || transcriptions.length > 0 ? (
           <label className="flex items-center gap-2">
             <span className="sr-only" id={pickerId}>
               Load a score from this project
@@ -80,20 +87,47 @@ export function ScoreField({
               // untrue about what is about to be sent.
               value=""
               onChange={(event) => {
-                const picked = scores.find((score) => score.id === event.target.value);
-                if (picked) {
-                  setFileError(undefined);
-                  onChange(picked.abc);
+                const [kind, id] = event.target.value.split(':');
+                if (kind === 'score') {
+                  const picked = scores.find((score) => score.id === id);
+                  if (picked) {
+                    setFileError(undefined);
+                    onChange(picked.abc);
+                  }
+                  return;
+                }
+                // A transcription is not a score yet. It goes through the
+                // dialog, which is where the tempo and key it does not carry
+                // get guessed and shown.
+                if (kind === 'midi') {
+                  const picked = transcriptions.find((entry) => entry.id === id);
+                  if (picked) {
+                    setFileError(undefined);
+                    setConverting(picked);
+                  }
                 }
               }}
               className="min-h-9 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink transition-colors duration-150 hover:border-line-strong"
             >
               <option value="">Use a score from this project</option>
-              {scores.map((score) => (
-                <option key={score.id} value={score.id}>
-                  {score.label}
-                </option>
-              ))}
+              {scores.length > 0 ? (
+                <optgroup label="Scores">
+                  {scores.map((score) => (
+                    <option key={score.id} value={`score:${score.id}`}>
+                      {score.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+              {transcriptions.length > 0 ? (
+                <optgroup label="Transcriptions">
+                  {transcriptions.map((entry) => (
+                    <option key={entry.id} value={`midi:${entry.id}`}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
             </select>
           </label>
         ) : null}
@@ -127,6 +161,15 @@ export function ScoreField({
           {fileError}
         </p>
       ) : null}
+
+      <TranscriptionScoreDialog
+        artifact={converting}
+        onCancel={() => setConverting(undefined)}
+        onConfirm={(abc) => {
+          onChange(abc);
+          setConverting(undefined);
+        }}
+      />
     </div>
   );
 }

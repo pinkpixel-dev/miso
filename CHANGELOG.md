@@ -3,6 +3,36 @@
 Miso follows [semantic versioning](https://semver.org/). Development before 0.2.0 predates
 this file, so the earlier history lives in the git log.
 
+## 1.4.0 - September 20, 2026
+
+A transcription can become a score. That is the missing half of a cover: YuE2
+already sings a score you give it, and now Miso can make one out of a recording
+instead of only out of YuE2's own planning.
+
+### 🎼 Covers
+
+- **Turn a transcription into a melody.** The Score box on the create form now
+  offers your transcriptions alongside your scores. Pick one and Miso works out
+  a tempo and a key from the notes, writes the melody as ABC, and shows you the
+  result before you use it.
+- **The guesses are on screen, and you can change them.** A tempo read at half
+  speed still writes the right notes, so a cover built on it sounds like the
+  right tune played wrong, which is hard to diagnose afterwards. The tempo, the
+  meter and the key sit above the score and it redraws as you change them.
+- **The whole path works.** Separate a song, transcribe the vocals stem, convert
+  it, and give it to YuE2 with a new style. Every step was already there except
+  the conversion.
+- One voice and no chord symbols, which is the shape a cover wants.
+
+### 🧱 Internals
+
+- `notesToAbc` converts note events into an ABC document: the melody taken as
+  the highest note wherever notes overlap, quantized to sixteenths, barred, and
+  tied across bar lines so the document adds up. Tempo comes from the typical
+  gap between onsets, and the key from a duration-weighted pitch histogram.
+- The `score` field kind now takes a transcription as well as a score, a file
+  and pasted text.
+
 ## 1.3.0 - September 20, 2026
 
 YuE2 joins the song writers. It is the first model here that answers at 48 kHz

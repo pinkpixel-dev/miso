@@ -6,6 +6,7 @@ import { Panel } from '../components/ui.tsx';
 import { installedPackages } from '../lib/models.ts';
 import { prefillFromJob } from '../lib/reusePrompt.ts';
 import { projectPath } from '../lib/routes.ts';
+import { useMidiArtifacts } from '../lib/useMidiArtifacts.ts';
 import { useScoreArtifacts } from '../lib/useScoreArtifacts.ts';
 import { useStudio } from '../lib/useStudio.ts';
 
@@ -33,6 +34,13 @@ export function CreateRoute() {
     outlives that. Clearing the queue should not empty the picker.
   */
   const scores = useScoreArtifacts(project?.id, allJobs);
+
+  /*
+    Transcriptions, for the other half of the score picker. A cover starts as a
+    transcription of a vocals stem, and the converting happens in the browser
+    from the notes this already carries, so nothing else is fetched for it.
+  */
+  const { artifacts: transcriptions } = useMidiArtifacts(project?.id, allJobs);
 
   /*
     The form can be seeded from a take that already exists, which the address
@@ -125,6 +133,7 @@ export function CreateRoute() {
         jobs={jobs}
         assets={assets}
         scores={scores}
+        transcriptions={transcriptions}
         catalog={catalog}
         catalogLoading={catalogLoading}
         prefill={prefill}

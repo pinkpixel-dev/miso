@@ -961,6 +961,41 @@ workbench, which lands on an onset by design.
 About 24x realtime. There is no length ceiling: the 80 s file transcribed out
 to 74.6 s, and the shorter spans above are simply where the last note fell.
 
+### A known melody survives the whole path
+
+Measured on 2026-09-20, after the note-to-ABC converter was written. The point of this one is
+ground truth: most transcription checks compare a result against a judgement, and this compares
+it against a tune that is known in advance.
+
+The source was a YuE2 take generated from a hand-written Twinkle Twinkle score, confirmed by
+listening to sing that melody. It went back through Miso: HTDemucs separation, MuScriptor on the
+vocals stem, then the converter.
+
+```
+source      48 kHz stereo take, 39.7 s, sings Twinkle Twinkle
+separated   4 stems at 44.1 kHz, vocals stem taken
+transcribed 41 notes over 37.05 s, pitch range 60 to 69
+```
+
+The melodic contour came back exactly right, three times, which is how many times the song sings
+the phrase:
+
+```
+expected   60 67 69 67 65 64 62 60
+recovered  60 67 69 67 65 64 62 60   x3
+```
+
+Tempo was read as 98 against the 100 written in the source score, and the key as C, which is
+correct. So pitch and key survive a real separation and a real transcription, and the tempo
+lands within a couple of beats.
+
+**Rhythm is the part that does not survive cleanly.** The output carries ties and one-sixteenth
+slivers where MuScriptor reported a single sung note as two, as in `A7GG7F-`. It is valid ABC
+and it holds the right notes in the right order. Merging a sliver into the note beside it is the
+obvious tidy-up and is deliberately not done, because the same rule would collapse a genuine
+repeated note, which is the bug that ate half of Twinkle Twinkle while the converter was being
+written. See DOCS/MEMORY.md.
+
 ### The instrument labels are not reliable
 
 An isolated drum stem came back as 76 `acoustic_guitar` notes and no drums.

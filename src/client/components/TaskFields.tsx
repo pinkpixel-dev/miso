@@ -1,4 +1,4 @@
-import type { ScoreArtifact, TaskField } from '../../shared/types.ts';
+import type { MidiArtifact, ScoreArtifact, TaskField } from '../../shared/types.ts';
 import { LyricsEditor } from './LyricsEditor.tsx';
 import { ScoreField } from './ScoreField.tsx';
 import { Field, SegmentedControl, TextArea } from './ui.tsx';
@@ -17,6 +17,7 @@ export function PlainField({
   onChange,
   placeholder = 'cinematic synth pop with clear vocals',
   scores = [],
+  transcriptions = [],
 }: {
   field: TaskField;
   value: string;
@@ -32,6 +33,12 @@ export function PlainField({
    * planned anything yet should see.
    */
   scores?: ScoreArtifact[];
+  /**
+   * Transcriptions already in this project, which a `score` field offers as a
+   * melody after converting them. Empty everywhere but the create column, the
+   * same as `scores`.
+   */
+  transcriptions?: MidiArtifact[];
 }) {
   if (field.kind === 'number') {
     return (
@@ -66,7 +73,15 @@ export function PlainField({
   }
 
   if (field.kind === 'score') {
-    return <ScoreField field={field} value={value} onChange={onChange} scores={scores} />;
+    return (
+      <ScoreField
+        field={field}
+        value={value}
+        onChange={onChange}
+        scores={scores}
+        transcriptions={transcriptions}
+      />
+    );
   }
 
   if (field.kind === 'lyrics') {
