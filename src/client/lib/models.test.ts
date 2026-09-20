@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Catalog, CatalogPackage, StudioTask } from '../../shared/types.ts';
-import { buildLabel, installedPackages } from './models.ts';
+import { buildLabel, firstRunSuggestion, installedPackages } from './models.ts';
 
 function pkg(id: string, patch: Partial<CatalogPackage> = {}): CatalogPackage {
   return {
@@ -91,5 +91,95 @@ describe('buildLabel', () => {
 
   it('keeps the whole label rather than leaving nothing behind', () => {
     expect(buildLabel(pkg('x', { label: 'ACE-Step 1.5' }), 'ACE-Step 1.5')).toBe('ACE-Step 1.5');
+  });
+});
+
+/** A catalog of music families, which is what the first run question is about. */
+function musicCatalog(
+  families: { id: string; packages: CatalogPackage[]; tasks?: string[] }[],
+  live: Catalog['live'] = 'ready',
+): Catalog {
+  return {
+    families: families.map((entry) => ({
+      id: entry.id,
+      family: entry.id,
+      displayName: entry.id.toUpperCase(),
+      summary: '',
+      tasks: entry.tasks ?? ['music'],
+      languages: [],
+      packages: entry.packages,
+    })),
+    live,
+    specVersion: 'test',
+    backendUrl: 'http://localhost:8080',
+  };
+}
+
+describe('what to download first', () => {
+  const uninstalled = (id: string, recommended: boolean) =>
+    pkg(id, { installed: false, recommended });
+
+  it('suggests the recommended ACE-Step package when nothing is installed', () => {
+    const catalog = musicCatalog([
+      { id: 'ace_step', packages: [uninstalled('ace_a', false), uninstalled('ace_b', true)] },
+    ]);
+
+    expect(firstRunSuggestion(catalog)?.pkg.id).toBe('ace_b');
+  });
+
+  it('prefers ACE-Step over the other families that can make music', () => {
+    const catalog = musicCatalog([
+      { id: 'minimax_music3', packages: [uninstalled('mini', true)] },
+      { id: 'ace_step', packages: [uninstalled('ace', true)] },
+    ]);
+
+    expect(firstRunSuggestion(catalog)?.pkg.id).toBe('ace');
+  });
+
+  it('falls back to another music family when ACE-Step is not in the catalog', () => {
+    const catalog = musicCatalog([{ id: 'minimax_music3', packages: [uninstalled('mini', true)] }]);
+
+    expect(firstRunSuggestion(catalog)?.pkg.id).toBe('mini');
+  });
+
+  it('suggests nothing once anything can make music', () => {
+    const catalog = musicCatalog([
+      { id: 'ace_step', packages: [uninstalled('ace', true)] },
+      { id: 'minimax_music3', packages: [pkg('mini', { installed: true })] },
+    ]);
+
+    expect(firstRunSuggestion(catalog)).toBeUndefined();
+  });
+
+  it('ignores a family that cannot make music', () => {
+    // Separation and voice models are installed the same way and are not an
+    // answer to "I cannot generate anything yet".
+    const catalog = musicCatalog([
+      { id: 'htdemucs', tasks: ['separate'], packages: [pkg('demucs', { installed: true })] },
+      { id: 'ace_step', packages: [uninstalled('ace', true)] },
+    ]);
+
+    expect(firstRunSuggestion(catalog)?.pkg.id).toBe('ace');
+  });
+
+  it('says nothing while the backend is still scanning', () => {
+    // A half-read catalog reports everything as absent. Telling somebody with a
+    // full model directory to download a model is worse than saying nothing.
+    const catalog = musicCatalog([{ id: 'ace_step', packages: [uninstalled('ace', true)] }], 'scanning');
+
+    expect(firstRunSuggestion(catalog)).toBeUndefined();
+  });
+
+  it('says nothing when the backend cannot be reached', () => {
+    const catalog = musicCatalog(
+      [{ id: 'ace_step', packages: [uninstalled('ace', true)] }],
+      'unavailable',
+    );
+
+    expect(firstRunSuggestion(catalog)).toBeUndefined();
+  });
+
+  it('says nothing before the catalog has loaded at all', () => {
+    expect(firstRunSuggestion(undefined)).toBeUndefined();
   });
 });

@@ -8,6 +8,7 @@ import { useCompareDeck } from '../components/player/useCompareDeck.ts';
 import { IconButton, Panel } from '../components/ui.tsx';
 import { loadLibraryAsset } from '../lib/libraryAsset.ts';
 import { taskLabels } from '../lib/librarySearch.ts';
+import { useShortcut } from '../lib/shortcuts.ts';
 import { useLibrary } from '../lib/useLibrary.ts';
 import { usePlayer } from '../lib/usePlayer.ts';
 
@@ -28,24 +29,10 @@ import { usePlayer } from '../lib/usePlayer.ts';
  * way in, because three audible takes is nobody's intention.
  */
 
-/** The key that flips, when focus is not in a field. */
-const FLIP_KEY = 'f';
-
 function formatTime(seconds: number | undefined): string {
   if (seconds === undefined || !Number.isFinite(seconds)) return '--:--';
   const whole = Math.max(0, Math.round(seconds));
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
-}
-
-/** Whether a keypress belongs to whatever the person is typing in. */
-function isTyping(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    target.tagName === 'INPUT' ||
-    target.tagName === 'TEXTAREA' ||
-    target.tagName === 'SELECT'
-  );
 }
 
 export function CompareRoute() {
@@ -136,21 +123,9 @@ export function CompareRoute() {
     setParams(next, { replace: true });
   }, [chosenA, chosenB, setParams]);
 
-  const flip = deck.flip;
-  useEffect(() => {
-    if (!deck.comparable) return;
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key.toLowerCase() !== FLIP_KEY) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (isTyping(event.target)) return;
-      event.preventDefault();
-      flip();
-    }
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [deck.comparable, flip]);
+  // The key itself, and every rule about when it must not fire, live in the
+  // shortcuts table so the help dialog and this page cannot disagree.
+  useShortcut('flipCompare', deck.flip, deck.comparable);
 
   const audibleAsset = deck.audible === 'a' ? assetA : assetB;
   const bothPicked = chosenA !== undefined && chosenB !== undefined;

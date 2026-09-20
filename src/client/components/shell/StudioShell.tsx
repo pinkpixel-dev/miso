@@ -1,8 +1,12 @@
 import * as RadixTooltip from '@radix-ui/react-tooltip';
 import { Outlet, useLocation } from 'react-router-dom';
+import { useCallback, useState } from 'react';
 import { wantsFullWidth } from '../../lib/routes.ts';
 import { useBackendStatus } from '../../lib/useBackendStatus.ts';
+import { usePlayer } from '../../lib/usePlayer.ts';
+import { useShortcut } from '../../lib/shortcuts.ts';
 import { BackendBanner } from '../BackendBanner.tsx';
+import { ShortcutsDialog } from '../ShortcutsDialog.tsx';
 import { PlayerDock } from '../player/PlayerDock.tsx';
 import { PlayerProvider } from '../player/PlayerProvider.tsx';
 import { cx } from '../ui.tsx';
@@ -50,6 +54,22 @@ function ShellFrame() {
   const { status, checking, recheck } = useBackendStatus();
 
   /*
+    The two shortcuts that belong to the frame rather than to a screen. They
+    live here because the dock and the rail outlive the router outlet, so
+    playback keeps its key while the middle column changes.
+
+    Generate is not here. It belongs to whichever panel is holding a prompt,
+    because there is nothing to generate from the frame alone.
+  */
+  const { toggle } = usePlayer();
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  useShortcut('playPause', toggle);
+  useShortcut(
+    'help',
+    useCallback(() => setShowShortcuts((open) => !open), []),
+  );
+
+  /*
     Some routes take the width the takes column would have had. A project page
     or a remix page carries its own list of takes, so keeping the column would
     put the same list on screen twice. Models and Settings are app level, and a
@@ -87,6 +107,8 @@ function ShellFrame() {
       </div>
 
       <PlayerDock />
+
+      <ShortcutsDialog open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   );
 }

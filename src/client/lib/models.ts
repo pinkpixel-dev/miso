@@ -30,6 +30,47 @@ export function installedPackages(catalog: Catalog | undefined, task: StudioTask
 }
 
 /**
+ * The family a first download should be, named rather than derived.
+ *
+ * Four families can make music and any of them would work. ACE-Step is the one
+ * Miso is built around: it carries the lyrics path and every remix route, so it
+ * is the package that makes the most of the application actually usable. If the
+ * catalog ever stops carrying it, the rule below falls back to any music family
+ * with a recommendation rather than suggesting nothing.
+ */
+const FIRST_FAMILY = 'ace_step';
+
+/**
+ * What to download first, or nothing when that question does not apply.
+ *
+ * Returns a package only when Miso genuinely cannot make music yet. Three cases
+ * give nothing back, and they are different from each other:
+ *
+ * A catalog that has not finished scanning is not an empty catalog, and neither
+ * is one from a backend that cannot be reached. Both would otherwise tell
+ * somebody with a full model directory to download a model they already have.
+ *
+ * A single installed music package is enough. The answer to "what do I do now"
+ * stops being "download something" the moment anything can generate.
+ */
+export function firstRunSuggestion(
+  catalog: Catalog | undefined,
+): { pkg: CatalogPackage; familyLabel: string } | undefined {
+  if (!catalog || catalog.live !== 'ready') return undefined;
+
+  const musical = catalog.families.filter((family) => family.tasks.includes('music'));
+  if (musical.some((family) => family.packages.some((pkg) => pkg.installed))) return undefined;
+
+  const preferred = musical.find((family) => family.id === FIRST_FAMILY);
+  for (const family of preferred ? [preferred, ...musical] : musical) {
+    const pkg = family.packages.find((entry) => entry.recommended);
+    if (pkg) return { pkg, familyLabel: family.displayName };
+  }
+
+  return undefined;
+}
+
+/**
  * A package label with the model name taken off the front.
  *
  * Every option sits under a heading naming its model, so the full catalog name

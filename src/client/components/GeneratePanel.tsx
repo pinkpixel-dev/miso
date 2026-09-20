@@ -11,6 +11,7 @@ import type {
 } from '../../shared/types.ts';
 import { api } from '../lib/api.ts';
 import { buildLabel, installedPackages } from '../lib/models.ts';
+import { useShortcut } from '../lib/shortcuts.ts';
 import type { Mode, Prefill, Values } from '../lib/reusePrompt.ts';
 import { EMPTY_STUDIO, compile, supportsGuided, wantsLyrics } from '../lib/studio.ts';
 import { estimateSeconds } from '../lib/useJobs.ts';
@@ -336,6 +337,16 @@ export function GeneratePanel({
     // one word and run it again. Only the queue tells them it worked.
     if (ok) return;
   };
+
+  /*
+    The one shortcut that fires while you are typing, which is the point of it.
+    A prompt is written in a textarea and the next thing you want is to run it,
+    without reaching for the mouse or tabbing past every card to the button.
+
+    Guarded by exactly what disables the button, so the key can never queue a
+    job the button would have refused.
+  */
+  useShortcut('generate', () => void submit(), !missing && chosenModel !== undefined && !submitting);
 
   return (
     <div className="flex flex-col gap-4">
