@@ -2,7 +2,11 @@
   <img src="logo.png" alt="Miso logo" width="300">
 </p>
 
-# Miso
+
+
+<p align="center">
+  <img src="cover.png" alt="Miso" width="100%">
+</p>
 
 A local music generation and remix studio. You bring a prompt or a song, and Miso gives you
 a real workspace for generating, remixing, splitting, and finishing music with models that
