@@ -2,9 +2,8 @@
 /**
  * The landing hero.
  *
- * Deliberately not the stock splash layout, which centres everything in a
- * full-height column. This is a two column split with the text on a left axis,
- * a real screenshot on the right, and a strip of plain facts under both. The
+ * A full-width cover leads into the introduction, with the project screenshot
+ * below it and a strip of plain facts at the end. The
  * actions still come from the page's `hero.actions` frontmatter, so the
  * content stays in the Markdown where it belongs.
  */
@@ -15,7 +14,7 @@ import shot from '../assets/screenshots/screenshot1.png';
  * `entry` is absent on Starlight's built-in 404 route, which renders with no
  * content entry at all. Everything below is read through optionals for that
  * reason, and a page with no hero frontmatter renders nothing rather than an
- * empty two column grid.
+ * empty layout.
  */
 const entry = Astro.locals.starlightRoute?.entry;
 const hero = entry?.data.hero;
@@ -24,6 +23,15 @@ const { title = entry?.data.title ?? '', tagline, actions = [] } = hero ?? {};
 
 {hero && (
 <div class="hero">
+  <img
+    class="cover"
+    src="/cover.png"
+    alt="Miso: local music creation, remixing, and stem control"
+    width="1672"
+    height="941"
+    loading="eager"
+    fetchpriority="high"
+  />
   <div class="lede">
     <h1 class="hero-title" set:html={title} />
     {tagline && <p class="tagline" set:html={tagline} />}
@@ -47,7 +55,7 @@ const { title = entry?.data.title ?? '', tagline, actions = [] } = hero ?? {};
   </div>
 
   <div class="shot">
-    <Image src={shot} alt="The Miso project page, showing a song list, waveform and job queue" loading="eager" />
+    <Image src={shot} alt="The Miso project page, showing a song list, waveform and job queue" loading="lazy" />
   </div>
 </div>
 )}
@@ -64,6 +72,7 @@ const { title = entry?.data.title ?? '', tagline, actions = [] } = hero ?? {};
 <style>
   .hero {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2.5rem;
     align-items: center;
     padding-block: 1rem 2rem;
@@ -154,11 +163,9 @@ const { title = entry?.data.title ?? '', tagline, actions = [] } = hero ?? {};
     color: var(--sl-color-white);
   }
 
-  .shot {
-    display: none;
-  }
-
+  .cover,
   .shot img {
+    display: block;
     width: 100%;
     height: auto;
     border: 1px solid var(--sl-color-hairline-light);
@@ -209,13 +216,8 @@ const { title = entry?.data.title ?? '', tagline, actions = [] } = hero ?? {};
 
   @media (min-width: 72rem) {
     .hero {
-      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
       gap: 3.5rem;
       padding-block: 2rem 3rem;
-    }
-
-    .shot {
-      display: block;
     }
   }
 </style>
