@@ -27,7 +27,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "typescript": "^6.0.3",
-    "wrangler": "^4.135.0"
+    "wrangler": "^4.147.0"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
