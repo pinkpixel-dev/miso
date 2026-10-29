@@ -38,7 +38,7 @@
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.0.0",
     "tsx": "^4.23.13",
-    "undici": "^8.10.2",
+    "undici": "^8.12.2",
     "wavesurfer.js": "^7.12.12",
     "yazl": "^3.3.1"
   },
